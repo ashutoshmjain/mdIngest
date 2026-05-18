@@ -1,0 +1,14 @@
+[book]
+authors = ["ashutosh"]
+language = "en"
+multilingual = false
+src = "src"
+title = "GoogleDocs-to-mdbook Extension Development"
+
+[preprocessor.ingest]
+command = "mdbook-ingest"
+downloads_path = "/mnt/c/Users/ashut/Downloads"
+scripts_path = "./scripts"
+
+[preprocessor.katex]
+# standard mdbook-katex configuration

@@ -1,0 +1,12 @@
+# Ignore mdbook output
+book/
+
+# Ignore Gemini temporary files
+.gemini/
+
+# Ignore Zone.Identifier files
+*:Zone.Identifier
+
+# Added by cargo
+
+/target
