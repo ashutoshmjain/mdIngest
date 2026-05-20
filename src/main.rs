@@ -124,27 +124,39 @@ fn run_doctor() -> Result<()> {
 }
 
 fn ingest_text(number: &str, source: &str) -> Result<()> {
-    println!("Ingesting text for episode {}...", number);
+    println!("Ingesting text for episode {} from {}...", number, source);
     
-    let pattern = format!("{}/*.md", source);
-    let mut files: Vec<PathBuf> = glob(&pattern)?
-        .filter_map(Result::ok)
+    // Find the latest .md or .zip file
+    let md_pattern = format!("{}/*.md", source);
+    let zip_pattern = format!("{}/*.zip", source);
+    
+    let mut md_files: Vec<PathBuf> = glob(&md_pattern)?.filter_map(Result::ok)
         .filter(|p| {
             let filename = p.file_name().unwrap().to_str().unwrap();
             !["SUMMARY.md", "cover.md", "README.md"].contains(&filename)
-        })
-        .collect();
+        }).collect();
+        
+    let mut zip_files: Vec<PathBuf> = glob(&zip_pattern)?.filter_map(Result::ok).collect();
+    
+    let mut all_files = Vec::new();
+    all_files.append(&mut md_files);
+    all_files.append(&mut zip_files);
 
-    files.sort_by(|a, b| {
+    all_files.sort_by(|a, b| {
         let metadata_a = std::fs::metadata(a).unwrap();
         let metadata_b = std::fs::metadata(b).unwrap();
         metadata_b.modified().unwrap().cmp(&metadata_a.modified().unwrap())
     });
 
-    let latest_file = files.first().context(format!("No .md files found in {}", source))?;
+    let latest_file = all_files.first().context(format!("No .md or .zip files found in {}", source))?;
     println!("Found export: {:?}", latest_file);
 
-    let content = std::fs::read_to_string(latest_file)?;
+    let content = if latest_file.extension().unwrap() == "zip" {
+        extract_html_from_zip(latest_file)?
+    } else {
+        std::fs::read_to_string(latest_file)?
+    };
+
     let processed = sanitizer::process_content(content, number);
 
     let dest_path = format!("src/{}.md", number);
@@ -154,6 +166,32 @@ fn ingest_text(number: &str, source: &str) -> Result<()> {
     update_summary(number, &dest_path)?;
     
     Ok(())
+}
+
+fn extract_html_from_zip(zip_path: &PathBuf) -> Result<String> {
+    let file = std::fs::File::open(zip_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+    
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        if file.name().ends_with(".html") {
+            let mut html_content = String::new();
+            use std::io::Read;
+            file.read_to_string(&mut html_content)?;
+            
+            // Google Docs HTML has equations in title attributes of images
+            // We use scraper to extract these or just use a simple regex for now since we just need the text
+            // html2md does a decent job, but we might lose equations if they are in titles.
+            // Let's preprocess the HTML to pull title attributes out of equation images.
+            let eq_regex = regex::Regex::new(r#"<img[^>]*class="[^"]*Math[^"]*"[^>]*title="([^"]*)"[^>]*>"#).unwrap();
+            let preprocessed_html = eq_regex.replace_all(&html_content, |caps: &regex::Captures| {
+                format!(" ${}$ ", caps.get(1).unwrap().as_str())
+            }).to_string();
+
+            return Ok(html2md::parse_html(&preprocessed_html));
+        }
+    }
+    anyhow::bail!("No HTML file found in ZIP archive")
 }
 
 fn update_summary(number: &str, file_path: &str) -> Result<()> {

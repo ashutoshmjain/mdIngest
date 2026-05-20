@@ -1,30 +1,5 @@
 use regex::Regex;
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
-
-static KATEX_MAP: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
-    let mut m = HashMap::new();
-    m.insert("![][image1]", r"$10^{500}$");
-    m.insert("![][image2]", r"$\mathbb{O}$");
-    m.insert("![][image3]", r"$\mathbb{H}$");
-    m.insert("![][image4]", r"$\mathbb{C}$");
-    m.insert("![][image5]", r"$\mathbb{R}$");
-    m.insert("![][image7]", r"$(SU(3) \times SU(2) \times U(1))$");
-    m.insert("![][image8]", r"$\mathbb{O}$");
-    m.insert("![][image9]", r"$SL(2, \mathbb{C})$");
-    m.insert("![][image10]", r"$SO(3,1)$");
-    m.insert("![][image11]", r"$10^{120}$");
-    m.insert("![][image12]", r"$T_{\mu\nu} l^\mu l^\nu = 0$");
-    m.insert("![][image13]", r"$T_{\mu\nu} l^\mu l^\nu \neq 0$");
-    m.insert("![][image14]", r"$z$");
-    m.insert("![][image15]", r"$\bar{z}$");
-    m.insert("![][image16]", r"**Associativity, Commutativity, and Strict Linear Order.**");
-    m.insert("![][image17]", r"$a > b$");
-    m.insert("![][image18]", r"$a < b$");
-    m.insert("![][image19]", r"$1$");
-    m.insert("![][image20]", r"$0$");
-    m
-});
 
 pub fn process_content(mut content: String, ep_num: &str) -> String {
     // 0. Strip orphaned base64 images early to prevent interference with diagram wrapping
@@ -44,6 +19,10 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     content = content.replace('\u{0332}', "");
     let control_chars = Regex::new(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]").unwrap();
     content = control_chars.replace_all(&content, "").to_string();
+
+    // 2.1 Strip Gemini markdown code block artifacts from direct downloads
+    let gemini_artifacts = Regex::new(r"(?m)^```(text)?\s*$").unwrap();
+    content = gemini_artifacts.replace_all(&content, "").to_string();
     
     // 3. Convert ASCII Tables to Markdown Tables (DO THIS BEFORE DIAGRAMS)
     content = convert_ascii_tables(content);
@@ -54,6 +33,13 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     // 5. Backslash cleanup (Surgical - only common GDocs escapes)
     let backslash_cleanup = Regex::new(r"\\([_.\-+!|>\[\]=])").unwrap();
     content = backslash_cleanup.replace_all(&content, "$1").to_string();
+
+    // 5.1 Convert Gemini Pure LaTeX prompt hack back to standard KaTeX
+    let block_math_hack = Regex::new(r"\[\[\[math:\s*(.*?)\s*\]\]\]").unwrap();
+    content = block_math_hack.replace_all(&content, "$$ $1 $$").to_string();
+    
+    let inline_math_hack = Regex::new(r"\[\[math:\s*(.*?)\s*\]\]").unwrap();
+    content = inline_math_hack.replace_all(&content, "$$$1$$").to_string();
 
     // 6. Preserve Math Blocks
     let math_block_regex = Regex::new(r"(?s)\$\$.*?\$\$").unwrap();
@@ -81,22 +67,10 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     temp_content = temp_content.replace("  ", " ");
     temp_content = temp_content.replace("$", r"\$");
 
-    // 9. Apply KaTeX placeholders
-    temp_content = temp_content.replace("![][image6]", "");
-    for (placeholder, symbol) in KATEX_MAP.iter() {
-        let escaped_placeholder = regex::escape(placeholder);
-        let re = Regex::new(&format!(r"{}(.)?", escaped_placeholder)).unwrap();
-        temp_content = re.replace_all(&temp_content, |caps: &regex::Captures| {
-            let next_char = caps.get(1).map(|m| m.as_str()).unwrap_or("");
-            if !next_char.is_empty() && next_char.chars().next().unwrap().is_alphanumeric() {
-                format!("{} {}", symbol, next_char)
-            } else {
-                format!("{}{}", symbol, next_char)
-            }
-        }).to_string();
-    }
-    
-    temp_content = temp_content.replace("  ", " ");
+    // 9. Clean any remaining image tags if they exist (though orphaned ones were stripped at the top)
+    // If the user used equation editor, they will be stripped here.
+    let image_tag_regex = Regex::new(r"!\[\]\[image\d+\]").unwrap();
+    temp_content = image_tag_regex.replace_all(&temp_content, "").to_string();
 
     // 10. Restore Math Blocks
     for (idx, block) in math_blocks.iter().enumerate() {
@@ -119,6 +93,7 @@ fn wrap_ascii_diagrams(content: String) -> String {
         if t.starts_with("v ") || t.starts_with("| ") { return true; }
         if t.contains("===>") || t.contains("<===") { return true; }
         if t.starts_with('[') && t.contains(']') && !t.contains("](") { return true; }
+        if t.starts_with("**<---") || t.starts_with("--->**") { return true; }
         if t.starts_with("**") && (t.ends_with("v**") || t.ends_with("|**")) { return true; }
         false
     };
