@@ -24,6 +24,10 @@ struct Cli {
     /// Source directory for exports
     #[arg(short, long, default_value = "/mnt/c/Users/ashut/Downloads")]
     source: String,
+
+    /// Title override
+    #[arg(short, long)]
+    title: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -67,7 +71,7 @@ fn main() -> Result<()> {
     // 3. Handle Ingestion
     if cli.text {
         if let Some(number) = cli.number {
-            ingest_text(&number, &cli.source)?;
+            ingest_text(&number, &cli.source, cli.title.as_deref())?;
         } else {
             anyhow::bail!("Error: Episode number (-n, --number) is required.");
         }
@@ -123,12 +127,13 @@ fn run_doctor() -> Result<()> {
     Ok(())
 }
 
-fn ingest_text(number: &str, source: &str) -> Result<()> {
+fn ingest_text(number: &str, source: &str, title: Option<&str>) -> Result<()> {
     println!("Ingesting text for episode {} from {}...", number, source);
     
-    // Find the latest .md or .zip file
+    // Find the latest .md, .zip, or .rs file
     let md_pattern = format!("{}/*.md", source);
     let zip_pattern = format!("{}/*.zip", source);
+    let rs_pattern = format!("{}/*.rs", source);
     
     let mut md_files: Vec<PathBuf> = glob(&md_pattern)?.filter_map(Result::ok)
         .filter(|p| {
@@ -137,10 +142,12 @@ fn ingest_text(number: &str, source: &str) -> Result<()> {
         }).collect();
         
     let mut zip_files: Vec<PathBuf> = glob(&zip_pattern)?.filter_map(Result::ok).collect();
+    let mut rs_files: Vec<PathBuf> = glob(&rs_pattern)?.filter_map(Result::ok).collect();
     
     let mut all_files = Vec::new();
     all_files.append(&mut md_files);
     all_files.append(&mut zip_files);
+    all_files.append(&mut rs_files);
 
     all_files.sort_by(|a, b| {
         let metadata_a = std::fs::metadata(a).unwrap();
@@ -148,7 +155,7 @@ fn ingest_text(number: &str, source: &str) -> Result<()> {
         metadata_b.modified().unwrap().cmp(&metadata_a.modified().unwrap())
     });
 
-    let latest_file = all_files.first().context(format!("No .md or .zip files found in {}", source))?;
+    let latest_file = all_files.first().context(format!("No .md, .zip, or .rs files found in {}", source))?;
     println!("Found export: {:?}", latest_file);
 
     let content = if latest_file.extension().unwrap() == "zip" {
@@ -157,7 +164,7 @@ fn ingest_text(number: &str, source: &str) -> Result<()> {
         std::fs::read_to_string(latest_file)?
     };
 
-    let processed = sanitizer::process_content(content, number);
+    let processed = sanitizer::process_content(content, number, title);
 
     let dest_path = format!("src/{}.md", number);
     std::fs::write(&dest_path, processed)?;

@@ -1,18 +1,54 @@
 use regex::Regex;
 use std::collections::HashMap;
+use html_escape::decode_html_entities;
 
-pub fn process_content(mut content: String, ep_num: &str) -> String {
-    // 0. Strip orphaned base64 images early to prevent interference with diagram wrapping
+pub fn process_content(mut content: String, ep_num: &str, title_override: Option<&str>) -> String {
+    // 0. Decode HTML Entities early
+    content = decode_html_entities(&content).to_string();
+
+    // 0.1 Strip Rust raw string artifacts and Gemini markdown markers
+    if content.starts_with("r#\"") {
+        content = content[3..].to_string();
+    }
+    if content.ends_with("\"#") {
+        content = content[..content.len()-2].to_string();
+    }
+    // Also handle possible trailing newline
+    if content.ends_with("\"#\n") {
+        content = content[..content.len()-3].to_string();
+    }
+    let gemini_artifacts = Regex::new(r"(?m)^```(text|markdown)?\s*$").unwrap();
+    content = gemini_artifacts.replace_all(&content, "").to_string();
+
+    // 0.2 Strip orphaned base64 images early to prevent interference with diagram wrapping
     let image_def_regex = Regex::new(r"(?m)^\[image\d+\]: <data:image/.*?>\s*$").unwrap();
     content = image_def_regex.replace_all(&content, "").to_string();
 
-    // 1. Title Sync
+    // 1. Title Sync - Handle "XXX : Title" format and enforce 5-word limit
     let h1_regex = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
-    if let Some(caps) = h1_regex.captures(&content) {
+    
+    let display_title = if let Some(t) = title_override {
+        t.to_string()
+    } else if let Some(caps) = h1_regex.captures(&content) {
         let raw_title = caps.get(1).unwrap().as_str().trim();
         let clean_title = raw_title.trim_matches('*').trim();
-        let new_h1 = format!("# {} : {}", ep_num, clean_title);
+        
+        // Enforce 5-word limit as per GEMINI.md standards
+        let words: Vec<&str> = clean_title.split_whitespace().collect();
+        if words.len() > 5 {
+            words[..5].join(" ")
+        } else {
+            clean_title.to_string()
+        }
+    } else {
+        "Untitled".to_string()
+    };
+    
+    let new_h1 = format!("# {} : {}", ep_num, display_title);
+    if h1_regex.is_match(&content) {
         content = h1_regex.replace(&content, new_h1.as_str()).to_string();
+    } else {
+        content = format!("{}\n\n{}", new_h1, content);
     }
 
     // 2. Invisible Character Sanitization
@@ -20,10 +56,6 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     let control_chars = Regex::new(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]").unwrap();
     content = control_chars.replace_all(&content, "").to_string();
 
-    // 2.1 Strip Gemini markdown code block artifacts from direct downloads
-    let gemini_artifacts = Regex::new(r"(?m)^```(text)?\s*$").unwrap();
-    content = gemini_artifacts.replace_all(&content, "").to_string();
-    
     // 3. Convert ASCII Tables to Markdown Tables (DO THIS BEFORE DIAGRAMS)
     content = convert_ascii_tables(content);
 
@@ -33,13 +65,6 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     // 5. Backslash cleanup (Surgical - only common GDocs escapes)
     let backslash_cleanup = Regex::new(r"\\([_.\-+!|>\[\]=])").unwrap();
     content = backslash_cleanup.replace_all(&content, "$1").to_string();
-
-    // 5.1 Convert Gemini Pure LaTeX prompt hack back to standard KaTeX
-    let block_math_hack = Regex::new(r"\[\[\[math:\s*(.*?)\s*\]\]\]").unwrap();
-    content = block_math_hack.replace_all(&content, "$$ $1 $$").to_string();
-    
-    let inline_math_hack = Regex::new(r"\[\[math:\s*(.*?)\s*\]\]").unwrap();
-    content = inline_math_hack.replace_all(&content, "$$$1$$").to_string();
 
     // 6. Preserve Math Blocks
     let math_block_regex = Regex::new(r"(?s)\$\$.*?\$\$").unwrap();
@@ -67,8 +92,7 @@ pub fn process_content(mut content: String, ep_num: &str) -> String {
     temp_content = temp_content.replace("  ", " ");
     temp_content = temp_content.replace("$", r"\$");
 
-    // 9. Clean any remaining image tags if they exist (though orphaned ones were stripped at the top)
-    // If the user used equation editor, they will be stripped here.
+    // 9. Clean any remaining image tags if they exist
     let image_tag_regex = Regex::new(r"!\[\]\[image\d+\]").unwrap();
     temp_content = image_tag_regex.replace_all(&temp_content, "").to_string();
 
@@ -92,7 +116,12 @@ fn wrap_ascii_diagrams(content: String) -> String {
         if t == "v" || t == "|" || t == "^" { return true; }
         if t.starts_with("v ") || t.starts_with("| ") { return true; }
         if t.contains("===>") || t.contains("<===") { return true; }
-        if t.starts_with('[') && t.contains(']') && !t.contains("](") { return true; }
+        if t.starts_with('[') && t.contains(']') && !t.contains("](") { 
+            // Check if it looks like a citation [1] or [23]
+            let citation_regex = Regex::new(r"^\[\d+\]").unwrap();
+            if citation_regex.is_match(t) { return false; }
+            return true; 
+        }
         if t.starts_with("**<---") || t.starts_with("--->**") { return true; }
         if t.starts_with("**") && (t.ends_with("v**") || t.ends_with("|**")) { return true; }
         false
@@ -108,8 +137,6 @@ fn wrap_ascii_diagrams(content: String) -> String {
                 if is_diag_line(lines[j]) {
                     last_diag_idx = j;
                 } else if !t.is_empty() {
-                    // It's a non-empty, non-diag line.
-                    // Keep it in the block only if it's indented and sandwiched between diag lines
                     let is_indented = lines[j].starts_with("  ");
                     let mut next_is_diag = false;
                     for k in 1..=3 {
@@ -154,107 +181,114 @@ fn wrap_ascii_diagrams(content: String) -> String {
 }
 
 fn fix_footnotes(content: String) -> String {
-    let parts: Vec<&str> = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*").unwrap().split(&content).collect();
+    let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
+    let parts: Vec<&str> = header_regex.split(&content).collect();
     if parts.len() < 2 { return content; }
 
     let body = parts[0];
     let refs_raw = parts[1];
     let header = "#### **Works cited**";
 
-    let mut ref_list = Vec::new();
-    let mut ref_map = HashMap::new();
-    let entry_regex = Regex::new(r"^\s*(?:\[?\^?(\d+)\]?[:.]?)\s*(.*)").unwrap();
+    // Ported from Python fix_241_footnotes.py
+    let ref_pattern = Regex::new(r"(?m)^\*?\s*(\*\*\[?(\d+)\]?\*\*|\*\*\*\*|\[(\d+)\])\s*").unwrap();
     
-    let mut current_entry = String::new();
-    let mut entries = Vec::new();
-
-    for line in refs_raw.lines() {
-        if Regex::new(r"^(\d+\.\s+|\[\^\d+\]:\s+)").unwrap().is_match(line) {
-            if !current_entry.is_empty() { entries.push(current_entry.clone()); }
-            current_entry = line.to_string();
-        } else if !current_entry.is_empty() {
-            current_entry.push('\n');
-            current_entry.push_str(line);
-        }
+    let mut ref_entries = Vec::new();
+    let matches: Vec<_> = ref_pattern.find_iter(refs_raw).collect();
+    
+    for (i, m) in matches.iter().enumerate() {
+        let caps = ref_pattern.captures(m.as_str()).unwrap();
+        let old_num = caps.get(2).map(|n| n.as_str().to_string())
+            .or_else(|| caps.get(3).map(|n| n.as_str().to_string()));
+        
+        let start = m.end();
+        let end = if i + 1 < matches.len() {
+            matches[i+1].start()
+        } else {
+            refs_raw.len()
+        };
+        
+        let text = refs_raw[start..end].trim().to_string();
+        ref_entries.push(RefEntry { old_num, text, processed: false });
     }
-    if !current_entry.is_empty() { entries.push(current_entry); }
+
+    if ref_entries.is_empty() { return content; }
+
+    let marker_pattern = Regex::new(r"\[(\d+(?:\s*,\s*\d+)*)\]").unwrap();
+    let mut unique_old_nums = Vec::new();
     
-    for entry in entries {
-        if let Some(caps) = entry_regex.captures(&entry) {
-            let num = caps.get(1).unwrap().as_str().to_string();
-            let text = caps.get(2).unwrap().as_str().trim().to_string();
-            if !ref_map.contains_key(&num) {
-                ref_map.insert(num.clone(), text.clone());
-                ref_list.push((num, text));
+    for caps in marker_pattern.captures_iter(body) {
+        let nums_str = caps.get(1).unwrap().as_str();
+        for n in nums_str.split(',') {
+            let n_trimmed = n.trim().to_string();
+            if !unique_old_nums.contains(&n_trimmed) {
+                unique_old_nums.push(n_trimmed);
             }
         }
     }
 
-    if ref_map.is_empty() { return content; }
-
-    let marker_regex = Regex::new(r"([.,;'\x22)\]])(\d+(?:[\s,]+\d+)*)(.)?").unwrap();
-    let mut body_with_markers = String::new();
-    let mut last_end = 0;
-
-    for caps in marker_regex.captures_iter(body) {
-        let full_match = caps.get(0).unwrap();
-        let punct = caps.get(1).unwrap().as_str();
-        let nums_str = caps.get(2).unwrap().as_str();
-        let next_char = caps.get(3).map(|m| m.as_str()).unwrap_or("");
-
-        if !next_char.is_empty() && (next_char.chars().next().unwrap().is_ascii_digit() || next_char == ".") {
-            continue;
-        }
-
-        body_with_markers.push_str(&body[last_end..full_match.start()]);
-        let markers: Vec<String> = nums_str.split(|c: char| c.is_whitespace() || c == ',').filter(|s| !s.is_empty()).map(|s| format!("[^{}]", s)).collect();
-        body_with_markers.push_str(punct);
-        body_with_markers.push_str(&markers.join(""));
-        body_with_markers.push_str(next_char);
-        last_end = full_match.end();
-    }
-    body_with_markers.push_str(&body[last_end..]);
-
-    let used_marker_regex = Regex::new(r"\[\^(\d+)\]").unwrap();
-    let mut unique_used = Vec::new();
-    for caps in used_marker_regex.captures_iter(&body_with_markers) {
-        let m = caps.get(1).unwrap().as_str().to_string();
-        if !unique_used.contains(&m) { unique_used.push(m); }
-    }
-
-    if unique_used.is_empty() { return body.to_string() + "\n\n" + header + "\n" + refs_raw; }
-
-    let mut final_map = HashMap::new();
-    let mut final_refs = Vec::new();
-    let mut available_defs: Vec<String> = ref_list.iter().map(|(_, t)| t.clone()).collect();
-
-    for (i, old_num) in unique_used.iter().enumerate() {
-        let new_num = (i + 1).to_string();
-        let text = if let Some(t) = ref_map.get(old_num) {
-            let t_clone = t.clone();
-            available_defs.retain(|x| x != &t_clone);
-            t_clone
-        } else if i < available_defs.len() {
-            available_defs.remove(0)
+    let mut old_to_new = HashMap::new();
+    let mut new_refs = Vec::new();
+    let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
+    
+    for old_num in unique_old_nums {
+        if let Some(ref_entry) = ref_entries.iter_mut().find(|r| r.old_num.as_ref() == Some(&old_num) && !r.processed) {
+            let new_num = (new_refs.len() + 1).to_string();
+            old_to_new.insert(old_num, new_num);
+            
+            let processed_text = url_regex.replace_all(&ref_entry.text, |caps: &regex::Captures| {
+                let url = caps.get(1).unwrap().as_str();
+                format!("[{}]({})", url, url)
+            }).to_string();
+            
+            new_refs.push(processed_text);
+            ref_entry.processed = true;
+        } else if let Some(unprocessed_star) = ref_entries.iter_mut().find(|r| r.old_num.is_none() && !r.processed) {
+            let new_num = (new_refs.len() + 1).to_string();
+            old_to_new.insert(old_num, new_num);
+            
+            let processed_text = url_regex.replace_all(&unprocessed_star.text, |caps: &regex::Captures| {
+                let url = caps.get(1).unwrap().as_str();
+                format!("[{}]({})", url, url)
+            }).to_string();
+            
+            new_refs.push(processed_text);
+            unprocessed_star.processed = true;
         } else {
-            "Missing citation".to_string()
-        };
-        final_map.insert(old_num.clone(), (new_num.clone(), text.clone()));
-        final_refs.push((new_num, text));
+            let new_num = (new_refs.len() + 1).to_string();
+            old_to_new.insert(old_num.clone(), new_num);
+            new_refs.push(format!("Missing citation for index {}", old_num));
+        }
     }
 
-    let final_body = used_marker_regex.replace_all(&body_with_markers, |caps: &regex::Captures| {
-        let old_num = caps.get(1).unwrap().as_str();
-        format!("[^{}]", final_map.get(old_num).map(|(n, _)| n).unwrap_or(&old_num.to_string()))
+    // Final body construction
+    let final_body = marker_pattern.replace_all(body, |caps: &regex::Captures| {
+        let nums_str = caps.get(1).unwrap().as_str();
+        let new_markers: Vec<String> = nums_str.split(',')
+            .map(|n| {
+                let n_trimmed = n.trim();
+                format!("[^{}]", old_to_new.get(n_trimmed).unwrap_or(&n_trimmed.to_string()))
+            }).collect();
+        new_markers.join(" ") // Add space between adjacent footnotes
     });
 
     let mut result = final_body.to_string();
     result.push_str("\n\n");
     result.push_str(header);
-    result.push('\n');
-    for (num, text) in final_refs { result.push_str(&format!("[^{}]: {}\n", num, text)); }
-    for (i, text) in available_defs.iter().enumerate() { result.push_str(&format!("{}. {}\n", unique_used.len() + i + 1, text)); }
+    result.push_str("\n\n");
+    
+    // Only include footnotes that were actually cited in the body
+    for (i, text) in new_refs.iter().enumerate() {
+        result.push_str(&format!("[^{}]: {}\n\n", i + 1, text)); // Add blank line between definitions
+    }
     result
+}
+
+// Update the loop above this to NOT add remaining references
+
+struct RefEntry {
+    old_num: Option<String>,
+    text: String,
+    processed: bool,
 }
 
 fn convert_ascii_tables(content: String) -> String {
