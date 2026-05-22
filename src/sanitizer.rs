@@ -1,12 +1,30 @@
+//! # Sanitizer Module (Gemini-to-mdbook)
+//! 
+//! This module provides the core transformation logic for converting 
+//! "shielded" Gemini Pro outputs into production-ready mdbook content.
+//! 
+//! It is specifically designed to handle the constraints of the **Master Prompt**, 
+//! including the removal of Rust-style raw string literals (`r#" ... "#`) and 
+//! the enforcement of research-tier formatting.
+
 use regex::Regex;
 use std::collections::HashMap;
 use html_escape::decode_html_entities;
 
-pub fn process_content(mut content: String, ep_num: &str, title_override: Option<&str>) -> String {
+/// The primary entry point for the Gemini-to-mdbook transformation.
+/// 
+/// This function executes a multi-stage sanitization pipeline:
+/// 1. Decodes HTML entities (to handle web-pasted content).
+/// 2. **Shield Stripping**: Removes the `r#"` and `"#` wrappers and Gemini backticks.
+/// 3. Title Sync: Enforces a word limit for H1 headers.
+/// 4. Unicode Sanitization: Strips invisible control characters and hidden artifacts.
+/// 5. Structural Wrapping: Detects ASCII tables/diagrams and applies correct Markdown formatting.
+/// 6. Footnote Hardening: Re-indexes and formats bibliography sections for KaTeX compatibility.
+pub fn process_content(mut content: String, ep_num: &str, title_override: Option<&str>, word_limit: usize) -> String {
     // 0. Decode HTML Entities early
     content = decode_html_entities(&content).to_string();
 
-    // 0.1 Strip Rust raw string artifacts and Gemini markdown markers
+    // 0.1 Strip Rust raw string artifacts and Gemini markdown markers (The "Shield")
     if content.starts_with("r#\"") {
         content = content[3..].to_string();
     }
@@ -17,14 +35,14 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     if content.ends_with("\"#\n") {
         content = content[..content.len()-3].to_string();
     }
-    let gemini_artifacts = Regex::new(r"(?m)^```(text|markdown)?\s*$").unwrap();
+    let gemini_artifacts = Regex::new(r"(?m)^```(text|markdown|rust)?\s*$").unwrap();
     content = gemini_artifacts.replace_all(&content, "").to_string();
 
     // 0.2 Strip orphaned base64 images early to prevent interference with diagram wrapping
     let image_def_regex = Regex::new(r"(?m)^\[image\d+\]: <data:image/.*?>\s*$").unwrap();
     content = image_def_regex.replace_all(&content, "").to_string();
 
-    // 1. Title Sync - Handle "XXX : Title" format and enforce 5-word limit
+    // 1. Title Sync - Handle "XXX : Title" format and enforce word limit
     let h1_regex = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
     
     let display_title = if let Some(t) = title_override {
@@ -33,10 +51,10 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
         let raw_title = caps.get(1).unwrap().as_str().trim();
         let clean_title = raw_title.trim_matches('*').trim();
         
-        // Enforce 5-word limit as per GEMINI.md standards
+        // Enforce word limit based on config
         let words: Vec<&str> = clean_title.split_whitespace().collect();
-        if words.len() > 5 {
-            words[..5].join(" ")
+        if words.len() > word_limit {
+            words[..word_limit].join(" ")
         } else {
             clean_title.to_string()
         }
@@ -62,7 +80,7 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     // 4. Wrap ASCII Diagrams in code blocks
     content = wrap_ascii_diagrams(content);
 
-    // 5. Backslash cleanup (Surgical - only common GDocs escapes)
+    // 5. Backslash cleanup (Surgical - only common AI escapes)
     let backslash_cleanup = Regex::new(r"\\([_.\-+!|>\[\]=])").unwrap();
     content = backslash_cleanup.replace_all(&content, "$1").to_string();
 
@@ -105,6 +123,10 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     temp_content.trim().to_string()
 }
 
+/// Identifies and wraps ASCII-based diagrams in code blocks.
+/// 
+/// Logic detects common diagram markers like `===>`, `|`, and `v` while 
+/// ignoring standard citations or Markdown lists.
 fn wrap_ascii_diagrams(content: String) -> String {
     let mut result = String::new();
     let lines: Vec<&str> = content.lines().collect();
@@ -117,7 +139,6 @@ fn wrap_ascii_diagrams(content: String) -> String {
         if t.starts_with("v ") || t.starts_with("| ") { return true; }
         if t.contains("===>") || t.contains("<===") { return true; }
         if t.starts_with('[') && t.contains(']') && !t.contains("](") { 
-            // Check if it looks like a citation [1] or [23]
             let citation_regex = Regex::new(r"^\[\d+\]").unwrap();
             if citation_regex.is_match(t) { return false; }
             return true; 
@@ -180,6 +201,13 @@ fn wrap_ascii_diagrams(content: String) -> String {
     result
 }
 
+/// Standardizes and re-indexes footnotes.
+/// 
+/// This function:
+/// - Extracts the "Works cited" or "References" section.
+/// - Re-numbers inline citations `[n]` to `[^n]`.
+/// - Re-numbers the reference list sequentially.
+/// - Ensures URLs are properly hyperlinked in the bibliography.
 fn fix_footnotes(content: String) -> String {
     let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
     let parts: Vec<&str> = header_regex.split(&content).collect();
@@ -189,7 +217,6 @@ fn fix_footnotes(content: String) -> String {
     let refs_raw = parts[1];
     let header = "#### **Works cited**";
 
-    // Ported from Python fix_241_footnotes.py
     let ref_pattern = Regex::new(r"(?m)^\*?\s*(\*\*\[?(\d+)\]?\*\*|\*\*\*\*|\[(\d+)\])\s*").unwrap();
     
     let mut ref_entries = Vec::new();
@@ -260,7 +287,6 @@ fn fix_footnotes(content: String) -> String {
         }
     }
 
-    // Final body construction
     let final_body = marker_pattern.replace_all(body, |caps: &regex::Captures| {
         let nums_str = caps.get(1).unwrap().as_str();
         let new_markers: Vec<String> = nums_str.split(',')
@@ -268,7 +294,7 @@ fn fix_footnotes(content: String) -> String {
                 let n_trimmed = n.trim();
                 format!("[^{}]", old_to_new.get(n_trimmed).unwrap_or(&n_trimmed.to_string()))
             }).collect();
-        new_markers.join(" ") // Add space between adjacent footnotes
+        new_markers.join(" ") 
     });
 
     let mut result = final_body.to_string();
@@ -276,14 +302,11 @@ fn fix_footnotes(content: String) -> String {
     result.push_str(header);
     result.push_str("\n\n");
     
-    // Only include footnotes that were actually cited in the body
     for (i, text) in new_refs.iter().enumerate() {
-        result.push_str(&format!("[^{}]: {}\n\n", i + 1, text)); // Add blank line between definitions
+        result.push_str(&format!("[^{}]: {}\n\n", i + 1, text));
     }
     result
 }
-
-// Update the loop above this to NOT add remaining references
 
 struct RefEntry {
     old_num: Option<String>,
@@ -291,6 +314,7 @@ struct RefEntry {
     processed: bool,
 }
 
+/// Identifies and converts ASCII grid tables to standard Markdown tables.
 fn convert_ascii_tables(content: String) -> String {
     let mut result = String::new();
     let mut lines = content.lines().peekable();
