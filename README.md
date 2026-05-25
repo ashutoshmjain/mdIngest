@@ -1,8 +1,18 @@
 # mdbook-ingest preprocessor (The Ingestion Layer)
 
-**mdbook-ingest** is a professional Rust-based preprocessor for `mdbook`. Its specific role is the "Ingestion Layer"—transforming raw AI-generated research into production-ready `mdbook` assets.
+**mdbook-ingest** is a professional Rust-based preprocessor designed to solve the "last-mile friction" of modern research publishing. 
 
-While the current implementation is optimized for **Google Gemini Pro** (via a specific "Master Prompt"), the architecture is designed to be LLM-agnostic.
+### 🧬 The Problem: The Ingestion Gap
+In an era of agentic research, moving high-fidelity output from an LLM (like Gemini Pro) into a production-ready `mdbook` is surprisingly difficult. Dense mathematics, non-associative algebraic notations, and complex KaTeX blocks often break during the transition. Furthermore, the manual overhead of sanitizing "shielded" code blocks, re-indexing non-sequential footnotes, and injecting multimedia widgets turns a creative flow into a repetitive structural chore.
+
+### ⚡ The Solution: The Automated Ingestion Bridge
+This tool acts as the automated bridge between raw AI-generated research and a polished, multimedia `mdbook` presentation. It autonomously handles the heavy lifting of:
+- **KaTeX Hardening:** Ensuring complex math blocks survive the parser without escaping errors.
+- **Structural Sanitization:** Stripping invisible Unicode artifacts and enforcing semantic title limits.
+- **Reference Reconciliation:** Aggregating duplicate citations and flagging hallucinations.
+- **Media Enrichment:** Injecting cover art, social snippets, and monetization widgets (Sats/Lightning) in a single pass.
+
+While the current implementation is optimized for **Google Gemini Pro** (via a specific "Master Prompt"), the architecture is designed to be LLM-agnostic, serving as the foundational ingestion layer for any agentic research-to-publish workflow.
 
 ## 🤖 The Agentic Vision: From Research to Global Syndication
 
