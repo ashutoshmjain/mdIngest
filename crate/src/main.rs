@@ -131,12 +131,12 @@ fn main() -> Result<()> {
     if let Some(config_path) = &config.downloads_path {
         if cli.source == "/mnt/c/Users/ashut/Downloads" {
             source = config_path.clone();
-            println!("📂 Using source from book.toml: {}", source);
+            eprintln!("📂 Using source from book.toml: {}", source);
         } else {
-            println!("💡 Overriding book.toml source with CLI flag: {}", source);
+            eprintln!("💡 Overriding book.toml source with CLI flag: {}", source);
         }
     } else if cli.source != "/mnt/c/Users/ashut/Downloads" {
-        println!("📂 Using source from CLI flag: {}", source);
+        eprintln!("📂 Using source from CLI flag: {}", source);
     }
 
     // 3. Handle Ingestion
@@ -153,10 +153,12 @@ fn main() -> Result<()> {
             anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
         }
     } else if cli.number.is_some() {
-        println!("ℹ️  Please specify asset type (e.g., --text or --image)");
+        eprintln!("ℹ️  Please specify asset type (e.g., --text or --image)");
     } else {
+        // Standard mdbook preprocessor handshake
         let (_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())?;
-        serde_json::to_writer(std::io::stdout(), &book)?;
+        let json = serde_json::to_string(&book)?;
+        print!("{}", json);
     }
 
     Ok(())
@@ -181,24 +183,24 @@ fn check_dependencies() -> Result<()> {
 
 /// Performs a diagnostic check of the local environment and book configuration.
 fn run_doctor() -> Result<()> {
-    println!("🔍 Checking environment...");
+    eprintln!("🔍 Checking environment...");
 
     match Command::new("mdbook").arg("--version").output() {
-        Ok(out) => println!("✅ mdbook: {}", String::from_utf8_lossy(&out.stdout).trim()),
-        Err(_) => println!("❌ mdbook: Not found"),
+        Ok(out) => eprintln!("✅ mdbook: {}", String::from_utf8_lossy(&out.stdout).trim()),
+        Err(_) => eprintln!("❌ mdbook: Not found"),
     }
 
     match Command::new("mdbook-katex").arg("--version").output() {
-        Ok(out) => println!("✅ mdbook-katex: {}", String::from_utf8_lossy(&out.stdout).trim()),
-        Err(_) => println!("❌ mdbook-katex: Not found (Install with 'cargo install mdbook-katex')"),
+        Ok(out) => eprintln!("✅ mdbook-katex: {}", String::from_utf8_lossy(&out.stdout).trim()),
+        Err(_) => eprintln!("❌ mdbook-katex: Not found (Install with 'cargo install mdbook-katex')"),
     }
 
     if std::path::Path::new("book.toml").exists() {
         if let Ok(toml) = std::fs::read_to_string("book.toml") {
             if toml.contains("preprocessor.ingest") {
-                println!("✅ book.toml: Ingestion configured");
+                eprintln!("✅ book.toml: Ingestion configured");
             } else {
-                println!("⚠️  book.toml: [preprocessor.ingest] section missing");
+                eprintln!("⚠️  book.toml: [preprocessor.ingest] section missing");
             }
         }
     }
@@ -208,7 +210,7 @@ fn run_doctor() -> Result<()> {
 
 /// Orchestrates the ingestion of text-based research assets.
 fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestConfig) -> Result<()> {
-    println!("📖 Ingesting text for episode {}...", number);
+    eprintln!("📖 Ingesting text for episode {}...", number);
     
     // Find the latest .md, .zip, or .rs file
     let md_pattern = format!("{}/*.md", source);
@@ -236,7 +238,7 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
     });
 
     let latest_file = all_files.first().context(format!("❌ No .md, .zip, or .rs files found in {}", source))?;
-    println!("📄 Found export: {:?}", latest_file.file_name().unwrap());
+    eprintln!("📄 Found export: {:?}", latest_file.file_name().unwrap());
 
     let content = if latest_file.extension().unwrap() == "zip" {
         extract_html_from_zip(latest_file)?
@@ -248,7 +250,7 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
 
     let dest_path = format!("src/{}.md", number);
     std::fs::write(&dest_path, processed)?;
-    println!("✅ Saved text to: {}", dest_path);
+    eprintln!("✅ Saved text to: {}", dest_path);
 
     update_summary(number, &dest_path)?;
     
@@ -280,7 +282,7 @@ fn extract_html_from_zip(zip_path: &PathBuf) -> Result<String> {
 
 /// Orchestrates the ingestion of image assets and social widgets.
 fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()> {
-    println!("🖼️  Ingesting image for episode {}...", number);
+    eprintln!("🖼️  Ingesting image for episode {}...", number);
     
     // 1. Find the latest image
     let img_extensions = ["png", "jpg", "jpeg", "webp"];
@@ -303,7 +305,7 @@ fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()>
 
     let latest_img = all_images.first().context(format!("❌ No image files found in {}", source))?;
     let ext = latest_img.extension().unwrap().to_str().unwrap();
-    println!("📸 Found image: {:?}", latest_img.file_name().unwrap());
+    eprintln!("📸 Found image: {:?}", latest_img.file_name().unwrap());
 
     // 2. Prepare destination
     let img_dir = "src/img";
@@ -312,7 +314,7 @@ fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()>
     
     // Move/Copy image
     std::fs::copy(latest_img, &dest_path)?;
-    println!("✅ Saved image to: {}", dest_path);
+    eprintln!("✅ Saved image to: {}", dest_path);
 
     // 3. Update the Markdown file
     let md_path = format!("src/{}.md", number);
@@ -378,12 +380,12 @@ To send Sats, you'll need a [lightning wallet](https://lightningaddress.com/).
             }
             
             std::fs::write(&md_path, lines.join("\n"))?;
-            println!("✅ Updated Markdown with cover and snippets.");
+            eprintln!("✅ Updated Markdown with cover and snippets.");
             
             update_summary(number, &md_path)?;
         }
     } else {
-        println!("⚠️  Markdown file {} not found. Snippets not injected.", md_path);
+        eprintln!("⚠️  Markdown file {} not found. Snippets not injected.", md_path);
     }
 
     Ok(())
@@ -419,7 +421,7 @@ fn update_summary(number: &str, file_path: &str) -> Result<()> {
         let new_recent_content = format!("\n{}\n", entries.join("\n"));
         summary_content.replace_range(insert_pos..end_idx, &new_recent_content);
         std::fs::write(summary_path, summary_content)?;
-        println!("📑 Updated SUMMARY.md");
+        eprintln!("📑 Updated SUMMARY.md");
     }
 
     Ok(())
