@@ -20,6 +20,7 @@ use clap::{Parser, Subcommand};
 use std::process::Command;
 use anyhow::{Result, Context};
 use glob::glob;
+use regex::Regex;
 use std::path::PathBuf;
 use serde::Deserialize;
 
@@ -182,13 +183,18 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     let vid_dir = "src/vid";
     std::fs::create_dir_all(vid_dir)?;
 
+    let epi_regex = Regex::new(r"^\d{3}-").unwrap();
+
     let pattern = format!("{}/*{}*.mp4", source, number);
     if let Ok(paths) = glob(&pattern) {
         for path in paths.filter_map(Result::ok) {
             let filename = path.file_name().unwrap().to_str().unwrap();
-            let dest = format!("{}/{}", vid_dir, filename);
-            std::fs::copy(&path, &dest)?;
-            eprintln!("✅ Migrated: {}", filename);
+            // Strictly enforce ###- pattern for migration
+            if epi_regex.is_match(filename) {
+                let dest = format!("{}/{}", vid_dir, filename);
+                std::fs::copy(&path, &dest)?;
+                eprintln!("✅ Migrated: {}", filename);
+            }
         }
     }
 
@@ -196,7 +202,11 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     let mut all_vids = Vec::new();
     if let Ok(paths) = glob(&format!("{}/*.mp4", vid_dir)) {
         for path in paths.filter_map(Result::ok) {
-            all_vids.push(path);
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            // Strictly enforce ###- pattern for the carousel
+            if epi_regex.is_match(filename) {
+                all_vids.push(path);
+            }
         }
     }
 
@@ -210,7 +220,7 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     // 3. Generate HTML Cinematic Scroll Strip
     let mut html = String::new();
     html.push_str("\n<!-- VIDEO_STRIP_START -->\n");
-    html.push_str("\n---\n\n### Cinematic Scroll Strip\n\n");
+    html.push_str("\n---\n\n### Info Graphics feed from Mosaic.SO\n\n");
     
     // Global Script and Styles
     html.push_str(r#"<style>

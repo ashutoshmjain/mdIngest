@@ -10,7 +10,8 @@ Whenever a manual "surgical" fix is required to deliver an episode, you must tre
 3.  **Retest:** Rerun the ingestion tool on the original source asset to verify that the tool now handles the case autonomously.
 4.  **Validate Build:** Run `mdbook build` to ensure the changes didn't break the rendering.
 
-## **Architectural Standards**
+## **Operational Standards**
+- **Repository Isolation:** Autonomous cross-repository activities are strictly prohibited. Actions involving other repositories (e.g., `deepDive`) must be explicitly initiated by the user.
 - **Surgical Processing:** The tool must remain a lean CLI utility.
 - **The Master Key:** Use the Episode Number (`--number XXX`) as the primary key for all file renaming and indexing.
 - **SUMMARY.md Sync:** The tool is responsible for maintaining the `# Recent ..` section.
