@@ -28,6 +28,30 @@ Currently, the tool supports a streamlined transition from Gemini Pro research t
 1.  **Draft:** Generate a report in Gemini Pro using the **Master Prompt**.
 2.  **Ingest Text:** Run `mdbook-ingest --text --number XXX`. The tool strips the "Shield" and sanitizes the content.
 3.  **Ingest Image:** Run `mdbook-ingest --image --number XXX`. The tool migrates cover art and injects social/monetization widgets.
+4.  **Ingest Video:** Run `mdbook-ingest --video --number XXX`. The tool migrates matching infographics and builds the global carousel.
+
+---
+
+## 🔑 The Master Key: Numbering Logic
+
+The architecture relies on the **Episode Number** (the "Master Key") to maintain strict repository integrity. The tool enforces the following naming conventions during ingestion:
+
+### 1. Episode Number (`--number XXX`)
+- Must be a unique identifier for the research paper.
+- Used to target the correct Markdown file and rename all associated assets.
+
+### 2. Markdown Documents
+- **Destination:** `src/XXX.md`
+- The tool automatically generates this file and synchronizes the title in `src/SUMMARY.md`.
+
+### 3. Image Assets (Cover Art)
+- **Destination:** `src/img/XXX.png`
+- The tool automatically identifies the latest image in your downloads folder and renames it strictly to the Episode Number.
+
+### 4. Video Assets (Infographics)
+- **Pattern:** `src/vid/XXX-description.mp4`
+- **Constraint:** Videos MUST start with exactly three digits followed by a dash (`###-`). 
+- The tool uses this strict regex (`^\d{3}-`) to distinguish between episodic content and general site assets. Only matching videos are included in the **Info Graphics feed from Mosaic.SO**.
 
 ---
 
