@@ -77,12 +77,36 @@ podcast_html = """
 
 ---
 
-## 🛠️ Installation & Usage
+## 🛠️ Prerequisites & Installation
+
+### 1. System Dependencies
+Before installing the preprocessor, ensure you have the following tools installed and available in your `PATH`:
+
+*   **Rust & Cargo:** [Install Rust](https://www.rust-lang.org/tools/install)
+*   **mdbook:** `cargo install mdbook`
+*   **mdbook-katex:** `cargo install mdbook-katex` (Required for math rendering validation)
+
+### 2. Build & Install
+```bash
+# Clone the repository
+git clone <repo-url>
+cd mdIngest
+
+# Build the binary
+cargo build --release
+
+# (Optional) Install to your cargo bin path
+cargo install --path .
+```
+
+## 🚀 Usage
 
 ```bash
-cargo build --release
-./target/release/mdbook-ingest --text --number 243
-./target/release/mdbook-ingest --image --number 243
+# Ingest text (strips shield, sanitizes markdown)
+./target/release/mdbook-ingest --text --number 240
+
+# Ingest media (migrates cover art, injects widgets)
+./target/release/mdbook-ingest --image --number 240
 ```
 
 ---
