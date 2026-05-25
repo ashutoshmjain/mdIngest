@@ -54,7 +54,14 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
         // Enforce word limit based on config
         let words: Vec<&str> = clean_title.split_whitespace().collect();
         if words.len() > word_limit {
-            words[..word_limit].join(" ")
+            let mut truncated = words[..word_limit].join(" ");
+            let stop_words = vec!["of", "the", "in", "and", "on", "a", "an", "with", "for", "to", "at", "by", "from"];
+            if let Some(last_word) = words[..word_limit].last() {
+                if stop_words.contains(&last_word.to_lowercase().as_str()) {
+                    truncated = words[..word_limit-1].join(" ");
+                }
+            }
+            truncated
         } else {
             clean_title.to_string()
         }
@@ -258,17 +265,27 @@ fn fix_footnotes(content: String) -> String {
     let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
     
     for old_num in unique_old_nums {
-        if let Some(ref_entry) = ref_entries.iter_mut().find(|r| r.old_num.as_ref() == Some(&old_num) && !r.processed) {
-            let new_num = (new_refs.len() + 1).to_string();
-            old_to_new.insert(old_num, new_num);
+        let mut aggregated_text = String::new();
+        let mut found = false;
+        
+        while let Some(ref_entry) = ref_entries.iter_mut().find(|r| r.old_num.as_ref() == Some(&old_num) && !r.processed) {
+            if found { aggregated_text.push_str(" | "); }
             
-            let processed_text = url_regex.replace_all(&ref_entry.text, |caps: &regex::Captures| {
+            let entry_text_clean = ref_entry.text.replace("`", "");
+            let processed_text = url_regex.replace_all(&entry_text_clean, |caps: &regex::Captures| {
                 let url = caps.get(1).unwrap().as_str();
                 format!("[{}]({})", url, url)
             }).to_string();
             
-            new_refs.push(processed_text);
+            aggregated_text.push_str(&processed_text);
             ref_entry.processed = true;
+            found = true;
+        }
+
+        if found {
+            let new_num = (new_refs.len() + 1).to_string();
+            old_to_new.insert(old_num, new_num);
+            new_refs.push(aggregated_text);
         } else if let Some(unprocessed_star) = ref_entries.iter_mut().find(|r| r.old_num.is_none() && !r.processed) {
             let new_num = (new_refs.len() + 1).to_string();
             old_to_new.insert(old_num, new_num);
@@ -283,17 +300,18 @@ fn fix_footnotes(content: String) -> String {
         } else {
             let new_num = (new_refs.len() + 1).to_string();
             old_to_new.insert(old_num.clone(), new_num);
-            new_refs.push(format!("Missing citation for index {}", old_num));
+            new_refs.push(format!("**TODO: Missing citation for index {}**", old_num));
         }
     }
 
     let final_body = marker_pattern.replace_all(body, |caps: &regex::Captures| {
         let nums_str = caps.get(1).unwrap().as_str();
-        let new_markers: Vec<String> = nums_str.split(',')
+        let mut new_markers: Vec<String> = nums_str.split(',')
             .map(|n| {
                 let n_trimmed = n.trim();
                 format!("[^{}]", old_to_new.get(n_trimmed).unwrap_or(&n_trimmed.to_string()))
             }).collect();
+        new_markers.dedup();
         new_markers.join(" ") 
     });
 

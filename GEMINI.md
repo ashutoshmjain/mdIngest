@@ -1,4 +1,4 @@
-# Project GEMINI: mdIngest (Ingestion Bridge)
+# Project GEMINI: mdIngest (mdbook-ingest preprocessor)
 
 ## **The Mission: Developer & Tester Role**
 In this repository, the Gemini CLI agent is not merely a user but the **Lead Developer and Automation Tester**. Your primary goal is to iteratively harden the `mdbook-ingest` tool through real-world "episode intakes."

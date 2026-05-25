@@ -1,8 +1,8 @@
-# mdbook-ingest (The Ingestion Layer)
+# mdbook-ingest preprocessor (The Ingestion Layer)
 
-**mdbook-ingest** is a modular component of an emerging **Agentic Research-to-Publish Workflow**. Its specific role is the "Ingestion Layer"—transforming raw AI-generated research into production-ready `mdbook` assets.
+**mdbook-ingest** is a professional Rust-based preprocessor for `mdbook`. Its specific role is the "Ingestion Layer"—transforming raw AI-generated research into production-ready `mdbook` assets.
 
-While the current implementation is optimized for **Google Gemini Pro** (via a specific "Master Prompt"), the architecture is designed to be LLM-agnostic, with future support planned for ChatGPT, Claude, and other research agents.
+While the current implementation is optimized for **Google Gemini Pro** (via a specific "Master Prompt"), the architecture is designed to be LLM-agnostic.
 
 ## 🤖 The Agentic Vision: From Research to Global Syndication
 
@@ -40,12 +40,15 @@ Please provide the final version of the report, delivered strictly according to 
 ## ✨ Features
 
 ### 📖 Modular Ingestion (`--text`)
-- **Shield Stripping:** Automatically handles "shielded" content blocks (currently supporting Gemini's Rust-style raw string literals).
+- **Shield Stripping:** Automatically handles "shielded" content blocks (Gemini's Rust-style raw string literals).
 - **Intelligent Sanitization:** 
-    - Enforces a 5-word limit for H1 titles.
-    - Strips invisible Unicode characters (`\u{0332}`, etc.).
-    - Wraps ASCII diagrams and tables in Markdown-compatible syntax.
-- **Footnote Hardening:** Re-numbers and formats bibliography sections for perfect KaTeX rendering.
+    - Enforces a word-limit for H1 titles (e.g., 5 words).
+    - **Smart Truncation:** Automatically avoids ending titles on prepositions or conjunctions.
+- **Footnote Hardening:** 
+    - **Aggregation:** Automatically combines multiple sources sharing the same index into a single, comprehensive footnote.
+    - **Validation:** Identifies and flags missing bibliography entries in the text.
+    - **Clickability:** Strips backticks from source URLs to ensure they render as clickable Markdown links.
+- **Unicode Sanitization:** Strips invisible control characters and hidden artifacts.
 
 ### 🖼️ Media & Socials (`--image`)
 - **Master Key Migration:** Moves images to `src/img/XXX.png` based on episode number.
