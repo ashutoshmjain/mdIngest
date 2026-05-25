@@ -34,15 +34,16 @@ Currently, the tool supports a streamlined transition from Gemini Pro research t
 
 ## 🔑 The Master Key: Numbering Logic
 
-The architecture relies on the **Episode Number** (the "Master Key") to maintain strict repository integrity. The tool enforces the following naming conventions during ingestion:
+The architecture relies on the **Episode Number** (interchangeable with **Chapter Number** from a book standpoint) as the "Master Key" to maintain strict repository integrity. The tool enforces the following naming conventions during ingestion:
 
 ### 1. Episode Number (`--number XXX`)
-- Must be a unique identifier for the research paper.
+- Must be a unique identifier for the research paper or chapter.
 - Used to target the correct Markdown file and rename all associated assets.
 
 ### 2. Markdown Documents
 - **Destination:** `src/XXX.md`
-- The tool automatically generates this file and synchronizes the title in `src/SUMMARY.md`.
+- The tool identifies the latest research export (Markdown or Rust raw string) in the `downloads_path` configured in `book.toml`.
+- It migrates this content to the destination, stripping AI wrappers, hardening KaTeX, and synchronizing the title in `src/SUMMARY.md`.
 
 ### 3. Image Assets (Cover Art)
 - **Destination:** `src/img/XXX.png`
