@@ -5,7 +5,7 @@
 # Recent ..
 
 <!-- RECENT_START -->
-- [240 : Rise of the Observer](240.md)
+- [233 : Rise of the Observer](233.md)
 <!-- RECENT_END -->
 
 # Thematic Categories

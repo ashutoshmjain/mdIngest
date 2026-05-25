@@ -73,6 +73,10 @@ struct Cli {
     #[arg(long)]
     image: bool,
 
+    /// Ingest as video (Cinematic Scroll Strip)
+    #[arg(long)]
+    video: bool,
+
     /// Episode number (the Master Key)
     #[arg(short, long)]
     number: Option<String>,
@@ -152,6 +156,12 @@ fn main() -> Result<()> {
         } else {
             anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
         }
+    } else if cli.video {
+        if let Some(number) = cli.number {
+            ingest_video(&number, &source, &config)?;
+        } else {
+            anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
+        }
     } else if cli.number.is_some() {
         eprintln!("ℹ️  Please specify asset type (e.g., --text or --image)");
     } else {
@@ -159,6 +169,181 @@ fn main() -> Result<()> {
         let (_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())?;
         let json = serde_json::to_string(&book)?;
         print!("{}", json);
+    }
+
+    Ok(())
+}
+
+/// Orchestrates the ingestion of video assets and generates the Cinematic Scroll Strip.
+fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()> {
+    eprintln!("🎬 Ingesting video for episode {}...", number);
+    
+    // 1. Discovery & Migration
+    let vid_dir = "src/vid";
+    std::fs::create_dir_all(vid_dir)?;
+
+    let pattern = format!("{}/*{}*.mp4", source, number);
+    if let Ok(paths) = glob(&pattern) {
+        for path in paths.filter_map(Result::ok) {
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            let dest = format!("{}/{}", vid_dir, filename);
+            std::fs::copy(&path, &dest)?;
+            eprintln!("✅ Migrated: {}", filename);
+        }
+    }
+
+    // 2. Build the Global Carousel List
+    let mut all_vids = Vec::new();
+    if let Ok(paths) = glob(&format!("{}/*.mp4", vid_dir)) {
+        for path in paths.filter_map(Result::ok) {
+            all_vids.push(path);
+        }
+    }
+
+    // Sort by episode number (descending)
+    all_vids.sort_by(|a, b| {
+        let name_a = a.file_name().unwrap().to_str().unwrap();
+        let name_b = b.file_name().unwrap().to_str().unwrap();
+        name_b.cmp(name_a)
+    });
+
+    // 3. Generate HTML Cinematic Scroll Strip
+    let mut html = String::new();
+    html.push_str("\n<!-- VIDEO_STRIP_START -->\n");
+    html.push_str("\n---\n\n### Cinematic Scroll Strip\n\n");
+    
+    // Global Script and Styles
+    html.push_str(r#"<style>
+  .video-carousel-container video { pointer-events: none; }
+  .vid-toggle { z-index: 100 !important; transition: transform 0.1s; }
+  .vid-toggle:active { transform: scale(0.9); }
+</style>
+<script>
+  window.oph_toggle = function(btn) {
+    const parent = btn.parentElement;
+    const vid = parent.querySelector('video');
+    const container = btn.closest('.video-carousel-container');
+    
+    if (vid.paused) {
+      container.querySelectorAll('video').forEach(v => {
+        v.pause();
+        v.muted = true;
+        const b = v.parentElement.querySelector('.vid-toggle');
+        if (b) b.innerText = '🔇';
+      });
+      vid.muted = false;
+      vid.play();
+      btn.innerText = '🔊';
+    } else {
+      vid.pause();
+      vid.muted = true;
+      btn.innerText = '🔇';
+    }
+  };
+</script>
+"#);
+
+    html.push_str("<div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\">\n");
+
+    let mut focus_id = None;
+
+    for (i, path) in all_vids.iter().enumerate() {
+        let filename = path.file_name().unwrap().to_str().unwrap();
+        let is_current = filename.starts_with(number);
+        let id = format!("vid-{}", i);
+        if is_current && focus_id.is_none() {
+            focus_id = Some(id.clone());
+        }
+
+        html.push_str(&format!(
+            r#"  <div id="{}" style="flex: 0 0 35%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;">
+    <video src="vid/{}" style="width: 100%; height: 85%; object-fit: contain; pointer-events: none;" playsinline loop preload="auto"></video>
+    <div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;">{}</div>
+    <button class="vid-toggle" onclick="oph_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; z-index: 100;">🔇</button>
+  </div>
+"#, id, filename, filename.replace(".mp4", "")));
+    }
+
+    html.push_str("</div>\n");
+
+    // Add Scroll-to-Focus and Init Script
+    html.push_str(r#"<script>
+  window.oph_toggle = function(btn) {
+    const parent = btn.parentElement;
+    const vid = parent.querySelector('video');
+    const container = btn.closest('.video-carousel-container');
+    
+    if (vid.paused) {
+      // 1. Stop and mute all others
+      container.querySelectorAll('video').forEach(v => {
+        if (v !== vid) {
+          v.pause();
+          v.muted = true;
+          const otherBtn = v.parentElement.querySelector('.vid-toggle');
+          if (otherBtn) otherBtn.innerText = '🔇';
+        }
+      });
+      
+      // 2. Play and unmute this one
+      vid.muted = false;
+      vid.volume = 1.0;
+      vid.play();
+      btn.innerText = '🔊';
+    } else {
+      vid.pause();
+      vid.muted = true;
+      btn.innerText = '🔇';
+    }
+  };
+
+  window.addEventListener('load', () => {
+    const container = document.querySelector('.video-carousel-container');
+    if (container) {
+      container.querySelectorAll('video').forEach(v => { 
+        v.muted = true; 
+        v.pause(); 
+      });
+    }
+"#);
+
+    if let Some(id) = focus_id {
+        html.push_str(&format!(
+            r#"    const el = document.getElementById('{}');
+    if (container && el) {{
+      const offset = el.offsetLeft - (container.offsetWidth / 2) + (el.offsetWidth / 2);
+      container.scrollTo({{ left: offset, behavior: 'smooth' }});
+    }}
+"#, id));
+    }
+    
+    html.push_str("  });\n</script>\n");
+    html.push_str("<!-- VIDEO_STRIP_END -->\n\n");
+
+    // 4. Inject into Markdown
+    let md_path = format!("src/{}.md", number);
+    if std::path::Path::new(&md_path).exists() {
+        let mut content = std::fs::read_to_string(&md_path)?;
+        
+        // Remove existing strip
+        let start_marker = "<!-- VIDEO_STRIP_START -->";
+        let end_marker = "<!-- VIDEO_STRIP_END -->";
+        if let (Some(s), Some(e)) = (content.find(start_marker), content.find(end_marker)) {
+            content.replace_range(s..e + end_marker.len(), "");
+        }
+
+        let wallet_marker = "### Tips and Donations";
+        let ref_regex = regex::Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
+        
+        if let Some(pos) = content.find(wallet_marker) {
+            content.insert_str(pos, &html);
+        } else if let Some(m) = ref_regex.find(&content) {
+            content.insert_str(m.start(), &html);
+        } else {
+            content.push_str(&html);
+        }
+
+        std::fs::write(&md_path, content)?;
+        eprintln!("✅ Injected Cinematic Scroll Strip into {}.md", number);
     }
 
     Ok(())
@@ -343,6 +528,7 @@ fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()>
             let lightning_address = config.lightning_address.as_deref().unwrap_or(default_lightning_address);
 
             let wallet_widget = format!(r##"
+<!-- WALLET_START -->
 ---
 
 ### Tips and Donations
@@ -360,26 +546,39 @@ If you enjoyed this deep dive, consider supporting the project with a tip in **S
 To send Sats, you'll need a [lightning wallet](https://lightningaddress.com/). 
 
 ---
+<!-- WALLET_END -->
 "##, lightning_address);
 
-            lines.insert(idx + 1, format!("{}\n{}", img_tag, podcast_links));
+            let mut content = std::fs::read_to_string(&md_path)?;
             
-            let ref_regex = regex::Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
-            let mut ref_idx = None;
-            for (i, line) in lines.iter().enumerate() {
-                if ref_regex.is_match(line) {
-                    ref_idx = Some(i);
-                    break;
+            // 3.1 Update Cover and Podcast Links
+            let h1_regex = regex::Regex::new(r"(?m)^#\s.*$").unwrap();
+            if let Some(m) = h1_regex.find(&content) {
+                let end = m.end();
+                // Clean existing cover/podcast
+                let pod_marker = "Fountain.fm</a></center>";
+                let mut search_area = &content[end..];
+                if let Some(pod_end) = search_area.find(pod_marker) {
+                    content.replace_range(end..end + pod_end + pod_marker.len(), "");
                 }
+                content.insert_str(end, &format!("\n{}\n{}", img_tag, podcast_links));
             }
 
-            if let Some(r_idx) = ref_idx {
-                lines.insert(r_idx, wallet_widget.to_string());
+            // 3.2 Update Wallet
+            let w_start = "<!-- WALLET_START -->";
+            let w_end = "<!-- WALLET_END -->";
+            if let (Some(s), Some(e)) = (content.find(w_start), content.find(w_end)) {
+                content.replace_range(s..e + w_end.len(), "");
+            }
+
+            let ref_regex = regex::Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
+            if let Some(m) = ref_regex.find(&content) {
+                content.insert_str(m.start(), &wallet_widget);
             } else {
-                lines.push(wallet_widget.to_string());
+                content.push_str(&wallet_widget);
             }
             
-            std::fs::write(&md_path, lines.join("\n"))?;
+            std::fs::write(&md_path, content)?;
             eprintln!("✅ Updated Markdown with cover and snippets.");
             
             update_summary(number, &md_path)?;
