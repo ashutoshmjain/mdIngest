@@ -20,13 +20,8 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install mdbook & Dependencies
-        run: |
-          cargo install mdbook
-          cargo install mdbook-katex
-
-      - name: Build & Install Ingest Preprocessor
-        run: cargo install --path .
+      - name: Install mdbook
+        run: cargo install mdbook
 
       - name: Build User Manual (mdbook)
         run: mdbook build
@@ -38,7 +33,7 @@ jobs:
         run: |
           # Move API docs into a subdirectory of the manual
           mv target/doc book/api
-          # Ensure .nojekyll is present at the root to allow underscores in filenames
+          # Ensure .nojekyll is present at the root
           touch book/.nojekyll
 
       - name: Deploy to GitHub Pages

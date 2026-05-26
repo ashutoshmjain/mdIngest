@@ -4,5 +4,5 @@ language = "en"
 src = "src"
 title = "mdbook-ingest: The Ingestion Layer"
 
-[preprocessor.katex]
-# standard mdbook-katex configuration
+
+# No preprocessors enabled for the manual build to ensure CI stability.
