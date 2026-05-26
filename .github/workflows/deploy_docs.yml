@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,10 +20,15 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install mdbook
+      - name: Install mdbook & Dependencies
         run: |
           cargo install mdbook
           cargo install mdbook-katex
+
+      - name: Build & Install Ingest Preprocessor
+        run: |
+          cd crate
+          cargo install --path .
 
       - name: Build mdbook
         run: mdbook build
