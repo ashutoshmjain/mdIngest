@@ -1,6 +1,6 @@
 # mdbook-ingest (The Ingestion Layer)
 
-**mdbook-ingest** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
+**mdbook-ingest** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
 
 ## 🧬 The Philosophy: The Opinionated Researcher
 To use this tool, the researcher must align their workflow with the **Ingestion Layer's** requirements. It automates the "last-mile" friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the **Master Ingestion Protocol**.
