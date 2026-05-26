@@ -33,13 +33,13 @@ The tool migrates cover art and injects social/monetization snippets.
     - Injects a **Lightning (Zap) Widget** at the end of the article.
 
 ### Phase 4: Visual Ingestion (`--video`)
-The tool builds a cinematic infographic carousel for the chapter.
+The tool builds a **global cinematic infographic feed** (carousel) and injects it into the chapter.
 - **Setup:** Save your Mosaic SO infographics to `src/vid/` following the naming convention `XXX-description.mp4`.
 - **Command:** `mdbook-ingest --video --number XXX`
 - **Actions:**
-    - Identifies all matching videos starting with `XXX-`.
-    - Generates a horizontal cinematic scroll strip with focus-auto-scroll.
-    - Injects the carousel into the Markdown file.
+    - Identifies matching videos starting with `XXX-` and migrates them.
+    - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
+    - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
 ---
 
