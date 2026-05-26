@@ -34,7 +34,7 @@ The tool migrates cover art and injects social/monetization snippets.
 
 ### Phase 4: Visual Ingestion (`--video`)
 The tool builds a **global cinematic infographic feed** (carousel) and injects it into the chapter.
-- **Setup:** Save your Mosaic SO infographics to `src/vid/` following the naming convention `XXX-description.mp4`.
+- **Setup:** Save your Mosaic SO infographics to your **downloads folder** following the naming convention `XXX-description.mp4`.
 - **Command:** `mdbook-ingest --video --number XXX`
 - **Actions:**
     - Identifies matching videos starting with `XXX-` and migrates them.

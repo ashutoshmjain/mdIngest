@@ -34,7 +34,7 @@ This document outlines the **4-Phase Research Process** for producing high-fidel
 
 ## Phase 4: Visual Ingestion (`--video`)
 1. **Infographics:** Generate infographics using Mosaic AI Video Editor.
-2. **Setup:** Place the resulting `.mp4` files in `src/vid/` following the strict naming convention: `XXX-description.mp4`.
+2. **Setup:** Save the resulting `.mp4` files to your **Downloads** folder following the strict naming convention: `XXX-description.mp4`.
 3. **Run Ingestion:** Execute the video ingestion command to rebuild the **global cinematic infographic feed** and inject it into the chapter with auto-focus logic.
    ```bash
    mdbook-ingest --video --number XXX
