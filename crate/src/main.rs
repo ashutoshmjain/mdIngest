@@ -319,41 +319,50 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     if let Some(id) = focus_id {
         html.push_str(&format!(
             r#"    const el = document.getElementById('{}');
-    if (container && el) {{
-      const offset = el.offsetLeft - (container.offsetWidth / 2) + (el.offsetWidth / 2);
-      container.scrollTo({{ left: offset, behavior: 'smooth' }});
-    }}
-"#, id));
+"#, "vid-focus-placeholder"));
     }
     
-    html.push_str("  });\n</script>\n");
+    html.push_str(r#"    if (container && el) {
+      const offset = el.offsetLeft - (container.offsetWidth / 2) + (el.offsetWidth / 2);
+      container.scrollTo({ left: offset, behavior: 'smooth' });
+    }
+  });
+</script>
+"#);
     html.push_str("<!-- VIDEO_STRIP_END -->\n\n");
 
-    // 4. Inject into Markdown
-    let md_path = format!("src/{}.md", number);
-    if std::path::Path::new(&md_path).exists() {
-        let mut content = std::fs::read_to_string(&md_path)?;
-        
-        // Remove existing strip
-        let start_marker = "<!-- VIDEO_STRIP_START -->";
-        let end_marker = "<!-- VIDEO_STRIP_END -->";
-        if let (Some(s), Some(e)) = (content.find(start_marker), content.find(end_marker)) {
-            content.replace_range(s..e + end_marker.len(), "");
-        }
+    // 4. Global Refresh: Inject into ALL Markdown files that have a strip marker
+    if let Ok(paths) = glob("src/*.md") {
+        for path in paths.filter_map(Result::ok) {
+            let mut content = std::fs::read_to_string(&path)?;
+            
+            if content.contains("<!-- VIDEO_STRIP_START -->") {
+                let current_file_num = path.file_stem().unwrap().to_str().unwrap();
+                
+                // 4.1 Update the Focus for THIS specific file
+                let mut local_html = html.clone();
+                
+                // Find the first video ID for this episode number
+                let mut local_focus_id = String::from("vid-0");
+                for (i, p) in all_vids.iter().enumerate() {
+                    if p.file_name().unwrap().to_str().unwrap().starts_with(current_file_num) {
+                        local_focus_id = format!("vid-{}", i);
+                        break;
+                    }
+                }
+                local_html = local_html.replace("'vid-focus-placeholder'", &format!("'{}'", local_focus_id));
 
-        let wallet_marker = "### Tips and Donations";
-        let ref_regex = regex::Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
-        
-        if let Some(pos) = content.find(wallet_marker) {
-            content.insert_str(pos, &html);
-        } else if let Some(m) = ref_regex.find(&content) {
-            content.insert_str(m.start(), &html);
-        } else {
-            content.push_str(&html);
-        }
+                // 4.2 Replace the existing strip
+                let start_marker = "<!-- VIDEO_STRIP_START -->";
+                let end_marker = "<!-- VIDEO_STRIP_END -->";
+                if let (Some(s), Some(e)) = (content.find(start_marker), content.find(end_marker)) {
+                    content.replace_range(s..e + end_marker.len(), &local_html);
+                }
 
-        std::fs::write(&md_path, content)?;
-        eprintln!("✅ Injected Cinematic Scroll Strip into {}.md", number);
+                std::fs::write(&path, content)?;
+                eprintln!("✅ Synchronized Global Strip in {}", path.display());
+            }
+        }
     }
 
     Ok(())
