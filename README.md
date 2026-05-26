@@ -1,64 +1,50 @@
-# mdbook-ingest preprocessor (The Ingestion Layer)
+# mdbook-ingest (The Ingestion Layer)
 
-**mdbook-ingest** is a professional Rust-based preprocessor designed to solve the "last-mile friction" of modern research publishing. 
+**mdbook-ingest** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
 
-### 🧬 The Problem: The Ingestion Gap
-In an era of agentic research, moving high-fidelity output from an LLM (like Gemini Pro) into a production-ready `mdbook` is surprisingly difficult. Dense mathematics, non-associative algebraic notations, and complex KaTeX blocks often break during the transition. Furthermore, the manual overhead of sanitizing "shielded" code blocks, re-indexing non-sequential footnotes, and injecting multimedia widgets turns a creative flow into a repetitive structural chore.
-
-### ⚡ The Solution: The Automated Ingestion Bridge
-This tool acts as the automated bridge between raw AI-generated research and a polished, multimedia `mdbook` presentation. It autonomously handles the heavy lifting of:
-- **KaTeX Hardening:** Ensuring complex math blocks survive the parser without escaping errors.
-- **Structural Sanitization:** Stripping invisible Unicode artifacts and enforcing semantic title limits.
-- **Reference Reconciliation:** Aggregating duplicate citations and flagging hallucinations.
-- **Media Enrichment:** Injecting cover art, social snippets, and monetization widgets (Sats/Lightning) in a single pass.
-
-While the current implementation is optimized for **Google Gemini Pro** (via a specific "Master Prompt"), the architecture is designed to be LLM-agnostic, serving as the foundational ingestion layer for any agentic research-to-publish workflow.
-
-## 🤖 The Agentic Vision: From Research to Global Syndication
-
-This tool is one part of a larger, multi-agent system:
-1.  **Research Agent:** (Future) Specialized agent to conduct research and extract text from LLMs using standardized prompts.
-2.  **Ingestion Agent (This Tool):** Sanitizes text, manages media, and indexes episodes using the **Master Key** (Episode Number).
-3.  **Publishing Agent:** (Future) Handles syndication to GitHub Pages, LinkedIn, Nostr, and other platforms.
-
-## 🚀 Current Pipeline: Gemini-to-mdbook
-
-Currently, the tool supports a streamlined transition from Gemini Pro research to `mdbook`:
-
-1.  **Draft:** Generate a report in Gemini Pro using the **Master Prompt**.
-2.  **Ingest Text:** Run `mdbook-ingest --text --number XXX`. The tool strips the "Shield" and sanitizes the content.
-3.  **Ingest Image:** Run `mdbook-ingest --image --number XXX`. The tool migrates cover art and injects social/monetization widgets.
-4.  **Ingest Video:** Run `mdbook-ingest --video --number XXX`. The tool migrates matching infographics and builds the global carousel.
+## 🧬 The Philosophy: The Opinionated Researcher
+To use this tool, the researcher must align their workflow with the **Ingestion Layer's** requirements. It automates the "last-mile" friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the **Master Ingestion Protocol**.
 
 ---
 
-## 🔑 The Master Key: Numbering Logic
+## 🚀 The 4-Phase Research Process
 
-The architecture relies on the **Episode Number** (interchangeable with **Chapter Number** from a book standpoint) as the "Master Key" to maintain strict repository integrity. The tool enforces the following naming conventions during ingestion:
+### Phase 1: Research & Export (The Gemini Protocol)
+The researcher conducts deep-dive research in Gemini (latest model). To export the results, they must use the **Master Ingestion Prompt** (see below).
+- **Format:** The output MUST be shielded using a Rust raw-string wrapper.
+- **Save As:** Save the shielded output as a `.rs` file in your `downloads_path` (e.g., `episode_241.rs`).
 
-### 1. Episode Number (`--number XXX`)
-- Must be a unique identifier for the research paper or chapter.
-- Used to target the correct Markdown file and rename all associated assets.
+### Phase 2: Text Ingestion (`--text`)
+The tool strips the "Shield," sanitizes the Markdown, and prepares the chapter.
+- **Command:** `mdbook-ingest --text --number XXX`
+- **Actions:** 
+    - Hardens KaTeX blocks (escapes `$` and fixes whitespace).
+    - Enforces a 5-word title limit (Smart Truncation).
+    - Re-indexes footnotes sequentially and aggregates duplicate sources.
+    - Synchronizes `SUMMARY.md` and the "Recent" articles list.
 
-### 2. Markdown Documents
-- **Destination:** `src/XXX.md`
-- The tool identifies the latest research export (Markdown or Rust raw string) in the `downloads_path` configured in `book.toml`.
-- It migrates this content to the destination, stripping AI wrappers, hardening KaTeX, and synchronizing the title in `src/SUMMARY.md`.
+### Phase 3: Media Ingestion (`--image`)
+The tool migrates cover art and injects social/monetization snippets.
+- **Setup:** Download your cover art (PNG/JPG) to the same downloads folder.
+- **Command:** `mdbook-ingest --image --number XXX`
+- **Actions:**
+    - Migrates the latest image to `src/img/XXX.png`.
+    - Injects **Spotify**, **Apple Podcasts**, and **YouTube** links immediately under the H1.
+    - Injects a **Lightning (Zap) Widget** at the end of the article.
 
-### 3. Image Assets (Cover Art)
-- **Destination:** `src/img/XXX.png`
-- The tool automatically identifies the latest image in your downloads folder and renames it strictly to the Episode Number.
-
-### 4. Video Assets (Infographics)
-- **Pattern:** `src/vid/XXX-description.mp4`
-- **Constraint:** Videos MUST start with exactly three digits followed by a dash (`###-`). 
-- The tool uses this strict regex (`^\d{3}-`) to distinguish between episodic content and general site assets. Only matching videos are included in the **Info Graphics feed from Mosaic.SO**.
+### Phase 4: Visual Ingestion (`--video`)
+The tool builds a cinematic infographic carousel for the chapter.
+- **Setup:** Save your Mosaic SO infographics to `src/vid/` following the naming convention `XXX-description.mp4`.
+- **Command:** `mdbook-ingest --video --number XXX`
+- **Actions:**
+    - Identifies all matching videos starting with `XXX-`.
+    - Generates a horizontal cinematic scroll strip with focus-auto-scroll.
+    - Injects the carousel into the Markdown file.
 
 ---
 
-## 🔑 The Master Prompt (Current Standard)
-
-To ensure compatibility with the ingestion layer's sanitization logic, use this prompt in Gemini Pro:
+## 🔑 The Master Ingestion Prompt
+Copy and paste this prompt into Gemini to generate ingestion-ready output:
 
 ```text
 Please provide the final version of the report, delivered strictly according to these formatting constraints:
@@ -72,28 +58,23 @@ Please provide the final version of the report, delivered strictly according to 
 
 ---
 
-## ✨ Features
+## ✨ Core Features
 
 ### 📖 Modular Ingestion (`--text`)
-- **Shield Stripping:** Automatically handles "shielded" content blocks (Gemini's Rust-style raw string literals).
-- **Intelligent Sanitization:** 
-    - Enforces a word-limit for H1 titles (e.g., 5 words).
-    - **Smart Truncation:** Automatically avoids ending titles on prepositions or conjunctions.
-- **Footnote Hardening:** 
-    - **Aggregation:** Automatically combines multiple sources sharing the same index into a single, comprehensive footnote.
-    - **Validation:** Identifies and flags missing bibliography entries in the text.
-    - **Clickability:** Strips backticks from source URLs to ensure they render as clickable Markdown links.
-- **Unicode Sanitization:** Strips invisible control characters and hidden artifacts.
+- **Shield Stripping:** Automatically handles Gemini's Rust-style raw string literals (`r#" ... "#`).
+- **Footnote Hardening:** Automatically combines multiple sources sharing the same index and flags missing entries.
+- **Unicode Sanitization:** Strips invisible control characters and hidden artifacts (like `\u{0332}`).
+- **ASCII Conversion:** Automatically wraps ASCII diagrams in code blocks and converts grid-style tables to Markdown.
 
 ### 🖼️ Media & Socials (`--image`)
-- **Master Key Migration:** Moves images to `src/img/XXX.png` based on episode number.
-- **Surgical Snippets:** Injects cover art, podcast links, and Lightning Wallet widgets at precise semantic locations.
+- **Master Key Migration:** Enforces naming strictly to the Episode Number.
+- **Surgical Snippets:** Injects cover art and monetization widgets at precise semantic locations.
 
 ---
 
 ## ⚙️ Configuration (`book.toml`)
 
-`mdbook-ingest` is highly customizable. You can configure the tool by adding an `[preprocessor.ingest]` section to your `book.toml`. If any fields are omitted, the tool uses sane defaults.
+Configure `mdbook-ingest` by adding a section to your `book.toml`:
 
 ```toml
 [preprocessor.ingest]
@@ -104,44 +85,25 @@ downloads_path = "/mnt/c/Users/ashut/Downloads"
 lightning_address = "shutosha@primal.net"
 # Maximum number of words for the H1 title
 title_word_limit = 5
-# Custom HTML snippet for podcast or social links
-podcast_html = """
-<center><a href="https://open.spotify.com/..." style="...">Spotify</a></center>
-"""
 ```
 
 ---
 
-## 🛠️ Prerequisites & Installation
+## 🛠️ Installation
 
-### 1. System Dependencies
-Before installing the preprocessor, ensure you have the following tools installed and available in your `PATH`:
-
-*   **Rust & Cargo:** [Install Rust](https://www.rust-lang.org/tools/install)
-*   **mdbook:** `cargo install mdbook`
-*   **mdbook-katex:** `cargo install mdbook-katex` (Required for math rendering validation)
-
-### 2. Build & Install
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd mdIngest
-
-# Build the binary
+# Build and install locally
 cargo build --release
-
-# (Optional) Install to your cargo bin path
 cargo install --path .
 ```
 
 ## 🚀 Usage
 
 ```bash
-# Ingest text (strips shield, sanitizes markdown)
-./target/release/mdbook-ingest --text --number 240
-
-# Ingest media (migrates cover art, injects widgets)
-./target/release/mdbook-ingest --image --number 240
+# Ingest full stack
+mdbook-ingest --text --number 240
+mdbook-ingest --image --number 240
+mdbook-ingest --video --number 240
 ```
 
 ---

@@ -10,6 +10,11 @@ Whenever a manual "surgical" fix is required to deliver an episode, you must tre
 3.  **Retest:** Rerun the ingestion tool on the original source asset to verify that the tool now handles the case autonomously.
 4.  **Validate Build:** Run `mdbook build` to ensure the changes didn't break the rendering.
 
+## **The Opinionated Process**
+- **Mandatory Alignment:** This is not a generic tool. The research process MUST be changed to meet the tool's requirements (The 4-Phase Protocol).
+- **The Gemini Protocol:** All text exports MUST be shielded in Rust raw-string literals and saved as `.rs` files.
+- **Master Ingestion Prompt:** Always use the latest version of the prompt found in `README.md`.
+
 ## **Operational Standards**
 - **Repository Isolation:** Autonomous cross-repository activities are strictly prohibited. Actions involving other repositories (e.g., `deepDive`) must be explicitly initiated by the user.
 - **Surgical Processing:** The tool must remain a lean CLI utility.

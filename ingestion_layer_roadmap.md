@@ -23,9 +23,9 @@ The workflow focuses on a seamless transition from AI research to a production-r
 - **Goal:** Automate the move and rename from `Downloads` to `src/`.
 - **Logic:** Identify the newest `.md` file in `Downloads` and move/rename it based on the provided episode number.
 
-### Baby Step 2: Automated Fixer Integration
-- **Goal:** Run `fix_markdown.py` immediately after ingestion.
-- **Logic:** Execute the Python script and verify the output.
+### Baby Step 2: Native Sanitization Logic
+- **Goal:** Harden and sanitize the Markdown immediately after ingestion.
+- **Logic:** Execute the internal `sanitizer.rs` logic (KaTeX hardening, shield stripping, title limits) during the ingestion pass.
 
 ### Baby Step 3: SUMMARY.md Sync
 - **Goal:** Zero-touch update of the book's table of contents.

@@ -1,8 +1,13 @@
-# DeepDive Creative Workflow
+# DeepDive Creative Workflow: The Opinionated Researcher
 
-The end-to-end creative workflow for producing an episode is as follows:
+This document outlines the **4-Phase Research Process** for producing high-fidelity research episodes using the `mdbook-ingest` tool.
 
-1. **Drafting & Editing:** Create and refine the research report directly in the Google Gemini Pro workspace. Use the following prompt to finalize the text with the necessary formatting constraints:
+---
+
+## Phase 1: Research & Export (The Gemini Protocol)
+1. **Research:** Conduct deep-dive research in Google Gemini (2.0/Pro).
+2. **Finalize:** Use the **Master Ingestion Prompt** to generate a shielded, production-ready report.
+   > **Master Ingestion Prompt:**
    > "Please provide the final version of the report, delivered strictly according to these formatting constraints:
    > 
    > 1. Shield the Output from the Parser: Wrap the entire report inside a single Rust code block using a raw string literal wrapper (i.e. start with ```rust followed on the next line by r#" and end with "# followed by ```). This guarantees my interface compiles it strictly as a static code array, preserving raw '#' characters and '$$' math signs.
@@ -10,12 +15,35 @@ The end-to-end creative workflow for producing an episode is as follows:
    > 3. Formal Bibliography: Provide a complete, structured "References" or "Bibliography" section at the end of the report, mapping every inline citation to its exact author, paper title, year, and URL from the retrieved sources.
    > 4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters.
    > 5. Table Constraint: Use only single spaces between cell contents and the pipe '|' separators to prevent tabular rendering errors."
-2. **Extraction:** Save the final raw markdown content (from the Rust code block) as a `.md` file in your `Downloads` folder.
-3. **Text Ingestion:** Run the `mdbook-ingest` CLI tool (e.g., `./target/release/mdbook-ingest --text --number XXX --title "Title"`) to automatically ingest, sanitize, and index the file.
-4. **Cover Image:** Import the markdown into NotebookLM to generate a cover image, then download the image (into the `Downloads` folder). *(Image ingestion pipeline to be developed).*
-5. **Initial Publication:** Use the markdown and image artifacts to publish the research on GitHub Pages via `mdbook build`.
-6. **Audio Production:** Run Audio Overviews (Deep Dives) in NotebookLM to create audio files, download them, and use Audacity to edit.
-7. **Podcast Syndication:** Publish the audio as a podcast on Spotify, which automatically syndicates to all other platforms via RSS feed (YouTube, Apple, Fountain, etc.).
-8. **Video Generation:** YouTube automatically converts the audio feed into a video file with a static picture.
-9. **Clipping:** Use YouTube's clipping tool to create 2-3 minute clips (still with a static picture).
-10. **Infographics & Final Integration:** Upload the clips one-by-one to Mosaic AI Video Editor to generate infographics. These resulting video files are then placed back into the original research pages based on context via the upcoming video ingestion workflow.
+3. **Export:** Copy the entire shielded block (including ` ```rust ` and `r#"...` artifacts) and save it as a `.rs` file (e.g., `ep241.rs`) in your `Downloads` folder.
+
+## Phase 2: Text Ingestion (`--text`)
+1. **Run Ingestion:** Execute the tool to sanitize and index the chapter.
+   ```bash
+   mdbook-ingest --text --number XXX
+   ```
+2. **Verification:** Verify that `src/XXX.md` has been created with hardened KaTeX, sequential footnotes, and the correct H1 title.
+
+## Phase 3: Media Ingestion (`--image`)
+1. **Cover Art:** Generate or source a cover image (PNG/JPG) and save it to your `Downloads` folder.
+2. **Run Ingestion:** Execute the image ingestion command.
+   ```bash
+   mdbook-ingest --image --number XXX
+   ```
+3. **Syndication:** This step automatically injects **Spotify**, **Apple Podcasts**, and **YouTube** links, along with a **Lightning Zap Widget**.
+
+## Phase 4: Visual Ingestion (`--video`)
+1. **Infographics:** Generate infographics using Mosaic AI Video Editor.
+2. **Setup:** Place the resulting `.mp4` files in `src/vid/` following the strict naming convention: `XXX-description.mp4`.
+3. **Run Ingestion:** Execute the video ingestion command to build the global carousel.
+   ```bash
+   mdbook-ingest --video --number XXX
+   ```
+
+---
+
+## Global Distribution Workflow (Post-Ingestion)
+1. **Audio Production:** Create Audio Overviews (Deep Dives) in NotebookLM.
+2. **Podcast Syndication:** Publish audio on Spotify (auto-syndicates via RSS to YouTube, Apple, Fountain).
+3. **Static Video:** YouTube converts the audio feed into a static video.
+4. **Final Build:** Run `mdbook build` to deploy the final multimedia research paper to GitHub Pages.
