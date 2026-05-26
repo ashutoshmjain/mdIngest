@@ -2,7 +2,7 @@
 authors = ["ashutosh"]
 language = "en"
 src = "src"
-title = "GoogleDocs-to-mdbook Extension Development"
+title = "mdbook-ingest: The Ingestion Layer"
 
 [preprocessor.ingest]
 command = "mdbook-ingest"
