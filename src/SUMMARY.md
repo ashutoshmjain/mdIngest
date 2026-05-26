@@ -8,6 +8,7 @@
 
 - [Opinionated Workflow](./workflow.md)
 - [Project Roadmap](./roadmap.md)
+- [Technical API Docs (Rust)](./api/mdbook_ingest/index.html)
 
 ---
 

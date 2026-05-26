@@ -28,8 +28,19 @@ jobs:
       - name: Build & Install Ingest Preprocessor
         run: cargo install --path .
 
-      - name: Build mdbook
+      - name: Build User Manual (mdbook)
         run: mdbook build
+
+      - name: Generate API Documentation (cargo doc)
+        run: cargo doc --no-deps
+
+      - name: Consolidate Documentation
+        run: |
+          # The mdbook is in ./book
+          # The API docs are in ./target/doc
+          # Move API docs into a subdirectory of the manual
+          mv target/doc book/api
+          # Create a redirect or link in the manual to the API docs if needed
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
