@@ -1,7 +1,6 @@
 [book]
 authors = ["ashutosh"]
 language = "en"
-multilingual = false
 src = "src"
 title = "GoogleDocs-to-mdbook Extension Development"
 
