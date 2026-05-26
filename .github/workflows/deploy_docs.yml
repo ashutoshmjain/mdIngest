@@ -32,15 +32,14 @@ jobs:
         run: mdbook build
 
       - name: Generate API Documentation (cargo doc)
-        run: cargo doc --no-deps
+        run: cargo doc --no-deps --document-private-items --bins
 
       - name: Consolidate Documentation
         run: |
-          # The mdbook is in ./book
-          # The API docs are in ./target/doc
           # Move API docs into a subdirectory of the manual
           mv target/doc book/api
-          # Create a redirect or link in the manual to the API docs if needed
+          # Ensure .nojekyll is present at the root to allow underscores in filenames
+          touch book/.nojekyll
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
