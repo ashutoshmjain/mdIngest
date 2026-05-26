@@ -26,9 +26,7 @@ jobs:
           cargo install mdbook-katex
 
       - name: Build & Install Ingest Preprocessor
-        run: |
-          cd crate
-          cargo install --path .
+        run: cargo install --path .
 
       - name: Build mdbook
         run: mdbook build
