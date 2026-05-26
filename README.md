@@ -100,8 +100,8 @@ cargo install --path .
 ## 🚀 Usage
 
 ```bash
-# Ingest full stack
-mdbook-ingest --text --number 240
+# Ingest full stack (with optional title override)
+mdbook-ingest --text --number 240 --title "A Catchy Five Word Title"
 mdbook-ingest --image --number 240
 mdbook-ingest --video --number 240
 ```
