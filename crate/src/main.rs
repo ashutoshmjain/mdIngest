@@ -266,7 +266,7 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
         }
 
         html.push_str(&format!(
-            r#"  <div id="{}" style="flex: 0 0 35%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;">
+            r#"  <div id="{}" style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;">
     <video src="vid/{}" style="width: 100%; height: 85%; object-fit: contain; pointer-events: none;" playsinline loop preload="auto"></video>
     <div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;">{}</div>
     <button class="vid-toggle" onclick="oph_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; z-index: 100;">🔇</button>
