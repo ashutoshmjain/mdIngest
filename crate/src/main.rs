@@ -558,7 +558,7 @@ If you enjoyed this deep dive, consider supporting the project with a tip in **S
   name="Thanks for supporting the publication"
   accent="#f9ce00"
   to="{}"
-  image="https://nostrcheck.me/me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
 />
 <script src="https://embed.twentyuno.net/js/app.js"></script>
 

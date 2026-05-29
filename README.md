@@ -49,9 +49,9 @@ Copy and paste this prompt into Gemini to generate ingestion-ready output:
 ```text
 Please provide the final version of the report, delivered strictly according to these formatting constraints:
 
-1. Shield the Output from the Parser: Wrap the entire report inside a single Rust code block using a raw string literal wrapper (i.e. start with ```rust followed on the next line by r#" and end with "# followed by ```). This guarantees my interface compiles it strictly as a static code array, preserving raw '#' characters and '$$' math signs.
+1. Shield the Output from the Parser: Wrap the entire report—including the title, all sections, and the complete bibliography—inside a single Rust code block using a raw string literal wrapper (i.e. start with ```rust followed on the next line by r#" and end with "# followed by ```). This is non-negotiable for my parser.
 2. Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim.
-3. Formal Bibliography: Provide a complete, structured "References" or "Bibliography" section at the end of the report, mapping every inline citation to its exact author, paper title, year, and URL from the retrieved sources.
+3. Full Bibliography Inclusion: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report, mapping every inline citation to its exact metadata (author, title, year, URL). This section MUST be inside the shield.
 4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters.
 5. Table Constraint: Use only single spaces between cell contents and the pipe '|' separators to prevent tabular rendering errors.
 ```
