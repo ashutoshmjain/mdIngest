@@ -79,569 +79,568 @@
 <a href=#79 id=79 data-nosnippet>79</a>    </span>video: bool,
 <a href=#80 id=80 data-nosnippet>80</a>
 <a href=#81 id=81 data-nosnippet>81</a>    <span class="doccomment">/// Episode number (the Master Key)
-<a href=#82 id=82 data-nosnippet>82</a>    </span><span class="attr">#[arg(short, long)]
-<a href=#83 id=83 data-nosnippet>83</a>    </span>number: <span class="prelude-ty">Option</span>&lt;String&gt;,
-<a href=#84 id=84 data-nosnippet>84</a>
-<a href=#85 id=85 data-nosnippet>85</a>    <span class="doccomment">/// Source directory for exports (e.g., Downloads folder)
-<a href=#86 id=86 data-nosnippet>86</a>    </span><span class="attr">#[arg(short, long, default_value = <span class="string">"/mnt/c/Users/ashut/Downloads"</span>)]
-<a href=#87 id=87 data-nosnippet>87</a>    </span>source: String,
-<a href=#88 id=88 data-nosnippet>88</a>
-<a href=#89 id=89 data-nosnippet>89</a>    <span class="doccomment">/// Title override
-<a href=#90 id=90 data-nosnippet>90</a>    </span><span class="attr">#[arg(short, long)]
-<a href=#91 id=91 data-nosnippet>91</a>    </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
-<a href=#92 id=92 data-nosnippet>92</a>}
-<a href=#93 id=93 data-nosnippet>93</a>
-<a href=#94 id=94 data-nosnippet>94</a><span class="doccomment">/// Available Subcommands
-<a href=#95 id=95 data-nosnippet>95</a></span><span class="attr">#[derive(Subcommand)]
-<a href=#96 id=96 data-nosnippet>96</a></span><span class="kw">enum </span>Commands {
-<a href=#97 id=97 data-nosnippet>97</a>    <span class="doccomment">/// Standard mdbook preprocessor handshake
-<a href=#98 id=98 data-nosnippet>98</a>    </span>Supports { renderer: String },
-<a href=#99 id=99 data-nosnippet>99</a>    <span class="doccomment">/// Check system dependencies (mdbook, mdbook-katex, etc.)
-<a href=#100 id=100 data-nosnippet>100</a>    </span>Doctor,
-<a href=#101 id=101 data-nosnippet>101</a>}
-<a href=#102 id=102 data-nosnippet>102</a>
-<a href=#103 id=103 data-nosnippet>103</a><span class="kw">fn </span>main() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#104 id=104 data-nosnippet>104</a>    <span class="comment">// 1. Run "Doctor" checks implicitly on every run (except doctor itself)
-<a href=#105 id=105 data-nosnippet>105</a>    </span><span class="kw">let </span>cli = Cli::parse();
-<a href=#106 id=106 data-nosnippet>106</a>    <span class="kw">let </span>config = IngestConfig::load();
-<a href=#107 id=107 data-nosnippet>107</a>    
-<a href=#108 id=108 data-nosnippet>108</a>    <span class="kw">match </span><span class="kw-2">&amp;</span>cli.command {
-<a href=#109 id=109 data-nosnippet>109</a>        <span class="prelude-val">Some</span>(Commands::Doctor) =&gt; {
-<a href=#110 id=110 data-nosnippet>110</a>            <span class="kw">return </span>run_doctor();
-<a href=#111 id=111 data-nosnippet>111</a>        }
-<a href=#112 id=112 data-nosnippet>112</a>        <span class="kw">_ </span>=&gt; {
-<a href=#113 id=113 data-nosnippet>113</a>            <span class="comment">// Implicit check: only warn, don't block yet, to allow installation
-<a href=#114 id=114 data-nosnippet>114</a>            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = check_dependencies() {
-<a href=#115 id=115 data-nosnippet>115</a>                <span class="macro">eprintln!</span>(<span class="string">"⚠️  Dependency Warning: {}"</span>, e);
-<a href=#116 id=116 data-nosnippet>116</a>            }
-<a href=#117 id=117 data-nosnippet>117</a>        }
-<a href=#118 id=118 data-nosnippet>118</a>    }
-<a href=#119 id=119 data-nosnippet>119</a>
-<a href=#120 id=120 data-nosnippet>120</a>    <span class="comment">// 2. Handle Subcommands
-<a href=#121 id=121 data-nosnippet>121</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(command) = cli.command {
-<a href=#122 id=122 data-nosnippet>122</a>        <span class="kw">match </span>command {
-<a href=#123 id=123 data-nosnippet>123</a>            Commands::Supports { renderer } =&gt; {
-<a href=#124 id=124 data-nosnippet>124</a>                <span class="kw">if </span>renderer == <span class="string">"html" </span>{
-<a href=#125 id=125 data-nosnippet>125</a>                    std::process::exit(<span class="number">0</span>);
-<a href=#126 id=126 data-nosnippet>126</a>                } <span class="kw">else </span>{
-<a href=#127 id=127 data-nosnippet>127</a>                    std::process::exit(<span class="number">1</span>);
-<a href=#128 id=128 data-nosnippet>128</a>                }
-<a href=#129 id=129 data-nosnippet>129</a>            }
-<a href=#130 id=130 data-nosnippet>130</a>            <span class="kw">_ </span>=&gt; {}
-<a href=#131 id=131 data-nosnippet>131</a>        }
-<a href=#132 id=132 data-nosnippet>132</a>    }
-<a href=#133 id=133 data-nosnippet>133</a>
-<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">let </span><span class="kw-2">mut </span>source = cli.source.clone();
-<a href=#135 id=135 data-nosnippet>135</a>    
-<a href=#136 id=136 data-nosnippet>136</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(config_path) = <span class="kw-2">&amp;</span>config.downloads_path {
-<a href=#137 id=137 data-nosnippet>137</a>        <span class="kw">if </span>cli.source == <span class="string">"/mnt/c/Users/ashut/Downloads" </span>{
-<a href=#138 id=138 data-nosnippet>138</a>            source = config_path.clone();
-<a href=#139 id=139 data-nosnippet>139</a>            <span class="macro">eprintln!</span>(<span class="string">"📂 Using source from book.toml: {}"</span>, source);
-<a href=#140 id=140 data-nosnippet>140</a>        } <span class="kw">else </span>{
-<a href=#141 id=141 data-nosnippet>141</a>            <span class="macro">eprintln!</span>(<span class="string">"💡 Overriding book.toml source with CLI flag: {}"</span>, source);
-<a href=#142 id=142 data-nosnippet>142</a>        }
-<a href=#143 id=143 data-nosnippet>143</a>    } <span class="kw">else if </span>cli.source != <span class="string">"/mnt/c/Users/ashut/Downloads" </span>{
-<a href=#144 id=144 data-nosnippet>144</a>        <span class="macro">eprintln!</span>(<span class="string">"📂 Using source from CLI flag: {}"</span>, source);
-<a href=#145 id=145 data-nosnippet>145</a>    }
-<a href=#146 id=146 data-nosnippet>146</a>
-<a href=#147 id=147 data-nosnippet>147</a>    <span class="comment">// 3. Handle Ingestion
-<a href=#148 id=148 data-nosnippet>148</a>    </span><span class="kw">if </span>cli.text {
-<a href=#149 id=149 data-nosnippet>149</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
-<a href=#150 id=150 data-nosnippet>150</a>            ingest_text(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, cli.title.as_deref(), <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
-<a href=#151 id=151 data-nosnippet>151</a>        } <span class="kw">else </span>{
-<a href=#152 id=152 data-nosnippet>152</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number (-n, --number) is required."</span>);
-<a href=#153 id=153 data-nosnippet>153</a>        }
-<a href=#154 id=154 data-nosnippet>154</a>    } <span class="kw">else if </span>cli.image {
-<a href=#155 id=155 data-nosnippet>155</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
-<a href=#156 id=156 data-nosnippet>156</a>            ingest_image(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
-<a href=#157 id=157 data-nosnippet>157</a>        } <span class="kw">else </span>{
-<a href=#158 id=158 data-nosnippet>158</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number (-n, --number) is required."</span>);
-<a href=#159 id=159 data-nosnippet>159</a>        }
-<a href=#160 id=160 data-nosnippet>160</a>    } <span class="kw">else if </span>cli.video {
-<a href=#161 id=161 data-nosnippet>161</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
-<a href=#162 id=162 data-nosnippet>162</a>            ingest_video(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
-<a href=#163 id=163 data-nosnippet>163</a>        } <span class="kw">else </span>{
-<a href=#164 id=164 data-nosnippet>164</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number (-n, --number) is required."</span>);
-<a href=#165 id=165 data-nosnippet>165</a>        }
-<a href=#166 id=166 data-nosnippet>166</a>    } <span class="kw">else if </span>cli.number.is_some() {
-<a href=#167 id=167 data-nosnippet>167</a>        <span class="macro">eprintln!</span>(<span class="string">"ℹ️  Please specify asset type (e.g., --text or --image)"</span>);
-<a href=#168 id=168 data-nosnippet>168</a>    } <span class="kw">else </span>{
-<a href=#169 id=169 data-nosnippet>169</a>        <span class="comment">// Standard mdbook preprocessor handshake
-<a href=#170 id=170 data-nosnippet>170</a>        </span><span class="kw">let </span>(_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())<span class="question-mark">?</span>;
-<a href=#171 id=171 data-nosnippet>171</a>        <span class="kw">let </span>json = serde_json::to_string(<span class="kw-2">&amp;</span>book)<span class="question-mark">?</span>;
-<a href=#172 id=172 data-nosnippet>172</a>        <span class="macro">print!</span>(<span class="string">"{}"</span>, json);
-<a href=#173 id=173 data-nosnippet>173</a>    }
-<a href=#174 id=174 data-nosnippet>174</a>
-<a href=#175 id=175 data-nosnippet>175</a>    <span class="prelude-val">Ok</span>(())
-<a href=#176 id=176 data-nosnippet>176</a>}
-<a href=#177 id=177 data-nosnippet>177</a>
-<a href=#178 id=178 data-nosnippet>178</a><span class="doccomment">/// Orchestrates the ingestion of video assets and generates the Cinematic Scroll Strip.
-<a href=#179 id=179 data-nosnippet>179</a></span><span class="kw">fn </span>ingest_video(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#180 id=180 data-nosnippet>180</a>    <span class="macro">eprintln!</span>(<span class="string">"🎬 Ingesting video for episode {}..."</span>, number);
-<a href=#181 id=181 data-nosnippet>181</a>    
-<a href=#182 id=182 data-nosnippet>182</a>    <span class="comment">// 1. Discovery &amp; Migration
-<a href=#183 id=183 data-nosnippet>183</a>    </span><span class="kw">let </span>vid_dir = <span class="string">"src/vid"</span>;
-<a href=#184 id=184 data-nosnippet>184</a>    std::fs::create_dir_all(vid_dir)<span class="question-mark">?</span>;
-<a href=#185 id=185 data-nosnippet>185</a>
-<a href=#186 id=186 data-nosnippet>186</a>    <span class="kw">let </span>epi_regex = Regex::new(<span class="string">r"^\d{3}-"</span>).unwrap();
-<a href=#187 id=187 data-nosnippet>187</a>
-<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*{}*.mp4"</span>, source, number);
-<a href=#189 id=189 data-nosnippet>189</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
-<a href=#190 id=190 data-nosnippet>190</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
-<a href=#191 id=191 data-nosnippet>191</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
-<a href=#192 id=192 data-nosnippet>192</a>            <span class="comment">// Strictly enforce ###- pattern for migration
-<a href=#193 id=193 data-nosnippet>193</a>            </span><span class="kw">if </span>epi_regex.is_match(filename) {
-<a href=#194 id=194 data-nosnippet>194</a>                <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"{}/{}"</span>, vid_dir, filename);
-<a href=#195 id=195 data-nosnippet>195</a>                std::fs::copy(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
-<a href=#196 id=196 data-nosnippet>196</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ Migrated: {}"</span>, filename);
-<a href=#197 id=197 data-nosnippet>197</a>            }
-<a href=#198 id=198 data-nosnippet>198</a>        }
-<a href=#199 id=199 data-nosnippet>199</a>    }
-<a href=#200 id=200 data-nosnippet>200</a>
-<a href=#201 id=201 data-nosnippet>201</a>    <span class="comment">// 2. Build the Global Carousel List
-<a href=#202 id=202 data-nosnippet>202</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>all_vids = Vec::new();
-<a href=#203 id=203 data-nosnippet>203</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}/*.mp4"</span>, vid_dir)) {
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
-<a href=#205 id=205 data-nosnippet>205</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
-<a href=#206 id=206 data-nosnippet>206</a>            <span class="comment">// Strictly enforce ###- pattern for the carousel
-<a href=#207 id=207 data-nosnippet>207</a>            </span><span class="kw">if </span>epi_regex.is_match(filename) {
-<a href=#208 id=208 data-nosnippet>208</a>                all_vids.push(path);
-<a href=#209 id=209 data-nosnippet>209</a>            }
-<a href=#210 id=210 data-nosnippet>210</a>        }
-<a href=#211 id=211 data-nosnippet>211</a>    }
-<a href=#212 id=212 data-nosnippet>212</a>
-<a href=#213 id=213 data-nosnippet>213</a>    <span class="comment">// Sort by episode number (descending)
-<a href=#214 id=214 data-nosnippet>214</a>    </span>all_vids.sort_by(|a, b| {
-<a href=#215 id=215 data-nosnippet>215</a>        <span class="kw">let </span>name_a = a.file_name().unwrap().to_str().unwrap();
-<a href=#216 id=216 data-nosnippet>216</a>        <span class="kw">let </span>name_b = b.file_name().unwrap().to_str().unwrap();
-<a href=#217 id=217 data-nosnippet>217</a>        name_b.cmp(name_a)
-<a href=#218 id=218 data-nosnippet>218</a>    });
-<a href=#219 id=219 data-nosnippet>219</a>
-<a href=#220 id=220 data-nosnippet>220</a>    <span class="comment">// 3. Generate HTML Cinematic Scroll Strip
-<a href=#221 id=221 data-nosnippet>221</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>html = String::new();
-<a href=#222 id=222 data-nosnippet>222</a>    html.push_str(<span class="string">"\n&lt;!-- VIDEO_STRIP_START --&gt;\n"</span>);
-<a href=#223 id=223 data-nosnippet>223</a>    html.push_str(<span class="string">"\n---\n\n### Info Graphics feed from Mosaic.SO\n\n"</span>);
-<a href=#224 id=224 data-nosnippet>224</a>    
-<a href=#225 id=225 data-nosnippet>225</a>    <span class="comment">// Global Script and Styles
-<a href=#226 id=226 data-nosnippet>226</a>    </span>html.push_str(<span class="string">r#"&lt;style&gt;
-<a href=#227 id=227 data-nosnippet>227</a>  .video-carousel-container video { pointer-events: none; }
-<a href=#228 id=228 data-nosnippet>228</a>  .vid-toggle { z-index: 100 !important; transition: transform 0.1s; }
-<a href=#229 id=229 data-nosnippet>229</a>  .vid-toggle:active { transform: scale(0.9); }
-<a href=#230 id=230 data-nosnippet>230</a>&lt;/style&gt;
-<a href=#231 id=231 data-nosnippet>231</a>&lt;script&gt;
-<a href=#232 id=232 data-nosnippet>232</a>  window.oph_toggle = function(btn) {
-<a href=#233 id=233 data-nosnippet>233</a>    const parent = btn.parentElement;
-<a href=#234 id=234 data-nosnippet>234</a>    const vid = parent.querySelector('video');
-<a href=#235 id=235 data-nosnippet>235</a>    const container = btn.closest('.video-carousel-container');
-<a href=#236 id=236 data-nosnippet>236</a>    
-<a href=#237 id=237 data-nosnippet>237</a>    if (vid.paused) {
-<a href=#238 id=238 data-nosnippet>238</a>      container.querySelectorAll('video').forEach(v =&gt; {
-<a href=#239 id=239 data-nosnippet>239</a>        v.pause();
-<a href=#240 id=240 data-nosnippet>240</a>        v.muted = true;
-<a href=#241 id=241 data-nosnippet>241</a>        const b = v.parentElement.querySelector('.vid-toggle');
-<a href=#242 id=242 data-nosnippet>242</a>        if (b) b.innerText = '🔇';
-<a href=#243 id=243 data-nosnippet>243</a>      });
-<a href=#244 id=244 data-nosnippet>244</a>      vid.muted = false;
-<a href=#245 id=245 data-nosnippet>245</a>      vid.play();
-<a href=#246 id=246 data-nosnippet>246</a>      btn.innerText = '🔊';
-<a href=#247 id=247 data-nosnippet>247</a>    } else {
-<a href=#248 id=248 data-nosnippet>248</a>      vid.pause();
-<a href=#249 id=249 data-nosnippet>249</a>      vid.muted = true;
-<a href=#250 id=250 data-nosnippet>250</a>      btn.innerText = '🔇';
-<a href=#251 id=251 data-nosnippet>251</a>    }
-<a href=#252 id=252 data-nosnippet>252</a>  };
-<a href=#253 id=253 data-nosnippet>253</a>&lt;/script&gt;
-<a href=#254 id=254 data-nosnippet>254</a>"#</span>);
-<a href=#255 id=255 data-nosnippet>255</a>
-<a href=#256 id=256 data-nosnippet>256</a>    html.push_str(<span class="string">"&lt;div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\"&gt;\n"</span>);
-<a href=#257 id=257 data-nosnippet>257</a>
-<a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">let </span><span class="kw-2">mut </span>focus_id = <span class="prelude-val">None</span>;
-<a href=#259 id=259 data-nosnippet>259</a>
-<a href=#260 id=260 data-nosnippet>260</a>    <span class="kw">for </span>(i, path) <span class="kw">in </span>all_vids.iter().enumerate() {
-<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
-<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">let </span>is_current = filename.starts_with(number);
-<a href=#263 id=263 data-nosnippet>263</a>        <span class="kw">let </span>id = <span class="macro">format!</span>(<span class="string">"vid-{}"</span>, i);
-<a href=#264 id=264 data-nosnippet>264</a>        <span class="kw">if </span>is_current &amp;&amp; focus_id.is_none() {
-<a href=#265 id=265 data-nosnippet>265</a>            focus_id = <span class="prelude-val">Some</span>(id.clone());
-<a href=#266 id=266 data-nosnippet>266</a>        }
-<a href=#267 id=267 data-nosnippet>267</a>
-<a href=#268 id=268 data-nosnippet>268</a>        html.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
-<a href=#269 id=269 data-nosnippet>269</a>            <span class="string">r#"  &lt;div id="{}" style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;"&gt;
-<a href=#270 id=270 data-nosnippet>270</a>    &lt;video src="vid/{}" style="width: 100%; height: 85%; object-fit: contain; pointer-events: none;" playsinline loop preload="auto"&gt;&lt;/video&gt;
-<a href=#271 id=271 data-nosnippet>271</a>    &lt;div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;"&gt;{}&lt;/div&gt;
-<a href=#272 id=272 data-nosnippet>272</a>    &lt;button class="vid-toggle" onclick="oph_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; z-index: 100;"&gt;🔇&lt;/button&gt;
-<a href=#273 id=273 data-nosnippet>273</a>  &lt;/div&gt;
-<a href=#274 id=274 data-nosnippet>274</a>"#</span>, id, filename, filename.replace(<span class="string">".mp4"</span>, <span class="string">""</span>)));
-<a href=#275 id=275 data-nosnippet>275</a>    }
-<a href=#276 id=276 data-nosnippet>276</a>
-<a href=#277 id=277 data-nosnippet>277</a>    html.push_str(<span class="string">"&lt;/div&gt;\n"</span>);
-<a href=#278 id=278 data-nosnippet>278</a>
-<a href=#279 id=279 data-nosnippet>279</a>    <span class="comment">// Add Scroll-to-Focus and Init Script
-<a href=#280 id=280 data-nosnippet>280</a>    </span>html.push_str(<span class="string">r#"&lt;script&gt;
-<a href=#281 id=281 data-nosnippet>281</a>  window.oph_toggle = function(btn) {
-<a href=#282 id=282 data-nosnippet>282</a>    const parent = btn.parentElement;
-<a href=#283 id=283 data-nosnippet>283</a>    const vid = parent.querySelector('video');
-<a href=#284 id=284 data-nosnippet>284</a>    const container = btn.closest('.video-carousel-container');
-<a href=#285 id=285 data-nosnippet>285</a>    
-<a href=#286 id=286 data-nosnippet>286</a>    if (vid.paused) {
-<a href=#287 id=287 data-nosnippet>287</a>      // 1. Stop and mute all others
-<a href=#288 id=288 data-nosnippet>288</a>      container.querySelectorAll('video').forEach(v =&gt; {
-<a href=#289 id=289 data-nosnippet>289</a>        if (v !== vid) {
-<a href=#290 id=290 data-nosnippet>290</a>          v.pause();
-<a href=#291 id=291 data-nosnippet>291</a>          v.muted = true;
-<a href=#292 id=292 data-nosnippet>292</a>          const otherBtn = v.parentElement.querySelector('.vid-toggle');
-<a href=#293 id=293 data-nosnippet>293</a>          if (otherBtn) otherBtn.innerText = '🔇';
-<a href=#294 id=294 data-nosnippet>294</a>        }
-<a href=#295 id=295 data-nosnippet>295</a>      });
-<a href=#296 id=296 data-nosnippet>296</a>      
-<a href=#297 id=297 data-nosnippet>297</a>      // 2. Play and unmute this one
-<a href=#298 id=298 data-nosnippet>298</a>      vid.muted = false;
-<a href=#299 id=299 data-nosnippet>299</a>      vid.volume = 1.0;
-<a href=#300 id=300 data-nosnippet>300</a>      vid.play();
-<a href=#301 id=301 data-nosnippet>301</a>      btn.innerText = '🔊';
-<a href=#302 id=302 data-nosnippet>302</a>    } else {
-<a href=#303 id=303 data-nosnippet>303</a>      vid.pause();
-<a href=#304 id=304 data-nosnippet>304</a>      vid.muted = true;
-<a href=#305 id=305 data-nosnippet>305</a>      btn.innerText = '🔇';
-<a href=#306 id=306 data-nosnippet>306</a>    }
-<a href=#307 id=307 data-nosnippet>307</a>  };
-<a href=#308 id=308 data-nosnippet>308</a>
-<a href=#309 id=309 data-nosnippet>309</a>  window.addEventListener('load', () =&gt; {
-<a href=#310 id=310 data-nosnippet>310</a>    const container = document.querySelector('.video-carousel-container');
-<a href=#311 id=311 data-nosnippet>311</a>    if (container) {
-<a href=#312 id=312 data-nosnippet>312</a>      container.querySelectorAll('video').forEach(v =&gt; { 
-<a href=#313 id=313 data-nosnippet>313</a>        v.muted = true; 
-<a href=#314 id=314 data-nosnippet>314</a>        v.pause(); 
-<a href=#315 id=315 data-nosnippet>315</a>      });
-<a href=#316 id=316 data-nosnippet>316</a>    }
-<a href=#317 id=317 data-nosnippet>317</a>"#</span>);
-<a href=#318 id=318 data-nosnippet>318</a>
-<a href=#319 id=319 data-nosnippet>319</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = focus_id {
-<a href=#320 id=320 data-nosnippet>320</a>        html.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
-<a href=#321 id=321 data-nosnippet>321</a>            <span class="string">r#"    const el = document.getElementById('{}');
-<a href=#322 id=322 data-nosnippet>322</a>"#</span>, <span class="string">"vid-focus-placeholder"</span>));
-<a href=#323 id=323 data-nosnippet>323</a>    }
-<a href=#324 id=324 data-nosnippet>324</a>    
-<a href=#325 id=325 data-nosnippet>325</a>    html.push_str(<span class="string">r#"    if (container &amp;&amp; el) {
-<a href=#326 id=326 data-nosnippet>326</a>      const offset = el.offsetLeft - (container.offsetWidth / 2) + (el.offsetWidth / 2);
-<a href=#327 id=327 data-nosnippet>327</a>      container.scrollTo({ left: offset, behavior: 'smooth' });
-<a href=#328 id=328 data-nosnippet>328</a>    }
-<a href=#329 id=329 data-nosnippet>329</a>  });
-<a href=#330 id=330 data-nosnippet>330</a>&lt;/script&gt;
-<a href=#331 id=331 data-nosnippet>331</a>"#</span>);
-<a href=#332 id=332 data-nosnippet>332</a>    html.push_str(<span class="string">"&lt;!-- VIDEO_STRIP_END --&gt;\n\n"</span>);
-<a href=#333 id=333 data-nosnippet>333</a>
-<a href=#334 id=334 data-nosnippet>334</a>    <span class="comment">// 4. Global Refresh: Inject into ALL Markdown files that have a strip marker
-<a href=#335 id=335 data-nosnippet>335</a>    </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="string">"src/*.md"</span>) {
-<a href=#336 id=336 data-nosnippet>336</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
-<a href=#337 id=337 data-nosnippet>337</a>            <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
-<a href=#338 id=338 data-nosnippet>338</a>            
-<a href=#339 id=339 data-nosnippet>339</a>            <span class="kw">if </span>content.contains(<span class="string">"&lt;!-- VIDEO_STRIP_START --&gt;"</span>) {
-<a href=#340 id=340 data-nosnippet>340</a>                <span class="kw">let </span>current_file_num = path.file_stem().unwrap().to_str().unwrap();
-<a href=#341 id=341 data-nosnippet>341</a>                
-<a href=#342 id=342 data-nosnippet>342</a>                <span class="comment">// 4.1 Update the Focus for THIS specific file
-<a href=#343 id=343 data-nosnippet>343</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>local_html = html.clone();
-<a href=#344 id=344 data-nosnippet>344</a>                
-<a href=#345 id=345 data-nosnippet>345</a>                <span class="comment">// Find the first video ID for this episode number
-<a href=#346 id=346 data-nosnippet>346</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>local_focus_id = String::from(<span class="string">"vid-0"</span>);
-<a href=#347 id=347 data-nosnippet>347</a>                <span class="kw">for </span>(i, p) <span class="kw">in </span>all_vids.iter().enumerate() {
-<a href=#348 id=348 data-nosnippet>348</a>                    <span class="kw">if </span>p.file_name().unwrap().to_str().unwrap().starts_with(current_file_num) {
-<a href=#349 id=349 data-nosnippet>349</a>                        local_focus_id = <span class="macro">format!</span>(<span class="string">"vid-{}"</span>, i);
-<a href=#350 id=350 data-nosnippet>350</a>                        <span class="kw">break</span>;
-<a href=#351 id=351 data-nosnippet>351</a>                    }
-<a href=#352 id=352 data-nosnippet>352</a>                }
-<a href=#353 id=353 data-nosnippet>353</a>                local_html = local_html.replace(<span class="string">"'vid-focus-placeholder'"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"'{}'"</span>, local_focus_id));
-<a href=#354 id=354 data-nosnippet>354</a>
-<a href=#355 id=355 data-nosnippet>355</a>                <span class="comment">// 4.2 Replace the existing strip
-<a href=#356 id=356 data-nosnippet>356</a>                </span><span class="kw">let </span>start_marker = <span class="string">"&lt;!-- VIDEO_STRIP_START --&gt;"</span>;
-<a href=#357 id=357 data-nosnippet>357</a>                <span class="kw">let </span>end_marker = <span class="string">"&lt;!-- VIDEO_STRIP_END --&gt;"</span>;
-<a href=#358 id=358 data-nosnippet>358</a>                <span class="kw">if let </span>(<span class="prelude-val">Some</span>(s), <span class="prelude-val">Some</span>(e)) = (content.find(start_marker), content.find(end_marker)) {
-<a href=#359 id=359 data-nosnippet>359</a>                    content.replace_range(s..e + end_marker.len(), <span class="kw-2">&amp;</span>local_html);
-<a href=#360 id=360 data-nosnippet>360</a>                }
-<a href=#361 id=361 data-nosnippet>361</a>
-<a href=#362 id=362 data-nosnippet>362</a>                std::fs::write(<span class="kw-2">&amp;</span>path, content)<span class="question-mark">?</span>;
-<a href=#363 id=363 data-nosnippet>363</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ Synchronized Global Strip in {}"</span>, path.display());
-<a href=#364 id=364 data-nosnippet>364</a>            }
-<a href=#365 id=365 data-nosnippet>365</a>        }
-<a href=#366 id=366 data-nosnippet>366</a>    }
-<a href=#367 id=367 data-nosnippet>367</a>
-<a href=#368 id=368 data-nosnippet>368</a>    <span class="prelude-val">Ok</span>(())
-<a href=#369 id=369 data-nosnippet>369</a>}
-<a href=#370 id=370 data-nosnippet>370</a>
-<a href=#371 id=371 data-nosnippet>371</a><span class="doccomment">/// Checks if required external tools are available in the PATH.
-<a href=#372 id=372 data-nosnippet>372</a></span><span class="kw">fn </span>check_dependencies() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#373 id=373 data-nosnippet>373</a>    <span class="comment">// Check mdbook
-<a href=#374 id=374 data-nosnippet>374</a>    </span><span class="kw">let _ </span>= Command::new(<span class="string">"mdbook"</span>)
-<a href=#375 id=375 data-nosnippet>375</a>        .arg(<span class="string">"--version"</span>)
-<a href=#376 id=376 data-nosnippet>376</a>        .output()
-<a href=#377 id=377 data-nosnippet>377</a>        .context(<span class="string">"mdbook not found in PATH"</span>)<span class="question-mark">?</span>;
-<a href=#378 id=378 data-nosnippet>378</a>
-<a href=#379 id=379 data-nosnippet>379</a>    <span class="comment">// Check mdbook-katex
-<a href=#380 id=380 data-nosnippet>380</a>    </span><span class="kw">let _ </span>= Command::new(<span class="string">"mdbook-katex"</span>)
-<a href=#381 id=381 data-nosnippet>381</a>        .arg(<span class="string">"--version"</span>)
-<a href=#382 id=382 data-nosnippet>382</a>        .output()
-<a href=#383 id=383 data-nosnippet>383</a>        .context(<span class="string">"mdbook-katex not found in PATH. Please install it with 'cargo install mdbook-katex'"</span>)<span class="question-mark">?</span>;
-<a href=#384 id=384 data-nosnippet>384</a>
-<a href=#385 id=385 data-nosnippet>385</a>    <span class="prelude-val">Ok</span>(())
-<a href=#386 id=386 data-nosnippet>386</a>}
-<a href=#387 id=387 data-nosnippet>387</a>
-<a href=#388 id=388 data-nosnippet>388</a><span class="doccomment">/// Performs a diagnostic check of the local environment and book configuration.
-<a href=#389 id=389 data-nosnippet>389</a></span><span class="kw">fn </span>run_doctor() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#390 id=390 data-nosnippet>390</a>    <span class="macro">eprintln!</span>(<span class="string">"🔍 Checking environment..."</span>);
-<a href=#391 id=391 data-nosnippet>391</a>
-<a href=#392 id=392 data-nosnippet>392</a>    <span class="kw">match </span>Command::new(<span class="string">"mdbook"</span>).arg(<span class="string">"--version"</span>).output() {
-<a href=#393 id=393 data-nosnippet>393</a>        <span class="prelude-val">Ok</span>(out) =&gt; <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()),
-<a href=#394 id=394 data-nosnippet>394</a>        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">eprintln!</span>(<span class="string">"❌ mdbook: Not found"</span>),
-<a href=#395 id=395 data-nosnippet>395</a>    }
-<a href=#396 id=396 data-nosnippet>396</a>
-<a href=#397 id=397 data-nosnippet>397</a>    <span class="kw">match </span>Command::new(<span class="string">"mdbook-katex"</span>).arg(<span class="string">"--version"</span>).output() {
-<a href=#398 id=398 data-nosnippet>398</a>        <span class="prelude-val">Ok</span>(out) =&gt; <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook-katex: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()),
-<a href=#399 id=399 data-nosnippet>399</a>        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">eprintln!</span>(<span class="string">"❌ mdbook-katex: Not found (Install with 'cargo install mdbook-katex')"</span>),
-<a href=#400 id=400 data-nosnippet>400</a>    }
-<a href=#401 id=401 data-nosnippet>401</a>
-<a href=#402 id=402 data-nosnippet>402</a>    <span class="kw">if </span>std::path::Path::new(<span class="string">"book.toml"</span>).exists() {
-<a href=#403 id=403 data-nosnippet>403</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(toml) = std::fs::read_to_string(<span class="string">"book.toml"</span>) {
-<a href=#404 id=404 data-nosnippet>404</a>            <span class="kw">if </span>toml.contains(<span class="string">"preprocessor.ingest"</span>) {
-<a href=#405 id=405 data-nosnippet>405</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ book.toml: Ingestion configured"</span>);
-<a href=#406 id=406 data-nosnippet>406</a>            } <span class="kw">else </span>{
-<a href=#407 id=407 data-nosnippet>407</a>                <span class="macro">eprintln!</span>(<span class="string">"⚠️  book.toml: [preprocessor.ingest] section missing"</span>);
-<a href=#408 id=408 data-nosnippet>408</a>            }
-<a href=#409 id=409 data-nosnippet>409</a>        }
-<a href=#410 id=410 data-nosnippet>410</a>    }
-<a href=#411 id=411 data-nosnippet>411</a>
-<a href=#412 id=412 data-nosnippet>412</a>    <span class="prelude-val">Ok</span>(())
-<a href=#413 id=413 data-nosnippet>413</a>}
-<a href=#414 id=414 data-nosnippet>414</a>
-<a href=#415 id=415 data-nosnippet>415</a><span class="doccomment">/// Orchestrates the ingestion of text-based research assets.
-<a href=#416 id=416 data-nosnippet>416</a></span><span class="kw">fn </span>ingest_text(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, title: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#417 id=417 data-nosnippet>417</a>    <span class="macro">eprintln!</span>(<span class="string">"📖 Ingesting text for episode {}..."</span>, number);
-<a href=#418 id=418 data-nosnippet>418</a>    
-<a href=#419 id=419 data-nosnippet>419</a>    <span class="comment">// Find the latest .md, .zip, or .rs file
-<a href=#420 id=420 data-nosnippet>420</a>    </span><span class="kw">let </span>md_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.md"</span>, source);
-<a href=#421 id=421 data-nosnippet>421</a>    <span class="kw">let </span>zip_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.zip"</span>, source);
-<a href=#422 id=422 data-nosnippet>422</a>    <span class="kw">let </span>rs_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.rs"</span>, source);
-<a href=#423 id=423 data-nosnippet>423</a>    
-<a href=#424 id=424 data-nosnippet>424</a>    <span class="kw">let </span><span class="kw-2">mut </span>md_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>md_pattern)<span class="question-mark">?</span>.filter_map(Result::ok)
-<a href=#425 id=425 data-nosnippet>425</a>        .filter(|p| {
-<a href=#426 id=426 data-nosnippet>426</a>            <span class="kw">let </span>filename = p.file_name().unwrap().to_str().unwrap();
-<a href=#427 id=427 data-nosnippet>427</a>            ![<span class="string">"SUMMARY.md"</span>, <span class="string">"cover.md"</span>, <span class="string">"README.md"</span>].contains(<span class="kw-2">&amp;</span>filename)
-<a href=#428 id=428 data-nosnippet>428</a>        }).collect();
-<a href=#429 id=429 data-nosnippet>429</a>        
-<a href=#430 id=430 data-nosnippet>430</a>    <span class="kw">let </span><span class="kw-2">mut </span>zip_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>zip_pattern)<span class="question-mark">?</span>.filter_map(Result::ok).collect();
-<a href=#431 id=431 data-nosnippet>431</a>    <span class="kw">let </span><span class="kw-2">mut </span>rs_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>rs_pattern)<span class="question-mark">?</span>.filter_map(Result::ok).collect();
-<a href=#432 id=432 data-nosnippet>432</a>    
-<a href=#433 id=433 data-nosnippet>433</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_files = Vec::new();
-<a href=#434 id=434 data-nosnippet>434</a>    all_files.append(<span class="kw-2">&amp;mut </span>md_files);
-<a href=#435 id=435 data-nosnippet>435</a>    all_files.append(<span class="kw-2">&amp;mut </span>zip_files);
-<a href=#436 id=436 data-nosnippet>436</a>    all_files.append(<span class="kw-2">&amp;mut </span>rs_files);
-<a href=#437 id=437 data-nosnippet>437</a>
-<a href=#438 id=438 data-nosnippet>438</a>    all_files.sort_by(|a, b| {
-<a href=#439 id=439 data-nosnippet>439</a>        <span class="kw">let </span>metadata_a = std::fs::metadata(a).unwrap();
-<a href=#440 id=440 data-nosnippet>440</a>        <span class="kw">let </span>metadata_b = std::fs::metadata(b).unwrap();
-<a href=#441 id=441 data-nosnippet>441</a>        metadata_b.modified().unwrap().cmp(<span class="kw-2">&amp;</span>metadata_a.modified().unwrap())
-<a href=#442 id=442 data-nosnippet>442</a>    });
-<a href=#443 id=443 data-nosnippet>443</a>
-<a href=#444 id=444 data-nosnippet>444</a>    <span class="kw">let </span>latest_file = all_files.first().context(<span class="macro">format!</span>(<span class="string">"❌ No .md, .zip, or .rs files found in {}"</span>, source))<span class="question-mark">?</span>;
-<a href=#445 id=445 data-nosnippet>445</a>    <span class="macro">eprintln!</span>(<span class="string">"📄 Found export: {:?}"</span>, latest_file.file_name().unwrap());
-<a href=#446 id=446 data-nosnippet>446</a>
-<a href=#447 id=447 data-nosnippet>447</a>    <span class="kw">let </span>content = <span class="kw">if </span>latest_file.extension().unwrap() == <span class="string">"zip" </span>{
-<a href=#448 id=448 data-nosnippet>448</a>        extract_html_from_zip(latest_file)<span class="question-mark">?
-<a href=#449 id=449 data-nosnippet>449</a>    </span>} <span class="kw">else </span>{
-<a href=#450 id=450 data-nosnippet>450</a>        std::fs::read_to_string(latest_file)<span class="question-mark">?
-<a href=#451 id=451 data-nosnippet>451</a>    </span>};
-<a href=#452 id=452 data-nosnippet>452</a>
-<a href=#453 id=453 data-nosnippet>453</a>    <span class="kw">let </span>processed = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(<span class="number">5</span>));
-<a href=#454 id=454 data-nosnippet>454</a>
-<a href=#455 id=455 data-nosnippet>455</a>    <span class="kw">let </span>dest_path = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
-<a href=#456 id=456 data-nosnippet>456</a>    std::fs::write(<span class="kw-2">&amp;</span>dest_path, processed)<span class="question-mark">?</span>;
-<a href=#457 id=457 data-nosnippet>457</a>    <span class="macro">eprintln!</span>(<span class="string">"✅ Saved text to: {}"</span>, dest_path);
-<a href=#458 id=458 data-nosnippet>458</a>
-<a href=#459 id=459 data-nosnippet>459</a>    update_summary(number, <span class="kw-2">&amp;</span>dest_path)<span class="question-mark">?</span>;
-<a href=#460 id=460 data-nosnippet>460</a>    
-<a href=#461 id=461 data-nosnippet>461</a>    <span class="prelude-val">Ok</span>(())
-<a href=#462 id=462 data-nosnippet>462</a>}
-<a href=#463 id=463 data-nosnippet>463</a>
-<a href=#464 id=464 data-nosnippet>464</a><span class="doccomment">/// Legacy/Fallback: Extracts HTML from ZIP.
-<a href=#465 id=465 data-nosnippet>465</a></span><span class="kw">fn </span>extract_html_from_zip(zip_path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="prelude-ty">Result</span>&lt;String&gt; {
-<a href=#466 id=466 data-nosnippet>466</a>    <span class="kw">let </span>file = std::fs::File::open(zip_path)<span class="question-mark">?</span>;
-<a href=#467 id=467 data-nosnippet>467</a>    <span class="kw">let </span><span class="kw-2">mut </span>archive = zip::ZipArchive::new(file)<span class="question-mark">?</span>;
-<a href=#468 id=468 data-nosnippet>468</a>    
-<a href=#469 id=469 data-nosnippet>469</a>    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..archive.len() {
-<a href=#470 id=470 data-nosnippet>470</a>        <span class="kw">let </span><span class="kw-2">mut </span>file = archive.by_index(i)<span class="question-mark">?</span>;
-<a href=#471 id=471 data-nosnippet>471</a>        <span class="kw">if </span>file.name().ends_with(<span class="string">".html"</span>) {
-<a href=#472 id=472 data-nosnippet>472</a>            <span class="kw">let </span><span class="kw-2">mut </span>html_content = String::new();
-<a href=#473 id=473 data-nosnippet>473</a>            <span class="kw">use </span>std::io::Read;
-<a href=#474 id=474 data-nosnippet>474</a>            file.read_to_string(<span class="kw-2">&amp;mut </span>html_content)<span class="question-mark">?</span>;
-<a href=#475 id=475 data-nosnippet>475</a>            
-<a href=#476 id=476 data-nosnippet>476</a>            <span class="kw">let </span>eq_regex = regex::Regex::new(<span class="string">r#"&lt;img[^&gt;]*class="[^"]*Math[^"]*"[^&gt;]*title="([^"]*)"[^&gt;]*&gt;"#</span>).unwrap();
-<a href=#477 id=477 data-nosnippet>477</a>            <span class="kw">let </span>preprocessed_html = eq_regex.replace_all(<span class="kw-2">&amp;</span>html_content, |caps: <span class="kw-2">&amp;</span>regex::Captures| {
-<a href=#478 id=478 data-nosnippet>478</a>                <span class="macro">format!</span>(<span class="string">" ${}$ "</span>, caps.get(<span class="number">1</span>).unwrap().as_str())
-<a href=#479 id=479 data-nosnippet>479</a>            }).to_string();
-<a href=#480 id=480 data-nosnippet>480</a>
-<a href=#481 id=481 data-nosnippet>481</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(html2md::parse_html(<span class="kw-2">&amp;</span>preprocessed_html));
-<a href=#482 id=482 data-nosnippet>482</a>        }
-<a href=#483 id=483 data-nosnippet>483</a>    }
-<a href=#484 id=484 data-nosnippet>484</a>    <span class="macro">anyhow::bail!</span>(<span class="string">"❌ No HTML file found in ZIP archive"</span>)
-<a href=#485 id=485 data-nosnippet>485</a>}
-<a href=#486 id=486 data-nosnippet>486</a>
-<a href=#487 id=487 data-nosnippet>487</a><span class="doccomment">/// Orchestrates the ingestion of image assets and social widgets.
-<a href=#488 id=488 data-nosnippet>488</a></span><span class="kw">fn </span>ingest_image(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#489 id=489 data-nosnippet>489</a>    <span class="macro">eprintln!</span>(<span class="string">"🖼️  Ingesting image for episode {}..."</span>, number);
-<a href=#490 id=490 data-nosnippet>490</a>    
-<a href=#491 id=491 data-nosnippet>491</a>    <span class="comment">// 1. Find the latest image
-<a href=#492 id=492 data-nosnippet>492</a>    </span><span class="kw">let </span>img_extensions = [<span class="string">"png"</span>, <span class="string">"jpg"</span>, <span class="string">"jpeg"</span>, <span class="string">"webp"</span>];
-<a href=#493 id=493 data-nosnippet>493</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_images = Vec::new();
-<a href=#494 id=494 data-nosnippet>494</a>    
-<a href=#495 id=495 data-nosnippet>495</a>    <span class="kw">for </span>ext <span class="kw">in </span>img_extensions {
-<a href=#496 id=496 data-nosnippet>496</a>        <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*.{}"</span>, source, ext);
-<a href=#497 id=497 data-nosnippet>497</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
-<a href=#498 id=498 data-nosnippet>498</a>            <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
-<a href=#499 id=499 data-nosnippet>499</a>                all_images.push(path);
-<a href=#500 id=500 data-nosnippet>500</a>            }
-<a href=#501 id=501 data-nosnippet>501</a>        }
-<a href=#502 id=502 data-nosnippet>502</a>    }
-<a href=#503 id=503 data-nosnippet>503</a>
-<a href=#504 id=504 data-nosnippet>504</a>    all_images.sort_by(|a, b| {
-<a href=#505 id=505 data-nosnippet>505</a>        <span class="kw">let </span>metadata_a = std::fs::metadata(a).unwrap();
-<a href=#506 id=506 data-nosnippet>506</a>        <span class="kw">let </span>metadata_b = std::fs::metadata(b).unwrap();
-<a href=#507 id=507 data-nosnippet>507</a>        metadata_b.modified().unwrap().cmp(<span class="kw-2">&amp;</span>metadata_a.modified().unwrap())
-<a href=#508 id=508 data-nosnippet>508</a>    });
-<a href=#509 id=509 data-nosnippet>509</a>
-<a href=#510 id=510 data-nosnippet>510</a>    <span class="kw">let </span>latest_img = all_images.first().context(<span class="macro">format!</span>(<span class="string">"❌ No image files found in {}"</span>, source))<span class="question-mark">?</span>;
-<a href=#511 id=511 data-nosnippet>511</a>    <span class="kw">let </span>ext = latest_img.extension().unwrap().to_str().unwrap();
-<a href=#512 id=512 data-nosnippet>512</a>    <span class="macro">eprintln!</span>(<span class="string">"📸 Found image: {:?}"</span>, latest_img.file_name().unwrap());
-<a href=#513 id=513 data-nosnippet>513</a>
-<a href=#514 id=514 data-nosnippet>514</a>    <span class="comment">// 2. Prepare destination
-<a href=#515 id=515 data-nosnippet>515</a>    </span><span class="kw">let </span>img_dir = <span class="string">"src/img"</span>;
-<a href=#516 id=516 data-nosnippet>516</a>    std::fs::create_dir_all(img_dir)<span class="question-mark">?</span>;
-<a href=#517 id=517 data-nosnippet>517</a>    <span class="kw">let </span>dest_path = <span class="macro">format!</span>(<span class="string">"{}/{}.{}"</span>, img_dir, number, ext);
-<a href=#518 id=518 data-nosnippet>518</a>    
-<a href=#519 id=519 data-nosnippet>519</a>    <span class="comment">// Move/Copy image
-<a href=#520 id=520 data-nosnippet>520</a>    </span>std::fs::copy(latest_img, <span class="kw-2">&amp;</span>dest_path)<span class="question-mark">?</span>;
-<a href=#521 id=521 data-nosnippet>521</a>    <span class="macro">eprintln!</span>(<span class="string">"✅ Saved image to: {}"</span>, dest_path);
-<a href=#522 id=522 data-nosnippet>522</a>
-<a href=#523 id=523 data-nosnippet>523</a>    <span class="comment">// 3. Update the Markdown file
-<a href=#524 id=524 data-nosnippet>524</a>    </span><span class="kw">let </span>md_path = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
-<a href=#525 id=525 data-nosnippet>525</a>    <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span>md_path).exists() {
-<a href=#526 id=526 data-nosnippet>526</a>        <span class="kw">let </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
-<a href=#527 id=527 data-nosnippet>527</a>        <span class="kw">let </span><span class="kw-2">mut </span>lines: Vec&lt;String&gt; = content.lines().map(|s| s.to_string()).collect();
-<a href=#528 id=528 data-nosnippet>528</a>        
-<a href=#529 id=529 data-nosnippet>529</a>        <span class="kw">let </span><span class="kw-2">mut </span>h1_idx = <span class="prelude-val">None</span>;
-<a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">for </span>(i, line) <span class="kw">in </span>lines.iter().enumerate() {
-<a href=#531 id=531 data-nosnippet>531</a>            <span class="kw">if </span>line.starts_with(<span class="string">"# "</span>) {
-<a href=#532 id=532 data-nosnippet>532</a>                h1_idx = <span class="prelude-val">Some</span>(i);
-<a href=#533 id=533 data-nosnippet>533</a>                <span class="kw">break</span>;
-<a href=#534 id=534 data-nosnippet>534</a>            }
-<a href=#535 id=535 data-nosnippet>535</a>        }
-<a href=#536 id=536 data-nosnippet>536</a>
-<a href=#537 id=537 data-nosnippet>537</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(idx) = h1_idx {
-<a href=#538 id=538 data-nosnippet>538</a>            <span class="kw">let </span>relative_img_path = <span class="macro">format!</span>(<span class="string">"img/{}.{}"</span>, number, ext);
-<a href=#539 id=539 data-nosnippet>539</a>            <span class="kw">let </span>img_tag = <span class="macro">format!</span>(<span class="string">"\n![Cover Image]({})\n"</span>, relative_img_path);
-<a href=#540 id=540 data-nosnippet>540</a>            
-<a href=#541 id=541 data-nosnippet>541</a>            <span class="kw">let </span>default_podcast_links = <span class="string">r#"
-<a href=#542 id=542 data-nosnippet>542</a>&lt;center&gt;&lt;a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;Spotify&lt;/a&gt;&lt;a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;Apple Podcasts&lt;/a&gt;&lt;a href="https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe&amp;si=o534zFZsc7p5XA9Q" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;YouTube Music&lt;/a&gt;&lt;a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;YouTube&lt;/a&gt;&lt;a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;"&gt;Fountain.fm&lt;/a&gt;&lt;/center&gt;
-<a href=#543 id=543 data-nosnippet>543</a>"#</span>;
-<a href=#544 id=544 data-nosnippet>544</a>            <span class="kw">let </span>podcast_links = config.podcast_html.as_deref().unwrap_or(default_podcast_links);
-<a href=#545 id=545 data-nosnippet>545</a>
-<a href=#546 id=546 data-nosnippet>546</a>            <span class="kw">let </span>default_lightning_address = <span class="string">"shutosha@primal.net"</span>;
-<a href=#547 id=547 data-nosnippet>547</a>            <span class="kw">let </span>lightning_address = config.lightning_address.as_deref().unwrap_or(default_lightning_address);
-<a href=#548 id=548 data-nosnippet>548</a>
-<a href=#549 id=549 data-nosnippet>549</a>            <span class="kw">let </span>wallet_widget = <span class="macro">format!</span>(<span class="string">r##"
-<a href=#550 id=550 data-nosnippet>550</a>&lt;!-- WALLET_START --&gt;
-<a href=#551 id=551 data-nosnippet>551</a>---
-<a href=#552 id=552 data-nosnippet>552</a>
-<a href=#553 id=553 data-nosnippet>553</a>### Tips and Donations
-<a href=#554 id=554 data-nosnippet>554</a>
-<a href=#555 id=555 data-nosnippet>555</a>If you enjoyed this deep dive, consider supporting the project with a tip in **Sats**. It's a simple, global way to support independent research.
-<a href=#556 id=556 data-nosnippet>556</a>
-<a href=#557 id=557 data-nosnippet>557</a>&lt;lightning-widget
-<a href=#558 id=558 data-nosnippet>558</a>  name="Thanks for supporting the publication"
-<a href=#559 id=559 data-nosnippet>559</a>  accent="#f9ce00"
-<a href=#560 id=560 data-nosnippet>560</a>  to="{}"
-<a href=#561 id=561 data-nosnippet>561</a>  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
-<a href=#562 id=562 data-nosnippet>562</a>/&gt;
-<a href=#563 id=563 data-nosnippet>563</a>&lt;script src="https://embed.twentyuno.net/js/app.js"&gt;&lt;/script&gt;
-<a href=#564 id=564 data-nosnippet>564</a>
-<a href=#565 id=565 data-nosnippet>565</a>To send Sats, you'll need a [lightning wallet](https://lightningaddress.com/). 
-<a href=#566 id=566 data-nosnippet>566</a>
-<a href=#567 id=567 data-nosnippet>567</a>---
-<a href=#568 id=568 data-nosnippet>568</a>&lt;!-- WALLET_END --&gt;
-<a href=#569 id=569 data-nosnippet>569</a>"##</span>, lightning_address);
-<a href=#570 id=570 data-nosnippet>570</a>
-<a href=#571 id=571 data-nosnippet>571</a>            <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
-<a href=#572 id=572 data-nosnippet>572</a>            
-<a href=#573 id=573 data-nosnippet>573</a>            <span class="comment">// 3.1 Update Cover and Podcast Links
-<a href=#574 id=574 data-nosnippet>574</a>            </span><span class="kw">let </span>h1_regex = regex::Regex::new(<span class="string">r"(?m)^#\s.*$"</span>).unwrap();
-<a href=#575 id=575 data-nosnippet>575</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(m) = h1_regex.find(<span class="kw-2">&amp;</span>content) {
-<a href=#576 id=576 data-nosnippet>576</a>                <span class="kw">let </span>end = m.end();
-<a href=#577 id=577 data-nosnippet>577</a>                <span class="comment">// Clean existing cover/podcast
-<a href=#578 id=578 data-nosnippet>578</a>                </span><span class="kw">let </span>pod_marker = <span class="string">"Fountain.fm&lt;/a&gt;&lt;/center&gt;"</span>;
-<a href=#579 id=579 data-nosnippet>579</a>                <span class="kw">let </span><span class="kw-2">mut </span>search_area = <span class="kw-2">&amp;</span>content[end..];
-<a href=#580 id=580 data-nosnippet>580</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(pod_end) = search_area.find(pod_marker) {
-<a href=#581 id=581 data-nosnippet>581</a>                    content.replace_range(end..end + pod_end + pod_marker.len(), <span class="string">""</span>);
-<a href=#582 id=582 data-nosnippet>582</a>                }
-<a href=#583 id=583 data-nosnippet>583</a>                content.insert_str(end, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"\n{}\n{}"</span>, img_tag, podcast_links));
-<a href=#584 id=584 data-nosnippet>584</a>            }
-<a href=#585 id=585 data-nosnippet>585</a>
-<a href=#586 id=586 data-nosnippet>586</a>            <span class="comment">// 3.2 Update Wallet
-<a href=#587 id=587 data-nosnippet>587</a>            </span><span class="kw">let </span>w_start = <span class="string">"&lt;!-- WALLET_START --&gt;"</span>;
-<a href=#588 id=588 data-nosnippet>588</a>            <span class="kw">let </span>w_end = <span class="string">"&lt;!-- WALLET_END --&gt;"</span>;
-<a href=#589 id=589 data-nosnippet>589</a>            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(s), <span class="prelude-val">Some</span>(e)) = (content.find(w_start), content.find(w_end)) {
-<a href=#590 id=590 data-nosnippet>590</a>                content.replace_range(s..e + w_end.len(), <span class="string">""</span>);
-<a href=#591 id=591 data-nosnippet>591</a>            }
-<a href=#592 id=592 data-nosnippet>592</a>
-<a href=#593 id=593 data-nosnippet>593</a>            <span class="kw">let </span>ref_regex = regex::Regex::new(<span class="string">r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography"</span>).unwrap();
-<a href=#594 id=594 data-nosnippet>594</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(m) = ref_regex.find(<span class="kw-2">&amp;</span>content) {
-<a href=#595 id=595 data-nosnippet>595</a>                content.insert_str(m.start(), <span class="kw-2">&amp;</span>wallet_widget);
-<a href=#596 id=596 data-nosnippet>596</a>            } <span class="kw">else </span>{
-<a href=#597 id=597 data-nosnippet>597</a>                content.push_str(<span class="kw-2">&amp;</span>wallet_widget);
-<a href=#598 id=598 data-nosnippet>598</a>            }
-<a href=#599 id=599 data-nosnippet>599</a>            
-<a href=#600 id=600 data-nosnippet>600</a>            std::fs::write(<span class="kw-2">&amp;</span>md_path, content)<span class="question-mark">?</span>;
-<a href=#601 id=601 data-nosnippet>601</a>            <span class="macro">eprintln!</span>(<span class="string">"✅ Updated Markdown with cover and snippets."</span>);
-<a href=#602 id=602 data-nosnippet>602</a>            
-<a href=#603 id=603 data-nosnippet>603</a>            update_summary(number, <span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
-<a href=#604 id=604 data-nosnippet>604</a>        }
-<a href=#605 id=605 data-nosnippet>605</a>    } <span class="kw">else </span>{
-<a href=#606 id=606 data-nosnippet>606</a>        <span class="macro">eprintln!</span>(<span class="string">"⚠️  Markdown file {} not found. Snippets not injected."</span>, md_path);
-<a href=#607 id=607 data-nosnippet>607</a>    }
-<a href=#608 id=608 data-nosnippet>608</a>
-<a href=#609 id=609 data-nosnippet>609</a>    <span class="prelude-val">Ok</span>(())
-<a href=#610 id=610 data-nosnippet>610</a>}
-<a href=#611 id=611 data-nosnippet>611</a>
-<a href=#612 id=612 data-nosnippet>612</a><span class="doccomment">/// Updates the `SUMMARY.md` file to include the newly ingested episode.
-<a href=#613 id=613 data-nosnippet>613</a></span><span class="kw">fn </span>update_summary(number: <span class="kw-2">&amp;</span>str, file_path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#614 id=614 data-nosnippet>614</a>    <span class="kw">let </span>summary_path = <span class="string">"src/SUMMARY.md"</span>;
-<a href=#615 id=615 data-nosnippet>615</a>    <span class="kw">if </span>!std::path::Path::new(summary_path).exists() { <span class="kw">return </span><span class="prelude-val">Ok</span>(()); }
-<a href=#616 id=616 data-nosnippet>616</a>
-<a href=#617 id=617 data-nosnippet>617</a>    <span class="kw">let </span><span class="kw-2">mut </span>summary_content = std::fs::read_to_string(summary_path)<span class="question-mark">?</span>;
-<a href=#618 id=618 data-nosnippet>618</a>    <span class="kw">let </span>content = std::fs::read_to_string(file_path)<span class="question-mark">?</span>;
-<a href=#619 id=619 data-nosnippet>619</a>    <span class="kw">let </span>title_line = content.lines()
-<a href=#620 id=620 data-nosnippet>620</a>        .find(|line| line.starts_with(<span class="string">"# "</span>))
-<a href=#621 id=621 data-nosnippet>621</a>        .map(|line| line.trim_start_matches(<span class="string">"# "</span>).trim())
-<a href=#622 id=622 data-nosnippet>622</a>        .unwrap_or(<span class="string">"Untitled"</span>);
-<a href=#623 id=623 data-nosnippet>623</a>
-<a href=#624 id=624 data-nosnippet>624</a>    <span class="kw">let </span><span class="kw-2">mut </span>title = title_line.replace(<span class="string">"**"</span>, <span class="string">""</span>).trim().to_string();
-<a href=#625 id=625 data-nosnippet>625</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = title.find(<span class="string">':'</span>) {
-<a href=#626 id=626 data-nosnippet>626</a>        title = title[pos + <span class="number">1</span>..].trim().to_string();
-<a href=#627 id=627 data-nosnippet>627</a>    }
-<a href=#628 id=628 data-nosnippet>628</a>
-<a href=#629 id=629 data-nosnippet>629</a>    <span class="kw">let </span>new_entry = <span class="macro">format!</span>(<span class="string">"- [{} : {}]({}.md)"</span>, number, title, number);
-<a href=#630 id=630 data-nosnippet>630</a>    <span class="kw">let </span>start_marker = <span class="string">"&lt;!-- RECENT_START --&gt;"</span>;
-<a href=#631 id=631 data-nosnippet>631</a>    <span class="kw">let </span>end_marker = <span class="string">"&lt;!-- RECENT_END --&gt;"</span>;
-<a href=#632 id=632 data-nosnippet>632</a>
-<a href=#633 id=633 data-nosnippet>633</a>    <span class="kw">if let </span>(<span class="prelude-val">Some</span>(start_idx), <span class="prelude-val">Some</span>(end_idx)) = (summary_content.find(start_marker), summary_content.find(end_marker)) {
-<a href=#634 id=634 data-nosnippet>634</a>        <span class="kw">let </span>insert_pos = start_idx + start_marker.len();
-<a href=#635 id=635 data-nosnippet>635</a>        <span class="kw">let </span>recent_section = <span class="kw-2">&amp;</span>summary_content[insert_pos..end_idx];
-<a href=#636 id=636 data-nosnippet>636</a>        <span class="kw">let </span><span class="kw-2">mut </span>entries: Vec&lt;String&gt; = recent_section.trim().lines().map(|l| l.to_string()).filter(|l| !l.is_empty()).collect();
-<a href=#637 id=637 data-nosnippet>637</a>        entries.retain(|l| !l.contains(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"({}.md)"</span>, number)));
-<a href=#638 id=638 data-nosnippet>638</a>        entries.insert(<span class="number">0</span>, new_entry);
-<a href=#639 id=639 data-nosnippet>639</a>        <span class="kw">let </span>new_recent_content = <span class="macro">format!</span>(<span class="string">"\n{}\n"</span>, entries.join(<span class="string">"\n"</span>));
-<a href=#640 id=640 data-nosnippet>640</a>        summary_content.replace_range(insert_pos..end_idx, <span class="kw-2">&amp;</span>new_recent_content);
-<a href=#641 id=641 data-nosnippet>641</a>        std::fs::write(summary_path, summary_content)<span class="question-mark">?</span>;
-<a href=#642 id=642 data-nosnippet>642</a>        <span class="macro">eprintln!</span>(<span class="string">"📑 Updated SUMMARY.md"</span>);
-<a href=#643 id=643 data-nosnippet>643</a>    }
-<a href=#644 id=644 data-nosnippet>644</a>
-<a href=#645 id=645 data-nosnippet>645</a>    <span class="prelude-val">Ok</span>(())
-<a href=#646 id=646 data-nosnippet>646</a>}
+<a href=#82 id=82 data-nosnippet>82</a>    </span>number: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#83 id=83 data-nosnippet>83</a>
+<a href=#84 id=84 data-nosnippet>84</a>    <span class="doccomment">/// Source directory for exports (e.g., Downloads folder)
+<a href=#85 id=85 data-nosnippet>85</a>    </span><span class="attr">#[arg(short, long, default_value = <span class="string">"/mnt/c/Users/ashut/Downloads"</span>)]
+<a href=#86 id=86 data-nosnippet>86</a>    </span>source: String,
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="doccomment">/// Title override
+<a href=#89 id=89 data-nosnippet>89</a>    </span><span class="attr">#[arg(short, long)]
+<a href=#90 id=90 data-nosnippet>90</a>    </span>title: <span class="prelude-ty">Option</span>&lt;String&gt;,
+<a href=#91 id=91 data-nosnippet>91</a>}
+<a href=#92 id=92 data-nosnippet>92</a>
+<a href=#93 id=93 data-nosnippet>93</a><span class="doccomment">/// Available Subcommands
+<a href=#94 id=94 data-nosnippet>94</a></span><span class="attr">#[derive(Subcommand)]
+<a href=#95 id=95 data-nosnippet>95</a></span><span class="kw">enum </span>Commands {
+<a href=#96 id=96 data-nosnippet>96</a>    <span class="doccomment">/// Standard mdbook preprocessor handshake
+<a href=#97 id=97 data-nosnippet>97</a>    </span>Supports { renderer: String },
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="doccomment">/// Check system dependencies (mdbook, mdbook-katex, etc.)
+<a href=#99 id=99 data-nosnippet>99</a>    </span>Doctor,
+<a href=#100 id=100 data-nosnippet>100</a>}
+<a href=#101 id=101 data-nosnippet>101</a>
+<a href=#102 id=102 data-nosnippet>102</a><span class="kw">fn </span>main() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="comment">// 1. Run "Doctor" checks implicitly on every run (except doctor itself)
+<a href=#104 id=104 data-nosnippet>104</a>    </span><span class="kw">let </span>cli = Cli::parse();
+<a href=#105 id=105 data-nosnippet>105</a>    <span class="kw">let </span>config = IngestConfig::load();
+<a href=#106 id=106 data-nosnippet>106</a>    
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="kw">match </span><span class="kw-2">&amp;</span>cli.command {
+<a href=#108 id=108 data-nosnippet>108</a>        <span class="prelude-val">Some</span>(Commands::Doctor) =&gt; {
+<a href=#109 id=109 data-nosnippet>109</a>            <span class="kw">return </span>run_doctor();
+<a href=#110 id=110 data-nosnippet>110</a>        }
+<a href=#111 id=111 data-nosnippet>111</a>        <span class="kw">_ </span>=&gt; {
+<a href=#112 id=112 data-nosnippet>112</a>            <span class="comment">// Implicit check: only warn, don't block yet, to allow installation
+<a href=#113 id=113 data-nosnippet>113</a>            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = check_dependencies() {
+<a href=#114 id=114 data-nosnippet>114</a>                <span class="macro">eprintln!</span>(<span class="string">"⚠️  Dependency Warning: {}"</span>, e);
+<a href=#115 id=115 data-nosnippet>115</a>            }
+<a href=#116 id=116 data-nosnippet>116</a>        }
+<a href=#117 id=117 data-nosnippet>117</a>    }
+<a href=#118 id=118 data-nosnippet>118</a>
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="comment">// 2. Handle Subcommands
+<a href=#120 id=120 data-nosnippet>120</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(command) = cli.command {
+<a href=#121 id=121 data-nosnippet>121</a>        <span class="kw">match </span>command {
+<a href=#122 id=122 data-nosnippet>122</a>            Commands::Supports { renderer } =&gt; {
+<a href=#123 id=123 data-nosnippet>123</a>                <span class="kw">if </span>renderer == <span class="string">"html" </span>{
+<a href=#124 id=124 data-nosnippet>124</a>                    std::process::exit(<span class="number">0</span>);
+<a href=#125 id=125 data-nosnippet>125</a>                } <span class="kw">else </span>{
+<a href=#126 id=126 data-nosnippet>126</a>                    std::process::exit(<span class="number">1</span>);
+<a href=#127 id=127 data-nosnippet>127</a>                }
+<a href=#128 id=128 data-nosnippet>128</a>            }
+<a href=#129 id=129 data-nosnippet>129</a>            <span class="kw">_ </span>=&gt; {}
+<a href=#130 id=130 data-nosnippet>130</a>        }
+<a href=#131 id=131 data-nosnippet>131</a>    }
+<a href=#132 id=132 data-nosnippet>132</a>
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="kw">let </span><span class="kw-2">mut </span>source = cli.source.clone();
+<a href=#134 id=134 data-nosnippet>134</a>    
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(config_path) = <span class="kw-2">&amp;</span>config.downloads_path {
+<a href=#136 id=136 data-nosnippet>136</a>        <span class="kw">if </span>cli.source == <span class="string">"/mnt/c/Users/ashut/Downloads" </span>{
+<a href=#137 id=137 data-nosnippet>137</a>            source = config_path.clone();
+<a href=#138 id=138 data-nosnippet>138</a>            <span class="macro">eprintln!</span>(<span class="string">"📂 Using source from book.toml: {}"</span>, source);
+<a href=#139 id=139 data-nosnippet>139</a>        } <span class="kw">else </span>{
+<a href=#140 id=140 data-nosnippet>140</a>            <span class="macro">eprintln!</span>(<span class="string">"💡 Overriding book.toml source with CLI flag: {}"</span>, source);
+<a href=#141 id=141 data-nosnippet>141</a>        }
+<a href=#142 id=142 data-nosnippet>142</a>    } <span class="kw">else if </span>cli.source != <span class="string">"/mnt/c/Users/ashut/Downloads" </span>{
+<a href=#143 id=143 data-nosnippet>143</a>        <span class="macro">eprintln!</span>(<span class="string">"📂 Using source from CLI flag: {}"</span>, source);
+<a href=#144 id=144 data-nosnippet>144</a>    }
+<a href=#145 id=145 data-nosnippet>145</a>
+<a href=#146 id=146 data-nosnippet>146</a>    <span class="comment">// 3. Handle Ingestion
+<a href=#147 id=147 data-nosnippet>147</a>    </span><span class="kw">if </span>cli.text {
+<a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
+<a href=#149 id=149 data-nosnippet>149</a>            ingest_text(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, cli.title.as_deref(), <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
+<a href=#150 id=150 data-nosnippet>150</a>        } <span class="kw">else </span>{
+<a href=#151 id=151 data-nosnippet>151</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)"</span>);
+<a href=#152 id=152 data-nosnippet>152</a>        }
+<a href=#153 id=153 data-nosnippet>153</a>    } <span class="kw">else if </span>cli.image {
+<a href=#154 id=154 data-nosnippet>154</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
+<a href=#155 id=155 data-nosnippet>155</a>            ingest_image(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
+<a href=#156 id=156 data-nosnippet>156</a>        } <span class="kw">else </span>{
+<a href=#157 id=157 data-nosnippet>157</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)"</span>);
+<a href=#158 id=158 data-nosnippet>158</a>        }
+<a href=#159 id=159 data-nosnippet>159</a>    } <span class="kw">else if </span>cli.video {
+<a href=#160 id=160 data-nosnippet>160</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(number) = cli.number {
+<a href=#161 id=161 data-nosnippet>161</a>            ingest_video(<span class="kw-2">&amp;</span>number, <span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>config)<span class="question-mark">?</span>;
+<a href=#162 id=162 data-nosnippet>162</a>        } <span class="kw">else </span>{
+<a href=#163 id=163 data-nosnippet>163</a>            <span class="macro">anyhow::bail!</span>(<span class="string">"❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)"</span>);
+<a href=#164 id=164 data-nosnippet>164</a>        }
+<a href=#165 id=165 data-nosnippet>165</a>    } <span class="kw">else if </span>cli.number.is_some() {
+<a href=#166 id=166 data-nosnippet>166</a>        <span class="macro">eprintln!</span>(<span class="string">"ℹ️  Please specify asset type (e.g., --text or --image)"</span>);
+<a href=#167 id=167 data-nosnippet>167</a>    } <span class="kw">else </span>{
+<a href=#168 id=168 data-nosnippet>168</a>        <span class="comment">// Standard mdbook preprocessor handshake
+<a href=#169 id=169 data-nosnippet>169</a>        </span><span class="kw">let </span>(_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())<span class="question-mark">?</span>;
+<a href=#170 id=170 data-nosnippet>170</a>        <span class="kw">let </span>json = serde_json::to_string(<span class="kw-2">&amp;</span>book)<span class="question-mark">?</span>;
+<a href=#171 id=171 data-nosnippet>171</a>        <span class="macro">print!</span>(<span class="string">"{}"</span>, json);
+<a href=#172 id=172 data-nosnippet>172</a>    }
+<a href=#173 id=173 data-nosnippet>173</a>
+<a href=#174 id=174 data-nosnippet>174</a>    <span class="prelude-val">Ok</span>(())
+<a href=#175 id=175 data-nosnippet>175</a>}
+<a href=#176 id=176 data-nosnippet>176</a>
+<a href=#177 id=177 data-nosnippet>177</a><span class="doccomment">/// Orchestrates the ingestion of video assets and generates the Cinematic Scroll Strip.
+<a href=#178 id=178 data-nosnippet>178</a></span><span class="kw">fn </span>ingest_video(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#179 id=179 data-nosnippet>179</a>    <span class="macro">eprintln!</span>(<span class="string">"🎬 Ingesting video for episode {}..."</span>, number);
+<a href=#180 id=180 data-nosnippet>180</a>    
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="comment">// 1. Discovery &amp; Migration
+<a href=#182 id=182 data-nosnippet>182</a>    </span><span class="kw">let </span>vid_dir = <span class="string">"src/vid"</span>;
+<a href=#183 id=183 data-nosnippet>183</a>    std::fs::create_dir_all(vid_dir)<span class="question-mark">?</span>;
+<a href=#184 id=184 data-nosnippet>184</a>
+<a href=#185 id=185 data-nosnippet>185</a>    <span class="kw">let </span>epi_regex = Regex::new(<span class="string">r"^\d{3}-"</span>).unwrap();
+<a href=#186 id=186 data-nosnippet>186</a>
+<a href=#187 id=187 data-nosnippet>187</a>    <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*{}*.mp4"</span>, source, number);
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
+<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
+<a href=#190 id=190 data-nosnippet>190</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
+<a href=#191 id=191 data-nosnippet>191</a>            <span class="comment">// Strictly enforce ###- pattern for migration
+<a href=#192 id=192 data-nosnippet>192</a>            </span><span class="kw">if </span>epi_regex.is_match(filename) {
+<a href=#193 id=193 data-nosnippet>193</a>                <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"{}/{}"</span>, vid_dir, filename);
+<a href=#194 id=194 data-nosnippet>194</a>                std::fs::copy(<span class="kw-2">&amp;</span>path, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
+<a href=#195 id=195 data-nosnippet>195</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ Migrated: {}"</span>, filename);
+<a href=#196 id=196 data-nosnippet>196</a>            }
+<a href=#197 id=197 data-nosnippet>197</a>        }
+<a href=#198 id=198 data-nosnippet>198</a>    }
+<a href=#199 id=199 data-nosnippet>199</a>
+<a href=#200 id=200 data-nosnippet>200</a>    <span class="comment">// 2. Build the Global Carousel List
+<a href=#201 id=201 data-nosnippet>201</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>all_vids = Vec::new();
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}/*.mp4"</span>, vid_dir)) {
+<a href=#203 id=203 data-nosnippet>203</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
+<a href=#204 id=204 data-nosnippet>204</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
+<a href=#205 id=205 data-nosnippet>205</a>            <span class="comment">// Strictly enforce ###- pattern for the carousel
+<a href=#206 id=206 data-nosnippet>206</a>            </span><span class="kw">if </span>epi_regex.is_match(filename) {
+<a href=#207 id=207 data-nosnippet>207</a>                all_vids.push(path);
+<a href=#208 id=208 data-nosnippet>208</a>            }
+<a href=#209 id=209 data-nosnippet>209</a>        }
+<a href=#210 id=210 data-nosnippet>210</a>    }
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>    <span class="comment">// Sort by episode number (descending)
+<a href=#213 id=213 data-nosnippet>213</a>    </span>all_vids.sort_by(|a, b| {
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="kw">let </span>name_a = a.file_name().unwrap().to_str().unwrap();
+<a href=#215 id=215 data-nosnippet>215</a>        <span class="kw">let </span>name_b = b.file_name().unwrap().to_str().unwrap();
+<a href=#216 id=216 data-nosnippet>216</a>        name_b.cmp(name_a)
+<a href=#217 id=217 data-nosnippet>217</a>    });
+<a href=#218 id=218 data-nosnippet>218</a>
+<a href=#219 id=219 data-nosnippet>219</a>    <span class="comment">// 3. Generate HTML Cinematic Scroll Strip
+<a href=#220 id=220 data-nosnippet>220</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>html = String::new();
+<a href=#221 id=221 data-nosnippet>221</a>    html.push_str(<span class="string">"\n&lt;!-- VIDEO_STRIP_START --&gt;\n"</span>);
+<a href=#222 id=222 data-nosnippet>222</a>    html.push_str(<span class="string">"\n---\n\n### Info Graphics feed from Mosaic.SO\n\n"</span>);
+<a href=#223 id=223 data-nosnippet>223</a>    
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="comment">// Global Script and Styles
+<a href=#225 id=225 data-nosnippet>225</a>    </span>html.push_str(<span class="string">r#"&lt;style&gt;
+<a href=#226 id=226 data-nosnippet>226</a>  .video-carousel-container video { pointer-events: none; }
+<a href=#227 id=227 data-nosnippet>227</a>  .vid-toggle { z-index: 100 !important; transition: transform 0.1s; }
+<a href=#228 id=228 data-nosnippet>228</a>  .vid-toggle:active { transform: scale(0.9); }
+<a href=#229 id=229 data-nosnippet>229</a>&lt;/style&gt;
+<a href=#230 id=230 data-nosnippet>230</a>&lt;script&gt;
+<a href=#231 id=231 data-nosnippet>231</a>  window.oph_toggle = function(btn) {
+<a href=#232 id=232 data-nosnippet>232</a>    const parent = btn.parentElement;
+<a href=#233 id=233 data-nosnippet>233</a>    const vid = parent.querySelector('video');
+<a href=#234 id=234 data-nosnippet>234</a>    const container = btn.closest('.video-carousel-container');
+<a href=#235 id=235 data-nosnippet>235</a>    
+<a href=#236 id=236 data-nosnippet>236</a>    if (vid.paused) {
+<a href=#237 id=237 data-nosnippet>237</a>      container.querySelectorAll('video').forEach(v =&gt; {
+<a href=#238 id=238 data-nosnippet>238</a>        v.pause();
+<a href=#239 id=239 data-nosnippet>239</a>        v.muted = true;
+<a href=#240 id=240 data-nosnippet>240</a>        const b = v.parentElement.querySelector('.vid-toggle');
+<a href=#241 id=241 data-nosnippet>241</a>        if (b) b.innerText = '🔇';
+<a href=#242 id=242 data-nosnippet>242</a>      });
+<a href=#243 id=243 data-nosnippet>243</a>      vid.muted = false;
+<a href=#244 id=244 data-nosnippet>244</a>      vid.play();
+<a href=#245 id=245 data-nosnippet>245</a>      btn.innerText = '🔊';
+<a href=#246 id=246 data-nosnippet>246</a>    } else {
+<a href=#247 id=247 data-nosnippet>247</a>      vid.pause();
+<a href=#248 id=248 data-nosnippet>248</a>      vid.muted = true;
+<a href=#249 id=249 data-nosnippet>249</a>      btn.innerText = '🔇';
+<a href=#250 id=250 data-nosnippet>250</a>    }
+<a href=#251 id=251 data-nosnippet>251</a>  };
+<a href=#252 id=252 data-nosnippet>252</a>&lt;/script&gt;
+<a href=#253 id=253 data-nosnippet>253</a>"#</span>);
+<a href=#254 id=254 data-nosnippet>254</a>
+<a href=#255 id=255 data-nosnippet>255</a>    html.push_str(<span class="string">"&lt;div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\"&gt;\n"</span>);
+<a href=#256 id=256 data-nosnippet>256</a>
+<a href=#257 id=257 data-nosnippet>257</a>    <span class="kw">let </span><span class="kw-2">mut </span>focus_id = <span class="prelude-val">None</span>;
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a>    <span class="kw">for </span>(i, path) <span class="kw">in </span>all_vids.iter().enumerate() {
+<a href=#260 id=260 data-nosnippet>260</a>        <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="kw">let </span>is_current = filename.starts_with(number);
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="kw">let </span>id = <span class="macro">format!</span>(<span class="string">"vid-{}"</span>, i);
+<a href=#263 id=263 data-nosnippet>263</a>        <span class="kw">if </span>is_current &amp;&amp; focus_id.is_none() {
+<a href=#264 id=264 data-nosnippet>264</a>            focus_id = <span class="prelude-val">Some</span>(id.clone());
+<a href=#265 id=265 data-nosnippet>265</a>        }
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>        html.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+<a href=#268 id=268 data-nosnippet>268</a>            <span class="string">r#"  &lt;div id="{}" style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;"&gt;
+<a href=#269 id=269 data-nosnippet>269</a>    &lt;video src="vid/{}" style="width: 100%; height: 85%; object-fit: contain; pointer-events: none;" playsinline loop preload="auto"&gt;&lt;/video&gt;
+<a href=#270 id=270 data-nosnippet>270</a>    &lt;div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;"&gt;{}&lt;/div&gt;
+<a href=#271 id=271 data-nosnippet>271</a>    &lt;button class="vid-toggle" onclick="oph_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; z-index: 100;"&gt;🔇&lt;/button&gt;
+<a href=#272 id=272 data-nosnippet>272</a>  &lt;/div&gt;
+<a href=#273 id=273 data-nosnippet>273</a>"#</span>, id, filename, filename.replace(<span class="string">".mp4"</span>, <span class="string">""</span>)));
+<a href=#274 id=274 data-nosnippet>274</a>    }
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>    html.push_str(<span class="string">"&lt;/div&gt;\n"</span>);
+<a href=#277 id=277 data-nosnippet>277</a>
+<a href=#278 id=278 data-nosnippet>278</a>    <span class="comment">// Add Scroll-to-Focus and Init Script
+<a href=#279 id=279 data-nosnippet>279</a>    </span>html.push_str(<span class="string">r#"&lt;script&gt;
+<a href=#280 id=280 data-nosnippet>280</a>  window.oph_toggle = function(btn) {
+<a href=#281 id=281 data-nosnippet>281</a>    const parent = btn.parentElement;
+<a href=#282 id=282 data-nosnippet>282</a>    const vid = parent.querySelector('video');
+<a href=#283 id=283 data-nosnippet>283</a>    const container = btn.closest('.video-carousel-container');
+<a href=#284 id=284 data-nosnippet>284</a>    
+<a href=#285 id=285 data-nosnippet>285</a>    if (vid.paused) {
+<a href=#286 id=286 data-nosnippet>286</a>      // 1. Stop and mute all others
+<a href=#287 id=287 data-nosnippet>287</a>      container.querySelectorAll('video').forEach(v =&gt; {
+<a href=#288 id=288 data-nosnippet>288</a>        if (v !== vid) {
+<a href=#289 id=289 data-nosnippet>289</a>          v.pause();
+<a href=#290 id=290 data-nosnippet>290</a>          v.muted = true;
+<a href=#291 id=291 data-nosnippet>291</a>          const otherBtn = v.parentElement.querySelector('.vid-toggle');
+<a href=#292 id=292 data-nosnippet>292</a>          if (otherBtn) otherBtn.innerText = '🔇';
+<a href=#293 id=293 data-nosnippet>293</a>        }
+<a href=#294 id=294 data-nosnippet>294</a>      });
+<a href=#295 id=295 data-nosnippet>295</a>      
+<a href=#296 id=296 data-nosnippet>296</a>      // 2. Play and unmute this one
+<a href=#297 id=297 data-nosnippet>297</a>      vid.muted = false;
+<a href=#298 id=298 data-nosnippet>298</a>      vid.volume = 1.0;
+<a href=#299 id=299 data-nosnippet>299</a>      vid.play();
+<a href=#300 id=300 data-nosnippet>300</a>      btn.innerText = '🔊';
+<a href=#301 id=301 data-nosnippet>301</a>    } else {
+<a href=#302 id=302 data-nosnippet>302</a>      vid.pause();
+<a href=#303 id=303 data-nosnippet>303</a>      vid.muted = true;
+<a href=#304 id=304 data-nosnippet>304</a>      btn.innerText = '🔇';
+<a href=#305 id=305 data-nosnippet>305</a>    }
+<a href=#306 id=306 data-nosnippet>306</a>  };
+<a href=#307 id=307 data-nosnippet>307</a>
+<a href=#308 id=308 data-nosnippet>308</a>  window.addEventListener('load', () =&gt; {
+<a href=#309 id=309 data-nosnippet>309</a>    const container = document.querySelector('.video-carousel-container');
+<a href=#310 id=310 data-nosnippet>310</a>    if (container) {
+<a href=#311 id=311 data-nosnippet>311</a>      container.querySelectorAll('video').forEach(v =&gt; { 
+<a href=#312 id=312 data-nosnippet>312</a>        v.muted = true; 
+<a href=#313 id=313 data-nosnippet>313</a>        v.pause(); 
+<a href=#314 id=314 data-nosnippet>314</a>      });
+<a href=#315 id=315 data-nosnippet>315</a>    }
+<a href=#316 id=316 data-nosnippet>316</a>"#</span>);
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = focus_id {
+<a href=#319 id=319 data-nosnippet>319</a>        html.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+<a href=#320 id=320 data-nosnippet>320</a>            <span class="string">r#"    const el = document.getElementById('{}');
+<a href=#321 id=321 data-nosnippet>321</a>"#</span>, <span class="string">"vid-focus-placeholder"</span>));
+<a href=#322 id=322 data-nosnippet>322</a>    }
+<a href=#323 id=323 data-nosnippet>323</a>    
+<a href=#324 id=324 data-nosnippet>324</a>    html.push_str(<span class="string">r#"    if (container &amp;&amp; el) {
+<a href=#325 id=325 data-nosnippet>325</a>      const offset = el.offsetLeft - (container.offsetWidth / 2) + (el.offsetWidth / 2);
+<a href=#326 id=326 data-nosnippet>326</a>      container.scrollTo({ left: offset, behavior: 'smooth' });
+<a href=#327 id=327 data-nosnippet>327</a>    }
+<a href=#328 id=328 data-nosnippet>328</a>  });
+<a href=#329 id=329 data-nosnippet>329</a>&lt;/script&gt;
+<a href=#330 id=330 data-nosnippet>330</a>"#</span>);
+<a href=#331 id=331 data-nosnippet>331</a>    html.push_str(<span class="string">"&lt;!-- VIDEO_STRIP_END --&gt;\n\n"</span>);
+<a href=#332 id=332 data-nosnippet>332</a>
+<a href=#333 id=333 data-nosnippet>333</a>    <span class="comment">// 4. Global Refresh: Inject into ALL Markdown files that have a strip marker
+<a href=#334 id=334 data-nosnippet>334</a>    </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="string">"src/*.md"</span>) {
+<a href=#335 id=335 data-nosnippet>335</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
+<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
+<a href=#337 id=337 data-nosnippet>337</a>            
+<a href=#338 id=338 data-nosnippet>338</a>            <span class="kw">if </span>content.contains(<span class="string">"&lt;!-- VIDEO_STRIP_START --&gt;"</span>) {
+<a href=#339 id=339 data-nosnippet>339</a>                <span class="kw">let </span>current_file_num = path.file_stem().unwrap().to_str().unwrap();
+<a href=#340 id=340 data-nosnippet>340</a>                
+<a href=#341 id=341 data-nosnippet>341</a>                <span class="comment">// 4.1 Update the Focus for THIS specific file
+<a href=#342 id=342 data-nosnippet>342</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>local_html = html.clone();
+<a href=#343 id=343 data-nosnippet>343</a>                
+<a href=#344 id=344 data-nosnippet>344</a>                <span class="comment">// Find the first video ID for this episode number
+<a href=#345 id=345 data-nosnippet>345</a>                </span><span class="kw">let </span><span class="kw-2">mut </span>local_focus_id = String::from(<span class="string">"vid-0"</span>);
+<a href=#346 id=346 data-nosnippet>346</a>                <span class="kw">for </span>(i, p) <span class="kw">in </span>all_vids.iter().enumerate() {
+<a href=#347 id=347 data-nosnippet>347</a>                    <span class="kw">if </span>p.file_name().unwrap().to_str().unwrap().starts_with(current_file_num) {
+<a href=#348 id=348 data-nosnippet>348</a>                        local_focus_id = <span class="macro">format!</span>(<span class="string">"vid-{}"</span>, i);
+<a href=#349 id=349 data-nosnippet>349</a>                        <span class="kw">break</span>;
+<a href=#350 id=350 data-nosnippet>350</a>                    }
+<a href=#351 id=351 data-nosnippet>351</a>                }
+<a href=#352 id=352 data-nosnippet>352</a>                local_html = local_html.replace(<span class="string">"'vid-focus-placeholder'"</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"'{}'"</span>, local_focus_id));
+<a href=#353 id=353 data-nosnippet>353</a>
+<a href=#354 id=354 data-nosnippet>354</a>                <span class="comment">// 4.2 Replace the existing strip
+<a href=#355 id=355 data-nosnippet>355</a>                </span><span class="kw">let </span>start_marker = <span class="string">"&lt;!-- VIDEO_STRIP_START --&gt;"</span>;
+<a href=#356 id=356 data-nosnippet>356</a>                <span class="kw">let </span>end_marker = <span class="string">"&lt;!-- VIDEO_STRIP_END --&gt;"</span>;
+<a href=#357 id=357 data-nosnippet>357</a>                <span class="kw">if let </span>(<span class="prelude-val">Some</span>(s), <span class="prelude-val">Some</span>(e)) = (content.find(start_marker), content.find(end_marker)) {
+<a href=#358 id=358 data-nosnippet>358</a>                    content.replace_range(s..e + end_marker.len(), <span class="kw-2">&amp;</span>local_html);
+<a href=#359 id=359 data-nosnippet>359</a>                }
+<a href=#360 id=360 data-nosnippet>360</a>
+<a href=#361 id=361 data-nosnippet>361</a>                std::fs::write(<span class="kw-2">&amp;</span>path, content)<span class="question-mark">?</span>;
+<a href=#362 id=362 data-nosnippet>362</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ Synchronized Global Strip in {}"</span>, path.display());
+<a href=#363 id=363 data-nosnippet>363</a>            }
+<a href=#364 id=364 data-nosnippet>364</a>        }
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>    <span class="prelude-val">Ok</span>(())
+<a href=#368 id=368 data-nosnippet>368</a>}
+<a href=#369 id=369 data-nosnippet>369</a>
+<a href=#370 id=370 data-nosnippet>370</a><span class="doccomment">/// Checks if required external tools are available in the PATH.
+<a href=#371 id=371 data-nosnippet>371</a></span><span class="kw">fn </span>check_dependencies() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#372 id=372 data-nosnippet>372</a>    <span class="comment">// Check mdbook
+<a href=#373 id=373 data-nosnippet>373</a>    </span><span class="kw">let _ </span>= Command::new(<span class="string">"mdbook"</span>)
+<a href=#374 id=374 data-nosnippet>374</a>        .arg(<span class="string">"--version"</span>)
+<a href=#375 id=375 data-nosnippet>375</a>        .output()
+<a href=#376 id=376 data-nosnippet>376</a>        .context(<span class="string">"mdbook not found in PATH"</span>)<span class="question-mark">?</span>;
+<a href=#377 id=377 data-nosnippet>377</a>
+<a href=#378 id=378 data-nosnippet>378</a>    <span class="comment">// Check mdbook-katex
+<a href=#379 id=379 data-nosnippet>379</a>    </span><span class="kw">let _ </span>= Command::new(<span class="string">"mdbook-katex"</span>)
+<a href=#380 id=380 data-nosnippet>380</a>        .arg(<span class="string">"--version"</span>)
+<a href=#381 id=381 data-nosnippet>381</a>        .output()
+<a href=#382 id=382 data-nosnippet>382</a>        .context(<span class="string">"mdbook-katex not found in PATH. Please install it with 'cargo install mdbook-katex'"</span>)<span class="question-mark">?</span>;
+<a href=#383 id=383 data-nosnippet>383</a>
+<a href=#384 id=384 data-nosnippet>384</a>    <span class="prelude-val">Ok</span>(())
+<a href=#385 id=385 data-nosnippet>385</a>}
+<a href=#386 id=386 data-nosnippet>386</a>
+<a href=#387 id=387 data-nosnippet>387</a><span class="doccomment">/// Performs a diagnostic check of the local environment and book configuration.
+<a href=#388 id=388 data-nosnippet>388</a></span><span class="kw">fn </span>run_doctor() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#389 id=389 data-nosnippet>389</a>    <span class="macro">eprintln!</span>(<span class="string">"🔍 Checking environment..."</span>);
+<a href=#390 id=390 data-nosnippet>390</a>
+<a href=#391 id=391 data-nosnippet>391</a>    <span class="kw">match </span>Command::new(<span class="string">"mdbook"</span>).arg(<span class="string">"--version"</span>).output() {
+<a href=#392 id=392 data-nosnippet>392</a>        <span class="prelude-val">Ok</span>(out) =&gt; <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()),
+<a href=#393 id=393 data-nosnippet>393</a>        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">eprintln!</span>(<span class="string">"❌ mdbook: Not found"</span>),
+<a href=#394 id=394 data-nosnippet>394</a>    }
+<a href=#395 id=395 data-nosnippet>395</a>
+<a href=#396 id=396 data-nosnippet>396</a>    <span class="kw">match </span>Command::new(<span class="string">"mdbook-katex"</span>).arg(<span class="string">"--version"</span>).output() {
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="prelude-val">Ok</span>(out) =&gt; <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook-katex: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()),
+<a href=#398 id=398 data-nosnippet>398</a>        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">eprintln!</span>(<span class="string">"❌ mdbook-katex: Not found (Install with 'cargo install mdbook-katex')"</span>),
+<a href=#399 id=399 data-nosnippet>399</a>    }
+<a href=#400 id=400 data-nosnippet>400</a>
+<a href=#401 id=401 data-nosnippet>401</a>    <span class="kw">if </span>std::path::Path::new(<span class="string">"book.toml"</span>).exists() {
+<a href=#402 id=402 data-nosnippet>402</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(toml) = std::fs::read_to_string(<span class="string">"book.toml"</span>) {
+<a href=#403 id=403 data-nosnippet>403</a>            <span class="kw">if </span>toml.contains(<span class="string">"preprocessor.ingest"</span>) {
+<a href=#404 id=404 data-nosnippet>404</a>                <span class="macro">eprintln!</span>(<span class="string">"✅ book.toml: Ingestion configured"</span>);
+<a href=#405 id=405 data-nosnippet>405</a>            } <span class="kw">else </span>{
+<a href=#406 id=406 data-nosnippet>406</a>                <span class="macro">eprintln!</span>(<span class="string">"⚠️  book.toml: [preprocessor.ingest] section missing"</span>);
+<a href=#407 id=407 data-nosnippet>407</a>            }
+<a href=#408 id=408 data-nosnippet>408</a>        }
+<a href=#409 id=409 data-nosnippet>409</a>    }
+<a href=#410 id=410 data-nosnippet>410</a>
+<a href=#411 id=411 data-nosnippet>411</a>    <span class="prelude-val">Ok</span>(())
+<a href=#412 id=412 data-nosnippet>412</a>}
+<a href=#413 id=413 data-nosnippet>413</a>
+<a href=#414 id=414 data-nosnippet>414</a><span class="doccomment">/// Orchestrates the ingestion of text-based research assets.
+<a href=#415 id=415 data-nosnippet>415</a></span><span class="kw">fn </span>ingest_text(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, title: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt;, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#416 id=416 data-nosnippet>416</a>    <span class="macro">eprintln!</span>(<span class="string">"📖 Ingesting text for episode {}..."</span>, number);
+<a href=#417 id=417 data-nosnippet>417</a>    
+<a href=#418 id=418 data-nosnippet>418</a>    <span class="comment">// Find the latest .md, .zip, or .rs file
+<a href=#419 id=419 data-nosnippet>419</a>    </span><span class="kw">let </span>md_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.md"</span>, source);
+<a href=#420 id=420 data-nosnippet>420</a>    <span class="kw">let </span>zip_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.zip"</span>, source);
+<a href=#421 id=421 data-nosnippet>421</a>    <span class="kw">let </span>rs_pattern = <span class="macro">format!</span>(<span class="string">"{}/*.rs"</span>, source);
+<a href=#422 id=422 data-nosnippet>422</a>    
+<a href=#423 id=423 data-nosnippet>423</a>    <span class="kw">let </span><span class="kw-2">mut </span>md_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>md_pattern)<span class="question-mark">?</span>.filter_map(Result::ok)
+<a href=#424 id=424 data-nosnippet>424</a>        .filter(|p| {
+<a href=#425 id=425 data-nosnippet>425</a>            <span class="kw">let </span>filename = p.file_name().unwrap().to_str().unwrap();
+<a href=#426 id=426 data-nosnippet>426</a>            ![<span class="string">"SUMMARY.md"</span>, <span class="string">"cover.md"</span>, <span class="string">"README.md"</span>].contains(<span class="kw-2">&amp;</span>filename)
+<a href=#427 id=427 data-nosnippet>427</a>        }).collect();
+<a href=#428 id=428 data-nosnippet>428</a>        
+<a href=#429 id=429 data-nosnippet>429</a>    <span class="kw">let </span><span class="kw-2">mut </span>zip_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>zip_pattern)<span class="question-mark">?</span>.filter_map(Result::ok).collect();
+<a href=#430 id=430 data-nosnippet>430</a>    <span class="kw">let </span><span class="kw-2">mut </span>rs_files: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span>rs_pattern)<span class="question-mark">?</span>.filter_map(Result::ok).collect();
+<a href=#431 id=431 data-nosnippet>431</a>    
+<a href=#432 id=432 data-nosnippet>432</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_files = Vec::new();
+<a href=#433 id=433 data-nosnippet>433</a>    all_files.append(<span class="kw-2">&amp;mut </span>md_files);
+<a href=#434 id=434 data-nosnippet>434</a>    all_files.append(<span class="kw-2">&amp;mut </span>zip_files);
+<a href=#435 id=435 data-nosnippet>435</a>    all_files.append(<span class="kw-2">&amp;mut </span>rs_files);
+<a href=#436 id=436 data-nosnippet>436</a>
+<a href=#437 id=437 data-nosnippet>437</a>    all_files.sort_by(|a, b| {
+<a href=#438 id=438 data-nosnippet>438</a>        <span class="kw">let </span>metadata_a = std::fs::metadata(a).unwrap();
+<a href=#439 id=439 data-nosnippet>439</a>        <span class="kw">let </span>metadata_b = std::fs::metadata(b).unwrap();
+<a href=#440 id=440 data-nosnippet>440</a>        metadata_b.modified().unwrap().cmp(<span class="kw-2">&amp;</span>metadata_a.modified().unwrap())
+<a href=#441 id=441 data-nosnippet>441</a>    });
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>    <span class="kw">let </span>latest_file = all_files.first().context(<span class="macro">format!</span>(<span class="string">"❌ No .md, .zip, or .rs files found in {}"</span>, source))<span class="question-mark">?</span>;
+<a href=#444 id=444 data-nosnippet>444</a>    <span class="macro">eprintln!</span>(<span class="string">"📄 Found export: {:?}"</span>, latest_file.file_name().unwrap());
+<a href=#445 id=445 data-nosnippet>445</a>
+<a href=#446 id=446 data-nosnippet>446</a>    <span class="kw">let </span>content = <span class="kw">if </span>latest_file.extension().unwrap() == <span class="string">"zip" </span>{
+<a href=#447 id=447 data-nosnippet>447</a>        extract_html_from_zip(latest_file)<span class="question-mark">?
+<a href=#448 id=448 data-nosnippet>448</a>    </span>} <span class="kw">else </span>{
+<a href=#449 id=449 data-nosnippet>449</a>        std::fs::read_to_string(latest_file)<span class="question-mark">?
+<a href=#450 id=450 data-nosnippet>450</a>    </span>};
+<a href=#451 id=451 data-nosnippet>451</a>
+<a href=#452 id=452 data-nosnippet>452</a>    <span class="kw">let </span>processed = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(<span class="number">5</span>));
+<a href=#453 id=453 data-nosnippet>453</a>
+<a href=#454 id=454 data-nosnippet>454</a>    <span class="kw">let </span>dest_path = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
+<a href=#455 id=455 data-nosnippet>455</a>    std::fs::write(<span class="kw-2">&amp;</span>dest_path, processed)<span class="question-mark">?</span>;
+<a href=#456 id=456 data-nosnippet>456</a>    <span class="macro">eprintln!</span>(<span class="string">"✅ Saved text to: {}"</span>, dest_path);
+<a href=#457 id=457 data-nosnippet>457</a>
+<a href=#458 id=458 data-nosnippet>458</a>    update_summary(number, <span class="kw-2">&amp;</span>dest_path)<span class="question-mark">?</span>;
+<a href=#459 id=459 data-nosnippet>459</a>    
+<a href=#460 id=460 data-nosnippet>460</a>    <span class="prelude-val">Ok</span>(())
+<a href=#461 id=461 data-nosnippet>461</a>}
+<a href=#462 id=462 data-nosnippet>462</a>
+<a href=#463 id=463 data-nosnippet>463</a><span class="doccomment">/// Legacy/Fallback: Extracts HTML from ZIP.
+<a href=#464 id=464 data-nosnippet>464</a></span><span class="kw">fn </span>extract_html_from_zip(zip_path: <span class="kw-2">&amp;</span>PathBuf) -&gt; <span class="prelude-ty">Result</span>&lt;String&gt; {
+<a href=#465 id=465 data-nosnippet>465</a>    <span class="kw">let </span>file = std::fs::File::open(zip_path)<span class="question-mark">?</span>;
+<a href=#466 id=466 data-nosnippet>466</a>    <span class="kw">let </span><span class="kw-2">mut </span>archive = zip::ZipArchive::new(file)<span class="question-mark">?</span>;
+<a href=#467 id=467 data-nosnippet>467</a>    
+<a href=#468 id=468 data-nosnippet>468</a>    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..archive.len() {
+<a href=#469 id=469 data-nosnippet>469</a>        <span class="kw">let </span><span class="kw-2">mut </span>file = archive.by_index(i)<span class="question-mark">?</span>;
+<a href=#470 id=470 data-nosnippet>470</a>        <span class="kw">if </span>file.name().ends_with(<span class="string">".html"</span>) {
+<a href=#471 id=471 data-nosnippet>471</a>            <span class="kw">let </span><span class="kw-2">mut </span>html_content = String::new();
+<a href=#472 id=472 data-nosnippet>472</a>            <span class="kw">use </span>std::io::Read;
+<a href=#473 id=473 data-nosnippet>473</a>            file.read_to_string(<span class="kw-2">&amp;mut </span>html_content)<span class="question-mark">?</span>;
+<a href=#474 id=474 data-nosnippet>474</a>            
+<a href=#475 id=475 data-nosnippet>475</a>            <span class="kw">let </span>eq_regex = regex::Regex::new(<span class="string">r#"&lt;img[^&gt;]*class="[^"]*Math[^"]*"[^&gt;]*title="([^"]*)"[^&gt;]*&gt;"#</span>).unwrap();
+<a href=#476 id=476 data-nosnippet>476</a>            <span class="kw">let </span>preprocessed_html = eq_regex.replace_all(<span class="kw-2">&amp;</span>html_content, |caps: <span class="kw-2">&amp;</span>regex::Captures| {
+<a href=#477 id=477 data-nosnippet>477</a>                <span class="macro">format!</span>(<span class="string">" ${}$ "</span>, caps.get(<span class="number">1</span>).unwrap().as_str())
+<a href=#478 id=478 data-nosnippet>478</a>            }).to_string();
+<a href=#479 id=479 data-nosnippet>479</a>
+<a href=#480 id=480 data-nosnippet>480</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(html2md::parse_html(<span class="kw-2">&amp;</span>preprocessed_html));
+<a href=#481 id=481 data-nosnippet>481</a>        }
+<a href=#482 id=482 data-nosnippet>482</a>    }
+<a href=#483 id=483 data-nosnippet>483</a>    <span class="macro">anyhow::bail!</span>(<span class="string">"❌ No HTML file found in ZIP archive"</span>)
+<a href=#484 id=484 data-nosnippet>484</a>}
+<a href=#485 id=485 data-nosnippet>485</a>
+<a href=#486 id=486 data-nosnippet>486</a><span class="doccomment">/// Orchestrates the ingestion of image assets and social widgets.
+<a href=#487 id=487 data-nosnippet>487</a></span><span class="kw">fn </span>ingest_image(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#488 id=488 data-nosnippet>488</a>    <span class="macro">eprintln!</span>(<span class="string">"🖼️  Ingesting image for episode {}..."</span>, number);
+<a href=#489 id=489 data-nosnippet>489</a>    
+<a href=#490 id=490 data-nosnippet>490</a>    <span class="comment">// 1. Find the latest image
+<a href=#491 id=491 data-nosnippet>491</a>    </span><span class="kw">let </span>img_extensions = [<span class="string">"png"</span>, <span class="string">"jpg"</span>, <span class="string">"jpeg"</span>, <span class="string">"webp"</span>];
+<a href=#492 id=492 data-nosnippet>492</a>    <span class="kw">let </span><span class="kw-2">mut </span>all_images = Vec::new();
+<a href=#493 id=493 data-nosnippet>493</a>    
+<a href=#494 id=494 data-nosnippet>494</a>    <span class="kw">for </span>ext <span class="kw">in </span>img_extensions {
+<a href=#495 id=495 data-nosnippet>495</a>        <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*.{}"</span>, source, ext);
+<a href=#496 id=496 data-nosnippet>496</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
+<a href=#497 id=497 data-nosnippet>497</a>            <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
+<a href=#498 id=498 data-nosnippet>498</a>                all_images.push(path);
+<a href=#499 id=499 data-nosnippet>499</a>            }
+<a href=#500 id=500 data-nosnippet>500</a>        }
+<a href=#501 id=501 data-nosnippet>501</a>    }
+<a href=#502 id=502 data-nosnippet>502</a>
+<a href=#503 id=503 data-nosnippet>503</a>    all_images.sort_by(|a, b| {
+<a href=#504 id=504 data-nosnippet>504</a>        <span class="kw">let </span>metadata_a = std::fs::metadata(a).unwrap();
+<a href=#505 id=505 data-nosnippet>505</a>        <span class="kw">let </span>metadata_b = std::fs::metadata(b).unwrap();
+<a href=#506 id=506 data-nosnippet>506</a>        metadata_b.modified().unwrap().cmp(<span class="kw-2">&amp;</span>metadata_a.modified().unwrap())
+<a href=#507 id=507 data-nosnippet>507</a>    });
+<a href=#508 id=508 data-nosnippet>508</a>
+<a href=#509 id=509 data-nosnippet>509</a>    <span class="kw">let </span>latest_img = all_images.first().context(<span class="macro">format!</span>(<span class="string">"❌ No image files found in {}"</span>, source))<span class="question-mark">?</span>;
+<a href=#510 id=510 data-nosnippet>510</a>    <span class="kw">let </span>ext = latest_img.extension().unwrap().to_str().unwrap();
+<a href=#511 id=511 data-nosnippet>511</a>    <span class="macro">eprintln!</span>(<span class="string">"📸 Found image: {:?}"</span>, latest_img.file_name().unwrap());
+<a href=#512 id=512 data-nosnippet>512</a>
+<a href=#513 id=513 data-nosnippet>513</a>    <span class="comment">// 2. Prepare destination
+<a href=#514 id=514 data-nosnippet>514</a>    </span><span class="kw">let </span>img_dir = <span class="string">"src/img"</span>;
+<a href=#515 id=515 data-nosnippet>515</a>    std::fs::create_dir_all(img_dir)<span class="question-mark">?</span>;
+<a href=#516 id=516 data-nosnippet>516</a>    <span class="kw">let </span>dest_path = <span class="macro">format!</span>(<span class="string">"{}/{}.{}"</span>, img_dir, number, ext);
+<a href=#517 id=517 data-nosnippet>517</a>    
+<a href=#518 id=518 data-nosnippet>518</a>    <span class="comment">// Move/Copy image
+<a href=#519 id=519 data-nosnippet>519</a>    </span>std::fs::copy(latest_img, <span class="kw-2">&amp;</span>dest_path)<span class="question-mark">?</span>;
+<a href=#520 id=520 data-nosnippet>520</a>    <span class="macro">eprintln!</span>(<span class="string">"✅ Saved image to: {}"</span>, dest_path);
+<a href=#521 id=521 data-nosnippet>521</a>
+<a href=#522 id=522 data-nosnippet>522</a>    <span class="comment">// 3. Update the Markdown file
+<a href=#523 id=523 data-nosnippet>523</a>    </span><span class="kw">let </span>md_path = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
+<a href=#524 id=524 data-nosnippet>524</a>    <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span>md_path).exists() {
+<a href=#525 id=525 data-nosnippet>525</a>        <span class="kw">let </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
+<a href=#526 id=526 data-nosnippet>526</a>        <span class="kw">let </span><span class="kw-2">mut </span>lines: Vec&lt;String&gt; = content.lines().map(|s| s.to_string()).collect();
+<a href=#527 id=527 data-nosnippet>527</a>        
+<a href=#528 id=528 data-nosnippet>528</a>        <span class="kw">let </span><span class="kw-2">mut </span>h1_idx = <span class="prelude-val">None</span>;
+<a href=#529 id=529 data-nosnippet>529</a>        <span class="kw">for </span>(i, line) <span class="kw">in </span>lines.iter().enumerate() {
+<a href=#530 id=530 data-nosnippet>530</a>            <span class="kw">if </span>line.starts_with(<span class="string">"# "</span>) {
+<a href=#531 id=531 data-nosnippet>531</a>                h1_idx = <span class="prelude-val">Some</span>(i);
+<a href=#532 id=532 data-nosnippet>532</a>                <span class="kw">break</span>;
+<a href=#533 id=533 data-nosnippet>533</a>            }
+<a href=#534 id=534 data-nosnippet>534</a>        }
+<a href=#535 id=535 data-nosnippet>535</a>
+<a href=#536 id=536 data-nosnippet>536</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(idx) = h1_idx {
+<a href=#537 id=537 data-nosnippet>537</a>            <span class="kw">let </span>relative_img_path = <span class="macro">format!</span>(<span class="string">"img/{}.{}"</span>, number, ext);
+<a href=#538 id=538 data-nosnippet>538</a>            <span class="kw">let </span>img_tag = <span class="macro">format!</span>(<span class="string">"\n![Cover Image]({})\n"</span>, relative_img_path);
+<a href=#539 id=539 data-nosnippet>539</a>            
+<a href=#540 id=540 data-nosnippet>540</a>            <span class="kw">let </span>default_podcast_links = <span class="string">r#"
+<a href=#541 id=541 data-nosnippet>541</a>&lt;center&gt;&lt;a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;Spotify&lt;/a&gt;&lt;a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;Apple Podcasts&lt;/a&gt;&lt;a href="https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe&amp;si=o534zFZsc7p5XA9Q" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;YouTube Music&lt;/a&gt;&lt;a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;"&gt;YouTube&lt;/a&gt;&lt;a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;"&gt;Fountain.fm&lt;/a&gt;&lt;/center&gt;
+<a href=#542 id=542 data-nosnippet>542</a>"#</span>;
+<a href=#543 id=543 data-nosnippet>543</a>            <span class="kw">let </span>podcast_links = config.podcast_html.as_deref().unwrap_or(default_podcast_links);
+<a href=#544 id=544 data-nosnippet>544</a>
+<a href=#545 id=545 data-nosnippet>545</a>            <span class="kw">let </span>default_lightning_address = <span class="string">"shutosha@primal.net"</span>;
+<a href=#546 id=546 data-nosnippet>546</a>            <span class="kw">let </span>lightning_address = config.lightning_address.as_deref().unwrap_or(default_lightning_address);
+<a href=#547 id=547 data-nosnippet>547</a>
+<a href=#548 id=548 data-nosnippet>548</a>            <span class="kw">let </span>wallet_widget = <span class="macro">format!</span>(<span class="string">r##"
+<a href=#549 id=549 data-nosnippet>549</a>&lt;!-- WALLET_START --&gt;
+<a href=#550 id=550 data-nosnippet>550</a>---
+<a href=#551 id=551 data-nosnippet>551</a>
+<a href=#552 id=552 data-nosnippet>552</a>### Tips and Donations
+<a href=#553 id=553 data-nosnippet>553</a>
+<a href=#554 id=554 data-nosnippet>554</a>If you enjoyed this deep dive, consider supporting the project with a tip in **Sats**. It's a simple, global way to support independent research.
+<a href=#555 id=555 data-nosnippet>555</a>
+<a href=#556 id=556 data-nosnippet>556</a>&lt;lightning-widget
+<a href=#557 id=557 data-nosnippet>557</a>  name="Thanks for supporting the publication"
+<a href=#558 id=558 data-nosnippet>558</a>  accent="#f9ce00"
+<a href=#559 id=559 data-nosnippet>559</a>  to="{}"
+<a href=#560 id=560 data-nosnippet>560</a>  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+<a href=#561 id=561 data-nosnippet>561</a>/&gt;
+<a href=#562 id=562 data-nosnippet>562</a>&lt;script src="https://embed.twentyuno.net/js/app.js"&gt;&lt;/script&gt;
+<a href=#563 id=563 data-nosnippet>563</a>
+<a href=#564 id=564 data-nosnippet>564</a>To send Sats, you'll need a [lightning wallet](https://lightningaddress.com/). 
+<a href=#565 id=565 data-nosnippet>565</a>
+<a href=#566 id=566 data-nosnippet>566</a>---
+<a href=#567 id=567 data-nosnippet>567</a>&lt;!-- WALLET_END --&gt;
+<a href=#568 id=568 data-nosnippet>568</a>"##</span>, lightning_address);
+<a href=#569 id=569 data-nosnippet>569</a>
+<a href=#570 id=570 data-nosnippet>570</a>            <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
+<a href=#571 id=571 data-nosnippet>571</a>            
+<a href=#572 id=572 data-nosnippet>572</a>            <span class="comment">// 3.1 Update Cover and Podcast Links
+<a href=#573 id=573 data-nosnippet>573</a>            </span><span class="kw">let </span>h1_regex = regex::Regex::new(<span class="string">r"(?m)^#\s.*$"</span>).unwrap();
+<a href=#574 id=574 data-nosnippet>574</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(m) = h1_regex.find(<span class="kw-2">&amp;</span>content) {
+<a href=#575 id=575 data-nosnippet>575</a>                <span class="kw">let </span>end = m.end();
+<a href=#576 id=576 data-nosnippet>576</a>                <span class="comment">// Clean existing cover/podcast
+<a href=#577 id=577 data-nosnippet>577</a>                </span><span class="kw">let </span>pod_marker = <span class="string">"Fountain.fm&lt;/a&gt;&lt;/center&gt;"</span>;
+<a href=#578 id=578 data-nosnippet>578</a>                <span class="kw">let </span><span class="kw-2">mut </span>search_area = <span class="kw-2">&amp;</span>content[end..];
+<a href=#579 id=579 data-nosnippet>579</a>                <span class="kw">if let </span><span class="prelude-val">Some</span>(pod_end) = search_area.find(pod_marker) {
+<a href=#580 id=580 data-nosnippet>580</a>                    content.replace_range(end..end + pod_end + pod_marker.len(), <span class="string">""</span>);
+<a href=#581 id=581 data-nosnippet>581</a>                }
+<a href=#582 id=582 data-nosnippet>582</a>                content.insert_str(end, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"\n{}\n{}"</span>, img_tag, podcast_links));
+<a href=#583 id=583 data-nosnippet>583</a>            }
+<a href=#584 id=584 data-nosnippet>584</a>
+<a href=#585 id=585 data-nosnippet>585</a>            <span class="comment">// 3.2 Update Wallet
+<a href=#586 id=586 data-nosnippet>586</a>            </span><span class="kw">let </span>w_start = <span class="string">"&lt;!-- WALLET_START --&gt;"</span>;
+<a href=#587 id=587 data-nosnippet>587</a>            <span class="kw">let </span>w_end = <span class="string">"&lt;!-- WALLET_END --&gt;"</span>;
+<a href=#588 id=588 data-nosnippet>588</a>            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(s), <span class="prelude-val">Some</span>(e)) = (content.find(w_start), content.find(w_end)) {
+<a href=#589 id=589 data-nosnippet>589</a>                content.replace_range(s..e + w_end.len(), <span class="string">""</span>);
+<a href=#590 id=590 data-nosnippet>590</a>            }
+<a href=#591 id=591 data-nosnippet>591</a>
+<a href=#592 id=592 data-nosnippet>592</a>            <span class="kw">let </span>ref_regex = regex::Regex::new(<span class="string">r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography"</span>).unwrap();
+<a href=#593 id=593 data-nosnippet>593</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(m) = ref_regex.find(<span class="kw-2">&amp;</span>content) {
+<a href=#594 id=594 data-nosnippet>594</a>                content.insert_str(m.start(), <span class="kw-2">&amp;</span>wallet_widget);
+<a href=#595 id=595 data-nosnippet>595</a>            } <span class="kw">else </span>{
+<a href=#596 id=596 data-nosnippet>596</a>                content.push_str(<span class="kw-2">&amp;</span>wallet_widget);
+<a href=#597 id=597 data-nosnippet>597</a>            }
+<a href=#598 id=598 data-nosnippet>598</a>            
+<a href=#599 id=599 data-nosnippet>599</a>            std::fs::write(<span class="kw-2">&amp;</span>md_path, content)<span class="question-mark">?</span>;
+<a href=#600 id=600 data-nosnippet>600</a>            <span class="macro">eprintln!</span>(<span class="string">"✅ Updated Markdown with cover and snippets."</span>);
+<a href=#601 id=601 data-nosnippet>601</a>            
+<a href=#602 id=602 data-nosnippet>602</a>            update_summary(number, <span class="kw-2">&amp;</span>md_path)<span class="question-mark">?</span>;
+<a href=#603 id=603 data-nosnippet>603</a>        }
+<a href=#604 id=604 data-nosnippet>604</a>    } <span class="kw">else </span>{
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="macro">eprintln!</span>(<span class="string">"⚠️  Markdown file {} not found. Snippets not injected."</span>, md_path);
+<a href=#606 id=606 data-nosnippet>606</a>    }
+<a href=#607 id=607 data-nosnippet>607</a>
+<a href=#608 id=608 data-nosnippet>608</a>    <span class="prelude-val">Ok</span>(())
+<a href=#609 id=609 data-nosnippet>609</a>}
+<a href=#610 id=610 data-nosnippet>610</a>
+<a href=#611 id=611 data-nosnippet>611</a><span class="doccomment">/// Updates the `SUMMARY.md` file to include the newly ingested episode.
+<a href=#612 id=612 data-nosnippet>612</a></span><span class="kw">fn </span>update_summary(number: <span class="kw-2">&amp;</span>str, file_path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#613 id=613 data-nosnippet>613</a>    <span class="kw">let </span>summary_path = <span class="string">"src/SUMMARY.md"</span>;
+<a href=#614 id=614 data-nosnippet>614</a>    <span class="kw">if </span>!std::path::Path::new(summary_path).exists() { <span class="kw">return </span><span class="prelude-val">Ok</span>(()); }
+<a href=#615 id=615 data-nosnippet>615</a>
+<a href=#616 id=616 data-nosnippet>616</a>    <span class="kw">let </span><span class="kw-2">mut </span>summary_content = std::fs::read_to_string(summary_path)<span class="question-mark">?</span>;
+<a href=#617 id=617 data-nosnippet>617</a>    <span class="kw">let </span>content = std::fs::read_to_string(file_path)<span class="question-mark">?</span>;
+<a href=#618 id=618 data-nosnippet>618</a>    <span class="kw">let </span>title_line = content.lines()
+<a href=#619 id=619 data-nosnippet>619</a>        .find(|line| line.starts_with(<span class="string">"# "</span>))
+<a href=#620 id=620 data-nosnippet>620</a>        .map(|line| line.trim_start_matches(<span class="string">"# "</span>).trim())
+<a href=#621 id=621 data-nosnippet>621</a>        .unwrap_or(<span class="string">"Untitled"</span>);
+<a href=#622 id=622 data-nosnippet>622</a>
+<a href=#623 id=623 data-nosnippet>623</a>    <span class="kw">let </span><span class="kw-2">mut </span>title = title_line.replace(<span class="string">"**"</span>, <span class="string">""</span>).trim().to_string();
+<a href=#624 id=624 data-nosnippet>624</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = title.find(<span class="string">':'</span>) {
+<a href=#625 id=625 data-nosnippet>625</a>        title = title[pos + <span class="number">1</span>..].trim().to_string();
+<a href=#626 id=626 data-nosnippet>626</a>    }
+<a href=#627 id=627 data-nosnippet>627</a>
+<a href=#628 id=628 data-nosnippet>628</a>    <span class="kw">let </span>new_entry = <span class="macro">format!</span>(<span class="string">"- [{} : {}]({}.md)"</span>, number, title, number);
+<a href=#629 id=629 data-nosnippet>629</a>    <span class="kw">let </span>start_marker = <span class="string">"&lt;!-- RECENT_START --&gt;"</span>;
+<a href=#630 id=630 data-nosnippet>630</a>    <span class="kw">let </span>end_marker = <span class="string">"&lt;!-- RECENT_END --&gt;"</span>;
+<a href=#631 id=631 data-nosnippet>631</a>
+<a href=#632 id=632 data-nosnippet>632</a>    <span class="kw">if let </span>(<span class="prelude-val">Some</span>(start_idx), <span class="prelude-val">Some</span>(end_idx)) = (summary_content.find(start_marker), summary_content.find(end_marker)) {
+<a href=#633 id=633 data-nosnippet>633</a>        <span class="kw">let </span>insert_pos = start_idx + start_marker.len();
+<a href=#634 id=634 data-nosnippet>634</a>        <span class="kw">let </span>recent_section = <span class="kw-2">&amp;</span>summary_content[insert_pos..end_idx];
+<a href=#635 id=635 data-nosnippet>635</a>        <span class="kw">let </span><span class="kw-2">mut </span>entries: Vec&lt;String&gt; = recent_section.trim().lines().map(|l| l.to_string()).filter(|l| !l.is_empty()).collect();
+<a href=#636 id=636 data-nosnippet>636</a>        entries.retain(|l| !l.contains(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"({}.md)"</span>, number)));
+<a href=#637 id=637 data-nosnippet>637</a>        entries.insert(<span class="number">0</span>, new_entry);
+<a href=#638 id=638 data-nosnippet>638</a>        <span class="kw">let </span>new_recent_content = <span class="macro">format!</span>(<span class="string">"\n{}\n"</span>, entries.join(<span class="string">"\n"</span>));
+<a href=#639 id=639 data-nosnippet>639</a>        summary_content.replace_range(insert_pos..end_idx, <span class="kw-2">&amp;</span>new_recent_content);
+<a href=#640 id=640 data-nosnippet>640</a>        std::fs::write(summary_path, summary_content)<span class="question-mark">?</span>;
+<a href=#641 id=641 data-nosnippet>641</a>        <span class="macro">eprintln!</span>(<span class="string">"📑 Updated SUMMARY.md"</span>);
+<a href=#642 id=642 data-nosnippet>642</a>    }
+<a href=#643 id=643 data-nosnippet>643</a>
+<a href=#644 id=644 data-nosnippet>644</a>    <span class="prelude-val">Ok</span>(())
+<a href=#645 id=645 data-nosnippet>645</a>}
 </code></pre></div></section></main></body></html>
