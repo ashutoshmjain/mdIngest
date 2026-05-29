@@ -79,7 +79,6 @@ struct Cli {
     video: bool,
 
     /// Episode number (the Master Key)
-    #[arg(short, long)]
     number: Option<String>,
 
     /// Source directory for exports (e.g., Downloads folder)
@@ -149,19 +148,19 @@ fn main() -> Result<()> {
         if let Some(number) = cli.number {
             ingest_text(&number, &source, cli.title.as_deref(), &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
         }
     } else if cli.image {
         if let Some(number) = cli.number {
             ingest_image(&number, &source, &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
         }
     } else if cli.video {
         if let Some(number) = cli.number {
             ingest_video(&number, &source, &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number (-n, --number) is required.");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
         }
     } else if cli.number.is_some() {
         eprintln!("ℹ️  Please specify asset type (e.g., --text or --image)");
