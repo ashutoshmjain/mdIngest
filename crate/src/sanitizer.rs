@@ -25,18 +25,24 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     content = decode_html_entities(&content).to_string();
 
     // 0.1 Strip Rust raw string artifacts and Gemini markdown markers (The "Shield")
-    if content.starts_with("r#\"") {
+    content = content.trim().to_string();
+    if content.starts_with("Rustr#\"") {
+        content = content[7..].to_string();
+    } else if content.starts_with("r#\"") {
         content = content[3..].to_string();
     }
+
     if content.ends_with("\"#") {
         content = content[..content.len()-2].to_string();
-    }
-    // Also handle possible trailing newline
-    if content.ends_with("\"#\n") {
+    } else if content.ends_with("\"#\n") {
         content = content[..content.len()-3].to_string();
     }
+
     let gemini_artifacts = Regex::new(r"(?m)^```(text|markdown|rust)?\s*$").unwrap();
     content = gemini_artifacts.replace_all(&content, "").to_string();
+    
+    // Final trim to handle any leftover backticks at top/bottom
+    content = content.trim_matches('`').trim().to_string();
 
     // 0.2 Strip orphaned base64 images early to prevent interference with diagram wrapping
     let image_def_regex = Regex::new(r"(?m)^\[image\d+\]: <data:image/.*?>\s*$").unwrap();
@@ -142,9 +148,9 @@ fn wrap_ascii_diagrams(content: String) -> String {
     let is_diag_line = |s: &str| -> bool {
         let t = s.trim();
         if t.is_empty() { return false; }
-        if t == "v" || t == "|" || t == "^" { return true; }
+        if t == "v" || t == "|" || t == "^" || t == "v |" { return true; }
         if t.starts_with("v ") || t.starts_with("| ") { return true; }
-        if t.contains("===>") || t.contains("<===") { return true; }
+        if t.contains("===>") || t.contains("<===") || t.contains("<====") { return true; }
         if t.starts_with('[') && t.contains(']') && !t.contains("](") { 
             let citation_regex = Regex::new(r"^\[\d+\]").unwrap();
             if citation_regex.is_match(t) { return false; }
@@ -152,6 +158,11 @@ fn wrap_ascii_diagrams(content: String) -> String {
         }
         if t.starts_with("**<---") || t.starts_with("--->**") { return true; }
         if t.starts_with("**") && (t.ends_with("v**") || t.ends_with("|**")) { return true; }
+        if t.starts_with("+---") && t.ends_with("+") { return true; }
+        if t.contains("|") && (t.contains("+--->") || t.contains("ALGEBRAIC ASCENT")) { return true; }
+        if t.starts_with("=====") { return true; }
+        if t.contains("<====") { return true; }
+        if t.contains("+---") && t.contains("+") { return true; }
         false
     };
 
@@ -181,10 +192,9 @@ fn wrap_ascii_diagrams(content: String) -> String {
             }
             
             let is_multi_line = last_diag_idx > i;
-            let contains_arrows = lines[i].contains("===>") || lines[i].contains("<===");
-            let has_table_separator = (i..=last_diag_idx).any(|k| lines[k].contains("--- |") || lines[k].contains("| ---"));
+            let contains_arrows = lines[i].contains("===>") || lines[i].contains("<===") || lines[i].contains("<====") || lines[i].starts_with("=====");
             
-            if (is_multi_line || contains_arrows) && !has_table_separator {
+            if is_multi_line || contains_arrows {
                 result.push_str("\n```text\n");
                 for k in i..=last_diag_idx {
                     result.push_str(lines[k]);
@@ -216,7 +226,7 @@ fn wrap_ascii_diagrams(content: String) -> String {
 /// - Re-numbers the reference list sequentially.
 /// - Ensures URLs are properly hyperlinked in the bibliography.
 fn fix_footnotes(content: String) -> String {
-    let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography").unwrap();
+    let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography|## References").unwrap();
     let parts: Vec<&str> = header_regex.split(&content).collect();
     if parts.len() < 2 { return content; }
 
@@ -367,6 +377,15 @@ fn convert_ascii_tables(content: String) -> String {
                 }
             }
             if !md_rows.is_empty() {
+                // Check if it's REALLY a table or a diagram part of a table-like structure
+                let is_diagram = md_rows.iter().any(|row| row.iter().any(|cell| cell.contains("ALGEBRAIC ASCENT") || cell.contains("+--->")));
+                if is_diagram {
+                    for row in md_rows {
+                        result.push_str(&format!("| {} |\n", row.join(" | ")));
+                    }
+                    continue;
+                }
+
                 result.push('\n');
                 let mut start_idx = 0;
                 if md_rows[0].len() == 1 {
