@@ -193,8 +193,9 @@ fn wrap_ascii_diagrams(content: String) -> String {
             
             let is_multi_line = last_diag_idx > i;
             let contains_arrows = lines[i].contains("===>") || lines[i].contains("<===") || lines[i].contains("<====") || lines[i].starts_with("=====");
+            let has_table_separator = (i..=last_diag_idx).any(|k| lines[k].contains("--- |") || lines[k].contains("| ---"));
             
-            if is_multi_line || contains_arrows {
+            if (is_multi_line || contains_arrows) && !has_table_separator {
                 result.push_str("\n```text\n");
                 for k in i..=last_diag_idx {
                     result.push_str(lines[k]);
