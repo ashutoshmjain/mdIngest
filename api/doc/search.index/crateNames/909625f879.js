@@ -1,0 +1,1 @@
+rd_("jmd_publish")

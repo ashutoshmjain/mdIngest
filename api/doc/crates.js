@@ -1,2 +1,2 @@
-window.ALL_CRATES = ["mdbook_ingest"];
-//{"start":21,"fragment_lengths":[15]}
+window.ALL_CRATES = ["md_publish"];
+//{"start":21,"fragment_lengths":[12]}

@@ -1,9 +1,9 @@
 (function() {
-    const implementors = Object.fromEntries([["mdbook_ingest",[["impl CommandFactory for <a class=\"struct\" href=\"mdbook_ingest/struct.Cli.html\" title=\"struct mdbook_ingest::Cli\">Cli</a>",0]]]]);
+    const implementors = Object.fromEntries([["md_publish",[["impl CommandFactory for <a class=\"struct\" href=\"md_publish/struct.Cli.html\" title=\"struct md_publish::Cli\">Cli</a>",0]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
         window.pending_implementors = implementors;
     }
 })()
-//{"start":59,"fragment_lengths":[152]}
+//{"start":59,"fragment_lengths":[143]}
