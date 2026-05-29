@@ -54,6 +54,7 @@ Please provide the final version of the report, delivered strictly according to 
 3. Full Bibliography Inclusion: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report, mapping every inline citation to its exact metadata (author, title, year, URL). This section MUST be inside the shield.
 4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters.
 5. Table Constraint: Use only single spaces between cell contents and the pipe '|' separators to prevent tabular rendering errors.
+6. ASCII Diagrams: For visual flowcharts or feedback loops, use clear ASCII markers (e.g., `+---+`, `===>`, `[ Box ]`). To avoid confusion with data tables, do not use the standard table separator line (`| --- |`) within a visual diagram.
 ```
 
 ---
