@@ -1,6 +1,6 @@
-# mdbook-ingest (The Ingestion Layer)
+# md-publish (The Ingestion Layer)
 
-**mdbook-ingest** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
+**md-publish** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
 
 ## 🧬 The Philosophy: The Opinionated Researcher
 To use this tool, the researcher must align their workflow with the **Ingestion Layer's** requirements. It automates the "last-mile" friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the **Master Ingestion Protocol**.
@@ -16,7 +16,7 @@ The researcher conducts deep-dive research in Gemini (latest model). To export t
 
 ### Phase 2: Text Ingestion (`--text`)
 The tool strips the "Shield," sanitizes the Markdown, and prepares the chapter.
-- **Command:** `mdbook-ingest --text XXX`
+- **Command:** `md-publish --text XXX`
 - **Actions:** 
     - Hardens KaTeX blocks (escapes `$` and fixes whitespace).
     - Enforces a 5-word title limit (Smart Truncation).
@@ -26,7 +26,7 @@ The tool strips the "Shield," sanitizes the Markdown, and prepares the chapter.
 ### Phase 3: Media Ingestion (`--image`)
 The tool migrates cover art and injects social/monetization snippets.
 - **Setup:** Download your cover art (PNG/JPG) to the same downloads folder.
-- **Command:** `mdbook-ingest --image XXX`
+- **Command:** `md-publish --image XXX`
 - **Actions:**
     - Migrates the latest image to `src/img/XXX.png`.
     - Injects **Spotify**, **Apple Podcasts**, and **YouTube** links immediately under the H1.
@@ -35,7 +35,7 @@ The tool migrates cover art and injects social/monetization snippets.
 ### Phase 4: Visual Ingestion (`--video`)
 The tool builds a **global cinematic infographic feed** (carousel) and injects it into the chapter.
 - **Setup:** Save your Mosaic SO infographics to your **downloads folder** following the naming convention `XXX-description.mp4`.
-- **Command:** `mdbook-ingest --video XXX`
+- **Command:** `md-publish --video XXX`
 - **Actions:**
     - Identifies matching videos starting with `XXX-` and migrates them.
     - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
@@ -75,11 +75,11 @@ Please provide the final version of the report, delivered strictly according to 
 
 ## ⚙️ Configuration (`book.toml`)
 
-Configure `mdbook-ingest` by adding a section to your `book.toml`:
+Configure `md-publish` by adding a section to your `book.toml`:
 
 ```toml
 [preprocessor.ingest]
-command = "mdbook-ingest"
+command = "md-publish"
 # Path to your browser's default download folder
 downloads_path = "/mnt/c/Users/ashut/Downloads"
 # Your lightning address for the Zap widget
@@ -102,9 +102,9 @@ cargo install --path .
 
 ```bash
 # Ingest full stack (with optional title override)
-mdbook-ingest --text 240 --title "A Catchy Five Word Title"
-mdbook-ingest --image 240
-mdbook-ingest --video 240
+md-publish --text 240 --title "A Catchy Five Word Title"
+md-publish --image 240
+md-publish --video 240
 ```
 
 ---

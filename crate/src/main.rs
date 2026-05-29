@@ -1,10 +1,10 @@
-//! # mdbook-ingest (The Ingestion Layer)
+//! # md-publish (The Ingestion Layer)
 //!
 //! A professional, modular asset ingestion bridge for `mdbook`. This crate serves 
 //! as the **Ingestion Layer** within an autonomous **Research-to-Publish Workflow**.
 //!
 //! ## Agentic Architecture
-//! `mdbook-ingest` is designed to operate as a standalone module that can be 
+//! `md-publish` is designed to operate as a standalone module that can be 
 //! triggered by a Research Agent. It handles:
 //! 1. **Sanitization**: Transforming raw AI output into hardened Markdown.
 //! 2. **Media Management**: Migrating and renaming assets based on a **Master Key** (Episode Number).
@@ -148,19 +148,19 @@ fn main() -> Result<()> {
         if let Some(number) = cli.number {
             ingest_text(&number, &source, cli.title.as_deref(), &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., md-publish --text 240)");
         }
     } else if cli.image {
         if let Some(number) = cli.number {
             ingest_image(&number, &source, &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., md-publish --text 240)");
         }
     } else if cli.video {
         if let Some(number) = cli.number {
             ingest_video(&number, &source, &config)?;
         } else {
-            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., mdbook-ingest --text 240)");
+            anyhow::bail!("❌ Error: Episode number is required as a positional argument (e.g., md-publish --text 240)");
         }
     } else if cli.number.is_some() {
         eprintln!("ℹ️  Please specify asset type (e.g., --text or --image)");

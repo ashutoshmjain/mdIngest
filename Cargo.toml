@@ -1,12 +1,12 @@
 [package]
-name = "mdbook-ingest"
+name = "md-publish"
 version = "0.1.0"
 authors = ["ashutosh"]
 edition = "2021"
 description = "A professional mdbook ingestion tool for Google Docs exports."
 
 [[bin]]
-name = "mdbook-ingest"
+name = "md-publish"
 path = "crate/src/main.rs"
 
 [dependencies]

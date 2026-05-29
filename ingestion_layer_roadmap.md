@@ -1,16 +1,16 @@
 # Ingestion Layer Roadmap: Research-to-Publish Workflow
 
 ## Objective
-Evolve the deepDive publishing workflow into a streamlined CLI tool named **mdbook-ingest**. The core goal is to serve as the **Ingestion Layer** in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.
+Evolve the deepDive publishing workflow into a streamlined CLI tool named **md-publish**. The core goal is to serve as the **Ingestion Layer** in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.
 
 ## The Vision: The "Research-to-src" Pipeline
 The workflow focuses on a seamless transition from AI research to a production-ready mdbook page:
 1.  **Generation:** An LLM (currently Gemini Pro) generates a research report using the **Master Prompt**.
-2.  **Ingestion:** The user runs `mdbook-ingest --text --number XXX`.
+2.  **Ingestion:** The user runs `md-publish --text --number XXX`.
 3.  **Renaming:** The tool automatically identifies the "shielded" markdown file in `Downloads`, renames it to `XXX.md`, and moves it to the `src/` folder.
 4.  **Surgical Fix:** The tool triggers the internal sanitization logic to handle KaTeX, currency, and footnotes while stripping the "Shield".
 5.  **Synchronization:** The tool automatically updates `SUMMARY.md` to include the new episode in the `# Recent ..` section.
-6.  **Media Enrichment:** The user runs `mdbook-ingest --image --number XXX` (and eventually `--video`) to migrate assets and inject high-engagement visual snippets.
+6.  **Media Enrichment:** The user runs `md-publish --image --number XXX` (and eventually `--video`) to migrate assets and inject high-engagement visual snippets.
 
 ## Architectural Model: mdbook Extension
 - **Configuration:** Source folders (Downloads), destination (`src/`), and script paths are managed via `book.toml`.

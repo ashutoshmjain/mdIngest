@@ -2,7 +2,7 @@
 authors = ["ashutosh"]
 language = "en"
 src = "src"
-title = "mdbook-ingest: The Ingestion Layer"
+title = "md-publish: The Ingestion Layer"
 
 
 # No preprocessors enabled for the manual build to ensure CI stability.
