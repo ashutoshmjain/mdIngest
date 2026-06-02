@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Commands"],"fn":["check_dependencies","extract_html_from_zip","ingest_image","ingest_text","ingest_video","main","run_doctor","update_summary"],"mod":["sanitizer"],"struct":["BookToml","Cli","IngestConfig","PreprocessorSection"]};
+window.SIDEBAR_ITEMS = {"enum":["Commands"],"fn":["ingest_image","ingest_text","ingest_video","main","run_doctor"],"mod":["sanitizer"],"struct":["BookToml","Cli","IngestConfig","PreprocessorSection"]};
