@@ -1485,6 +1485,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
+name = "md-publish"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fs_extra",
+ "glob",
+ "html-escape",
+ "html2md",
+ "mdbook",
+ "once_cell",
+ "regex",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.23",
+ "zip",
+]
+
+[[package]]
 name = "mdbook"
 version = "0.4.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1520,27 +1541,6 @@ dependencies = [
  "topological-sort",
  "tower-http",
  "walkdir",
-]
-
-[[package]]
-name = "mdbook-ingest"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "fs_extra",
- "glob",
- "html-escape",
- "html2md",
- "mdbook",
- "once_cell",
- "regex",
- "scraper",
- "serde",
- "serde_json",
- "tokio",
- "toml 0.8.23",
- "zip",
 ]
 
 [[package]]
