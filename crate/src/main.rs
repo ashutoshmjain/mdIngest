@@ -5,95 +5,171 @@
 
 mod sanitizer;
 
-use clap::{Parser, Subcommand};
-use std::process::Command;
-use anyhow::{Result, Context};
+use anyhow::{Result};
 use glob::glob;
-use regex::Regex;
 use std::path::PathBuf;
-use serde::Deserialize;
+use std::process::Command;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Default)]
-struct BookToml {
-    preprocessor: Option<PreprocessorSection>,
+#[derive(Debug, Deserialize)]
+struct IngestConfig {
+    downloads_path: Option<String>,
+    lightning_address: Option<String>,
+    title_word_limit: Option<usize>,
+    podcast_html: Option<String>,
+    visual_html: Option<String>,
 }
 
-#[derive(Deserialize, Default)]
-struct PreprocessorSection {
+#[derive(Debug, Deserialize)]
+struct BookConfig {
+    preprocessor: Option<PreprocessorConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PreprocessorConfig {
     ingest: Option<IngestConfig>,
 }
 
-#[derive(Deserialize, Default, Clone)]
-pub struct IngestConfig {
-    pub downloads_path: Option<String>,
-    pub lightning_address: Option<String>,
-    pub podcast_html: Option<String>,
-    pub visual_html: Option<String>,
-    pub title_word_limit: Option<usize>,
-}
-
-impl IngestConfig {
-    pub fn load() -> Self {
-        if let Ok(content) = std::fs::read_to_string("book.toml") {
-            if let Ok(toml) = toml::from_str::<BookToml>(&content) {
-                if let Some(prep) = toml.preprocessor {
-                    if let Some(ingest) = prep.ingest {
-                        return ingest;
-                    }
-                }
-            }
-        }
-        Self::default()
-    }
-}
-
-#[derive(Parser)]
-struct Cli {
-    #[command(subcommand)]
-    command: Option<Commands>,
-    #[arg(long)]
-    text: bool,
-    #[arg(long)]
-    image: bool,
-    #[arg(long)]
-    video: bool,
-    number: Option<String>,
-    #[arg(short, long, default_value = "/mnt/c/Users/ashut/Downloads")]
-    source: String,
-    #[arg(short, long)]
-    title: Option<String>,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Supports { renderer: String },
-    Doctor,
-}
-
 fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let config = IngestConfig::load();
-    let source = cli.source.clone();
+    let args: Vec<String> = std::env::args().collect();
+    
+    if args.len() > 1 && args[1] == "supports" {
+        return Ok(());
+    }
 
-    if let Some(command) = cli.command {
-        match command {
-            Commands::Supports { renderer } => {
-                if renderer != "not-supported" { std::process::exit(0); } else { std::process::exit(1); }
-            }
-            Commands::Doctor => { run_doctor()?; }
+    if args.len() > 1 && args[1] == "doctor" {
+        return run_doctor();
+    }
+
+    // Load config from book.toml
+    let config_content = std::fs::read_to_string("book.toml").unwrap_or_default();
+    let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { preprocessor: None });
+    let ingest_config = book_config.preprocessor.and_then(|p| p.ingest).unwrap_or(IngestConfig {
+        downloads_path: Some("/mnt/c/Users/ashut/Downloads".to_string()),
+        lightning_address: Some("shutosha@primal.net".to_string()),
+        title_word_limit: Some(5),
+        podcast_html: None,
+        visual_html: None,
+    });
+
+    let mut number = None;
+    let mut do_text = false;
+    let mut do_image = false;
+    let mut do_video = false;
+    let mut title_override = None;
+    let mut source = ingest_config.downloads_path.clone().unwrap_or_else(|| "/mnt/c/Users/ashut/Downloads".to_string());
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--text" => do_text = true,
+            "--image" => do_image = true,
+            "--video" => do_video = true,
+            "-t" | "--title" => {
+                if i + 1 < args.len() {
+                    title_override = Some(args[i+1].as_str());
+                    i += 1;
+                }
+            },
+            "-s" | "--source" => {
+                if i + 1 < args.len() {
+                    source = args[i+1].to_string();
+                    i += 1;
+                }
+            },
+            num if num.chars().all(|c| c.is_digit(10)) => number = Some(num.to_string()),
+            _ => {}
         }
-    } else if cli.text {
-        if let Some(number) = cli.number { ingest_text(&number, &source, cli.title.as_deref(), &config)?; }
-        else { anyhow::bail!("Episode number required"); }
-    } else if cli.image {
-        if let Some(number) = cli.number { ingest_image(&number, &source)?; }
-        else { anyhow::bail!("Episode number required"); }
-    } else if cli.video {
-        if let Some(number) = cli.number { ingest_video(&number, &source, &config)?; }
-        else { anyhow::bail!("Episode number required"); }
+        i += 1;
+    }
+
+    if let Some(num) = number {
+        if do_text { ingest_text(&num, &source, title_override, &ingest_config)?; }
+        if do_image { ingest_image(&num, &source, &ingest_config)?; }
+        if do_video { ingest_video(&num, &source, &ingest_config)?; }
     } else {
-        let (_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())?;
-        print!("{}", serde_json::to_string(&book)?);
+        if args.len() > 1 && !args[1].starts_with('-') {
+            // Support positional number
+        } else {
+            // Standard preprocessor mode
+            let (_ctx, book) = mdbook::preprocess::CmdPreprocessor::parse_input(std::io::stdin())?;
+            print!("{}", serde_json::to_string(&book)?);
+        }
+    }
+
+    Ok(())
+}
+
+fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestConfig) -> Result<()> {
+    eprintln!("📖 Ingesting text for episode {}...", number);
+    let mut files: Vec<PathBuf> = glob(&format!("{}/*.md", source))?.filter_map(Result::ok)
+        .filter(|p| !["SUMMARY.md", "cover.md"].contains(&p.file_name().unwrap().to_str().unwrap())).collect();
+    files.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
+
+    if let Some(path) = files.first() {
+        let content = std::fs::read_to_string(path)?;
+        let hardened = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(5));
+        std::fs::write(format!("src/{}.md", number), hardened)?;
+        eprintln!("✅ Ingested text to src/{}.md", number);
+    }
+    Ok(())
+}
+
+fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()> {
+    eprintln!("🎨 Ingesting image for episode {}...", number);
+    let img_dir = "src/img";
+    std::fs::create_dir_all(img_dir)?;
+    let mut images: Vec<PathBuf> = glob(&format!("{}/*{}*.png", source, number))?.filter_map(Result::ok).collect();
+    images.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
+
+    if let Some(path) = images.first() {
+        let dest = format!("{}/{}.png", img_dir, number);
+        std::fs::copy(path, &dest)?;
+        eprintln!("✅ Ingested cover art to {}", dest);
+
+        // Hybrid Layout Injection
+        let md_path = format!("src/{}.md", number);
+        if let Ok(content) = std::fs::read_to_string(&md_path) {
+            let podcast_html = config.podcast_html.as_deref().unwrap_or("");
+            let mut audio_feed = String::new();
+            audio_feed.push_str("\n<!-- AUDIO_FEED_START -->\n");
+            audio_feed.push_str(&format!("![Cover Image](img/{}.png)\n\n<center><h3>Audio Feed from <a href=\"https://notebooklm.google.com/\" target=\"_blank\" style=\"text-decoration: none; color: inherit; border-bottom: 1px solid #555;\">notebookLM</a></h3></center>\n\n{}\n", number, podcast_html));
+            audio_feed.push_str("<!-- AUDIO_FEED_END -->\n");
+
+            // Always strip existing block to ensure clean re-placement
+            let mut clean_content = if let (Some(s), Some(e)) = (content.find("<!-- AUDIO_FEED_START -->"), content.find("<!-- AUDIO_FEED_END -->")) {
+                let mut c = String::new();
+                c.push_str(&content[..s]);
+                c.push_str(&content[e + "<!-- AUDIO_FEED_END -->".len()..]);
+                c
+            } else {
+                content.clone()
+            };
+
+            // Re-calculate anchor point and insert
+            let final_content = if let Some(pos) = sanitizer::find_first_substantial_paragraph(&clean_content) {
+                let mut nc = String::new();
+                nc.push_str(&clean_content[..pos]);
+                nc.push_str(&audio_feed);
+                nc.push_str(&clean_content[pos..]);
+                nc
+            } else {
+                // Fallback to top (below H1)
+                let mut nc = String::new();
+                if let Some(h1_end) = clean_content.find('\n').map(|i| i + 1) {
+                    nc.push_str(&clean_content[..h1_end]);
+                    nc.push_str(&audio_feed);
+                    nc.push_str(&clean_content[h1_end..]);
+                } else {
+                    nc.push_str(&audio_feed);
+                    nc.push_str(&clean_content);
+                }
+                nc
+            };
+            
+            std::fs::write(&md_path, final_content)?;
+            eprintln!("✅ Injected audio feed into {}", md_path);
+        }
     }
     Ok(())
 }
@@ -131,7 +207,7 @@ fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()>
 
     // 3. Generate HTML
     let default_visual_links = r#"
-<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">TikTok</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Instagram</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37q8rU8HKTLhdLPZQadcvx-K" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">YouTube</a><a href="https://open.spotify.com/show/07r9EZMLpFC7qwZwxsJ5P9" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Spotify</a></center>
+<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">TikTok</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Instagram</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">YouTube</a><a href="https://open.spotify.com/show/07r9EZMLpFC7qwZwxsJ5P9" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Spotify</a></center>
 "#;
     let visual_links = config.visual_html.as_deref().unwrap_or(default_visual_links);
 
@@ -141,7 +217,7 @@ fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()>
     
     html.push_str("<div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\">\n");
 
-    for (i, path) in local_vids.iter().enumerate() {
+    for path in local_vids.iter() {
         let filename = path.file_name().unwrap().to_str().unwrap();
         html.push_str(&format!(
             r#"  <div style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;">
@@ -183,16 +259,30 @@ fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()>
     // 4. Inject into THIS file only
     let path = format!("src/{}.md", number);
     let content = std::fs::read_to_string(&path)?;
-    if let (Some(s), Some(e)) = (content.find("<!-- VIDEO_STRIP_START -->"), content.find("<!-- VIDEO_STRIP_END -->")) {
-        let mut new_content = String::new();
-        new_content.push_str(&content[..s]);
-        new_content.push_str(&html);
-        new_content.push_str(&content[e + "<!-- VIDEO_STRIP_END -->".len()..]);
-        std::fs::write(&path, new_content)?;
-        eprintln!("✅ Updated infographic scroll in {}", path);
+    
+    // Always strip existing block to ensure clean re-placement at the top
+    let clean_content = if let (Some(s), Some(e)) = (content.find("<!-- VIDEO_STRIP_START -->"), content.find("<!-- VIDEO_STRIP_END -->")) {
+        let mut c = String::new();
+        c.push_str(&content[..s]);
+        c.push_str(&content[e + "<!-- VIDEO_STRIP_END -->".len()..]);
+        c
     } else {
-        eprintln!("⚠️ No strip markers found in {}", path);
+        content.clone()
+    };
+
+    // Always insert after H1
+    let mut final_content = String::new();
+    if let Some(h1_end) = clean_content.find('\n').map(|i| i + 1) {
+        final_content.push_str(&clean_content[..h1_end]);
+        final_content.push_str(&html);
+        final_content.push_str(&clean_content[h1_end..]);
+    } else {
+        final_content.push_str(&html);
+        final_content.push_str(&clean_content);
     }
+
+    std::fs::write(&path, final_content)?;
+    eprintln!("✅ Updated infographic scroll in {}", path);
 
     Ok(())
 }
@@ -205,36 +295,6 @@ fn run_doctor() -> Result<()> {
     match Command::new("mdbook-katex").arg("--version").output() {
         Ok(out) => eprintln!("✅ mdbook-katex: {}", String::from_utf8_lossy(&out.stdout).trim()),
         Err(_) => eprintln!("❌ mdbook-katex: Not found"),
-    }
-    Ok(())
-}
-
-fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestConfig) -> Result<()> {
-    eprintln!("📖 Ingesting text for episode {}...", number);
-    let mut files: Vec<PathBuf> = glob(&format!("{}/*.md", source))?.filter_map(Result::ok)
-        .filter(|p| !["SUMMARY.md", "cover.md"].contains(&p.file_name().unwrap().to_str().unwrap())).collect();
-    files.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
-
-    if let Some(path) = files.first() {
-        let content = std::fs::read_to_string(path)?;
-        let hardened = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(5));
-        std::fs::write(format!("src/{}.md", number), hardened)?;
-        eprintln!("✅ Ingested text to src/{}.md", number);
-    }
-    Ok(())
-}
-
-fn ingest_image(number: &str, source: &str) -> Result<()> {
-    eprintln!("🎨 Ingesting image for episode {}...", number);
-    let img_dir = "src/img";
-    std::fs::create_dir_all(img_dir)?;
-    let mut images: Vec<PathBuf> = glob(&format!("{}/*{}*.png", source, number))?.filter_map(Result::ok).collect();
-    images.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
-
-    if let Some(path) = images.first() {
-        let dest = format!("{}/{}.png", img_dir, number);
-        std::fs::copy(path, &dest)?;
-        eprintln!("✅ Ingested cover art to {}", dest);
     }
     Ok(())
 }

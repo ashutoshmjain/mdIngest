@@ -48,12 +48,45 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     let image_def_regex = Regex::new(r"(?m)^\[image\d+\]: <data:image/.*?>\s*$").unwrap();
     content = image_def_regex.replace_all(&content, "").to_string();
 
-    // 1. Title Sync - Handle "XXX : Title" format and enforce word limit
-    let h1_regex = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
+    // [NEW] Aggressive Legacy Media Stripper
+    // Remove any images or centered links at the top (before the first paragraph)
+    // that are not enclosed in our automated markers.
+    let mut clean_lines = Vec::new();
+    let mut in_markers = false;
+    let mut paragraph_found = false;
+    let h1_regex = Regex::new(r"^#\s").unwrap();
+    let image_regex = Regex::new(r"^!\[.*?\]").unwrap();
+    let center_regex = Regex::new(r"^<center>").unwrap();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.contains("_START -->") { in_markers = true; }
+        
+        if !paragraph_found && !in_markers {
+            if h1_regex.is_match(trimmed) {
+                clean_lines.push(line);
+                continue;
+            }
+            if image_regex.is_match(trimmed) || center_regex.is_match(trimmed) {
+                // Strip this legacy media
+                continue;
+            }
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                paragraph_found = true;
+            }
+        }
+        
+        clean_lines.push(line);
+        if trimmed.contains("_END -->") { in_markers = false; }
+    }
+    content = clean_lines.join("\n");
+
+    // 1. Title Sync
+    let h1_regex_full = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
     
     let display_title = if let Some(t) = title_override {
         t.to_string()
-    } else if let Some(caps) = h1_regex.captures(&content) {
+    } else if let Some(caps) = h1_regex_full.captures(&content) {
         let raw_title = caps.get(1).unwrap().as_str().trim();
         let clean_title = raw_title.trim_matches('*').trim();
         
@@ -76,8 +109,8 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     };
     
     let new_h1 = format!("# {} : {}", ep_num, display_title);
-    if h1_regex.is_match(&content) {
-        content = h1_regex.replace(&content, new_h1.as_str()).to_string();
+    if h1_regex_full.is_match(&content) {
+        content = h1_regex_full.replace(&content, new_h1.as_str()).to_string();
     } else {
         content = format!("{}\n\n{}", new_h1, content);
     }
@@ -134,6 +167,41 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     }
 
     temp_content.trim().to_string()
+}
+
+/// Identifies the first "substantial" paragraph for smart anchor placement.
+/// 
+/// A substantial paragraph is:
+/// - Not a header (#)
+/// - Not a diagram/code block (```)
+/// - Not a list item (*, -, 1.)
+/// - Not an HTML block (<)
+/// - At least 100 characters long.
+pub fn find_first_substantial_paragraph(content: &str) -> Option<usize> {
+    let mut in_code_block = false;
+    let mut current_pos = 0;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            current_pos += line.len() + 1;
+            continue;
+        }
+
+        if !in_code_block && !trimmed.is_empty() {
+            let is_header = trimmed.starts_with('#');
+            let is_list = trimmed.starts_with('*') || trimmed.starts_with('-') || (trimmed.len() > 2 && trimmed.chars().next().unwrap().is_digit(10) && trimmed.contains(". "));
+            let is_html = trimmed.starts_with('<');
+
+            if !is_header && !is_list && !is_html && trimmed.len() > 100 {
+                return Some(current_pos + line.len());
+            }
+        }
+        current_pos += line.len() + 1;
+    }
+    None
 }
 
 /// Identifies and wraps ASCII-based diagrams in code blocks.
@@ -220,12 +288,6 @@ fn wrap_ascii_diagrams(content: String) -> String {
 }
 
 /// Standardizes and re-indexes footnotes.
-/// 
-/// This function:
-/// - Extracts the "Works cited" or "References" section.
-/// - Re-numbers inline citations `[n]` to `[^n]`.
-/// - Re-numbers the reference list sequentially.
-/// - Ensures URLs are properly hyperlinked in the bibliography.
 fn fix_footnotes(content: String) -> String {
     let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography|## References").unwrap();
     let parts: Vec<&str> = header_regex.split(&content).collect();
@@ -378,7 +440,6 @@ fn convert_ascii_tables(content: String) -> String {
                 }
             }
             if !md_rows.is_empty() {
-                // Check if it's REALLY a table or a diagram part of a table-like structure
                 let is_diagram = md_rows.iter().any(|row| row.iter().any(|cell| cell.contains("ALGEBRAIC ASCENT") || cell.contains("+--->")));
                 if is_diagram {
                     for row in md_rows {
