@@ -14,6 +14,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize)]
 struct IngestConfig {
     downloads_path: Option<String>,
+    text_source: Option<String>,
+    image_source: Option<String>,
+    video_source: Option<String>,
     lightning_address: Option<String>,
     title_word_limit: Option<usize>,
     podcast_html: Option<String>,
@@ -46,6 +49,9 @@ fn main() -> Result<()> {
     let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { preprocessor: None });
     let ingest_config = book_config.preprocessor.and_then(|p| p.ingest).unwrap_or(IngestConfig {
         downloads_path: Some("/mnt/c/Users/ashut/Downloads".to_string()),
+        text_source: None,
+        image_source: None,
+        video_source: None,
         lightning_address: Some("shutosha@primal.net".to_string()),
         title_word_limit: Some(5),
         podcast_html: None,
@@ -84,9 +90,18 @@ fn main() -> Result<()> {
     }
 
     if let Some(num) = number {
-        if do_text { ingest_text(&num, &source, title_override, &ingest_config)?; }
-        if do_image { ingest_image(&num, &source, &ingest_config)?; }
-        if do_video { ingest_video(&num, &source, &ingest_config)?; }
+        if do_text { 
+            let text_src = ingest_config.text_source.clone().unwrap_or(source.clone());
+            ingest_text(&num, &text_src, title_override, &ingest_config)?; 
+        }
+        if do_image { 
+            let image_src = ingest_config.image_source.clone().unwrap_or(source.clone());
+            ingest_image(&num, &image_src, &ingest_config)?; 
+        }
+        if do_video { 
+            let video_src = ingest_config.video_source.clone().unwrap_or(source.clone());
+            ingest_video(&num, &video_src, &ingest_config)?; 
+        }
     } else {
         if args.len() > 1 && !args[1].starts_with('-') {
             // Support positional number
