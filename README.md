@@ -1,6 +1,8 @@
 # md-publish (The Ingestion Layer)
 
-**md-publish** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook` with dense mathematics, multimedia widgets, and automated indexing.
+**md-publish** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook`. 
+
+When you run `md-publish`, you aren't just fixing Markdown or adding assets—you are **publishing the episode**. The tool handles structural sanitization, media injection, and the critical **synchronization of `SUMMARY.md`**, effectively making the chapter ready for local serving (e.g., via `mdbook serve`) the moment the command finishes.
 
 ## 🧬 The Philosophy: The Opinionated Researcher
 To use this tool, the researcher must align their workflow with the **Ingestion Layer's** requirements. It automates the "last-mile" friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the **Master Ingestion Protocol**.

@@ -1,7 +1,7 @@
-# Project GEMINI: mdIngest (mdbook-ingest preprocessor)
+# Project GEMINI: md-publish (The Ingestion Layer)
 
 ## **The Mission: Developer & Tester Role**
-In this repository, the Gemini CLI agent is not merely a user but the **Lead Developer and Automation Tester**. Your primary goal is to iteratively harden the `mdbook-ingest` tool through real-world "episode intakes."
+In this repository, the Gemini CLI agent is not merely a user but the **Lead Developer and Automation Tester**. Your primary goal is to iteratively harden the **md-publish** tool through real-world "episode intakes."
 
 ### **The Hardened Testing Workflow**
 Whenever a manual "surgical" fix is required to deliver an episode, you must treat it as a tool failure and follow this protocol:

@@ -1,6 +1,6 @@
 # DeepDive Creative Workflow: The Opinionated Researcher
 
-This document outlines the **4-Phase Research Process** for producing high-fidelity research episodes using the `mdbook-ingest` tool.
+This document outlines the **4-Phase Research Process** for producing high-fidelity research episodes using the `md-publish` tool.
 
 ---
 
@@ -20,7 +20,7 @@ This document outlines the **4-Phase Research Process** for producing high-fidel
 ## Phase 2: Text Ingestion (`--text`)
 1. **Run Ingestion:** Execute the tool to sanitize and index the chapter.
    ```bash
-   mdbook-ingest --text --number XXX
+   md-publish --text --number XXX
    ```
 2. **Verification:** Verify that `src/XXX.md` has been created with hardened KaTeX, sequential footnotes, and the correct H1 title.
 
@@ -28,7 +28,7 @@ This document outlines the **4-Phase Research Process** for producing high-fidel
 1. **Cover Art:** Generate or source a cover image (PNG/JPG) and save it to your `Downloads` folder.
 2. **Run Ingestion:** Execute the image ingestion command.
    ```bash
-   mdbook-ingest --image --number XXX
+   md-publish --image --number XXX
    ```
 3. **Syndication:** This step automatically injects **Spotify**, **Apple Podcasts**, and **YouTube** links, along with a **Lightning Zap Widget**.
 
@@ -37,7 +37,7 @@ This document outlines the **4-Phase Research Process** for producing high-fidel
 2. **Setup:** Save the resulting `.mp4` files to your **Downloads** folder following the strict naming convention: `XXX-description.mp4`.
 3. **Run Ingestion:** Execute the video ingestion command to rebuild the **global cinematic infographic feed** and inject it into the chapter with auto-focus logic.
    ```bash
-   mdbook-ingest --video --number XXX
+   md-publish --video --number XXX
    ```
 
 ---
