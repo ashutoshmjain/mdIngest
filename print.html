@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-011c1ac0.js";
+            window.path_to_searchindex_js = "searchindex-e8e847b5.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0d24d02b.js"></script>
@@ -175,8 +175,8 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="mdbook-ingest-the-ingestion-layer"><a class="header" href="#mdbook-ingest-the-ingestion-layer">mdbook-ingest (The Ingestion Layer)</a></h1>
-<p><strong>mdbook-ingest</strong> is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific <strong>4-Phase Research Process</strong> (as seen on <a href="https://deepDive.shutri.com">deepDive.shutri.com</a>) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready <code>mdbook</code> with dense mathematics, multimedia widgets, and automated indexing.</p>
+                        <h1 id="md-publish-the-ingestion-layer"><a class="header" href="#md-publish-the-ingestion-layer">md-publish (The Ingestion Layer)</a></h1>
+<p><strong>md-publish</strong> is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific <strong>4-Phase Research Process</strong> (as seen on <a href="https://deepDive.shutri.com">deepDive.shutri.com</a>) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready <code>mdbook</code> with dense mathematics, multimedia widgets, and automated indexing.</p>
 <h2 id="-the-philosophy-the-opinionated-researcher"><a class="header" href="#-the-philosophy-the-opinionated-researcher">🧬 The Philosophy: The Opinionated Researcher</a></h2>
 <p>To use this tool, the researcher must align their workflow with the <strong>Ingestion Layer’s</strong> requirements. It automates the “last-mile” friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the <strong>Master Ingestion Protocol</strong>.</p>
 <hr>
@@ -190,7 +190,7 @@
 <h3 id="phase-2-text-ingestion---text"><a class="header" href="#phase-2-text-ingestion---text">Phase 2: Text Ingestion (<code>--text</code>)</a></h3>
 <p>The tool strips the “Shield,” sanitizes the Markdown, and prepares the chapter.</p>
 <ul>
-<li><strong>Command:</strong> <code>mdbook-ingest --text --number XXX</code></li>
+<li><strong>Command:</strong> <code>md-publish --text --number XXX</code></li>
 <li><strong>Actions:</strong>
 <ul>
 <li>Hardens KaTeX blocks (escapes <code>$</code> and fixes whitespace).</li>
@@ -204,7 +204,7 @@
 <p>The tool migrates cover art and injects social/monetization snippets.</p>
 <ul>
 <li><strong>Setup:</strong> Download your cover art (PNG/JPG) to the same downloads folder.</li>
-<li><strong>Command:</strong> <code>mdbook-ingest --image --number XXX</code></li>
+<li><strong>Command:</strong> <code>md-publish --image --number XXX</code></li>
 <li><strong>Actions:</strong>
 <ul>
 <li>Migrates the latest image to <code>src/img/XXX.png</code>.</li>
@@ -217,7 +217,7 @@
 <p>The tool builds a <strong>global cinematic infographic feed</strong> (carousel) and injects it into the chapter.</p>
 <ul>
 <li><strong>Setup:</strong> Save your Mosaic SO infographics to your <strong>downloads folder</strong> following the naming convention <code>XXX-description.mp4</code>.</li>
-<li><strong>Command:</strong> <code>mdbook-ingest --video --number XXX</code></li>
+<li><strong>Command:</strong> <code>md-publish --video --number XXX</code></li>
 <li><strong>Actions:</strong>
 <ul>
 <li>Identifies matching videos starting with <code>XXX-</code> and migrates them.</li>
@@ -253,9 +253,9 @@
 </ul>
 <hr>
 <h2 id="-configuration-booktoml"><a class="header" href="#-configuration-booktoml">⚙️ Configuration (<code>book.toml</code>)</a></h2>
-<p>Configure <code>mdbook-ingest</code> by adding a section to your <code>book.toml</code>:</p>
+<p>Configure <code>md-publish</code> by adding a section to your <code>book.toml</code>:</p>
 <pre><code class="language-toml">[preprocessor.ingest]
-command = "mdbook-ingest"
+command = "md-publish"
 # Path to your browser's default download folder
 downloads_path = "/mnt/c/Users/ashut/Downloads"
 # Your lightning address for the Zap widget
@@ -271,16 +271,16 @@ cargo install --path .
 </code></pre>
 <h2 id="-usage"><a class="header" href="#-usage">🚀 Usage</a></h2>
 <pre><code class="language-bash"># Ingest full stack (with optional title override)
-mdbook-ingest --text --number 240 --title "A Catchy Five Word Title"
-mdbook-ingest --image --number 240
-mdbook-ingest --video --number 240
+md-publish --text --number 240 --title "A Catchy Five Word Title"
+md-publish --image --number 240
+md-publish --video --number 240
 </code></pre>
 <hr>
 <h2 id="-license"><a class="header" href="#-license">⚖️ License</a></h2>
 <p>MIT License.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="deepdive-creative-workflow-the-opinionated-researcher"><a class="header" href="#deepdive-creative-workflow-the-opinionated-researcher">DeepDive Creative Workflow: The Opinionated Researcher</a></h1>
-<p>This document outlines the <strong>4-Phase Research Process</strong> for producing high-fidelity research episodes using the <code>mdbook-ingest</code> tool.</p>
+<p>This document outlines the <strong>4-Phase Research Process</strong> for producing high-fidelity research episodes using the <code>md-publish</code> tool.</p>
 <hr>
 <h2 id="phase-1-research--export-the-gemini-protocol-1"><a class="header" href="#phase-1-research--export-the-gemini-protocol-1">Phase 1: Research &amp; Export (The Gemini Protocol)</a></h2>
 <ol>
@@ -303,7 +303,7 @@ mdbook-ingest --video --number 240
 <h2 id="phase-2-text-ingestion---text-1"><a class="header" href="#phase-2-text-ingestion---text-1">Phase 2: Text Ingestion (<code>--text</code>)</a></h2>
 <ol>
 <li><strong>Run Ingestion:</strong> Execute the tool to sanitize and index the chapter.
-<pre><code class="language-bash">mdbook-ingest --text --number XXX
+<pre><code class="language-bash">md-publish --text --number XXX
 </code></pre>
 </li>
 <li><strong>Verification:</strong> Verify that <code>src/XXX.md</code> has been created with hardened KaTeX, sequential footnotes, and the correct H1 title.</li>
@@ -312,7 +312,7 @@ mdbook-ingest --video --number 240
 <ol>
 <li><strong>Cover Art:</strong> Generate or source a cover image (PNG/JPG) and save it to your <code>Downloads</code> folder.</li>
 <li><strong>Run Ingestion:</strong> Execute the image ingestion command.
-<pre><code class="language-bash">mdbook-ingest --image --number XXX
+<pre><code class="language-bash">md-publish --image --number XXX
 </code></pre>
 </li>
 <li><strong>Syndication:</strong> This step automatically injects <strong>Spotify</strong>, <strong>Apple Podcasts</strong>, and <strong>YouTube</strong> links, along with a <strong>Lightning Zap Widget</strong>.</li>
@@ -322,7 +322,7 @@ mdbook-ingest --video --number 240
 <li><strong>Infographics:</strong> Generate infographics using Mosaic AI Video Editor.</li>
 <li><strong>Setup:</strong> Save the resulting <code>.mp4</code> files to your <strong>Downloads</strong> folder following the strict naming convention: <code>XXX-description.mp4</code>.</li>
 <li><strong>Run Ingestion:</strong> Execute the video ingestion command to rebuild the <strong>global cinematic infographic feed</strong> and inject it into the chapter with auto-focus logic.
-<pre><code class="language-bash">mdbook-ingest --video --number XXX
+<pre><code class="language-bash">md-publish --video --number XXX
 </code></pre>
 </li>
 </ol>
@@ -337,16 +337,16 @@ mdbook-ingest --video --number 240
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="ingestion-layer-roadmap-research-to-publish-workflow"><a class="header" href="#ingestion-layer-roadmap-research-to-publish-workflow">Ingestion Layer Roadmap: Research-to-Publish Workflow</a></h1>
 <h2 id="objective"><a class="header" href="#objective">Objective</a></h2>
-<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>mdbook-ingest</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
+<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>md-publish</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
 <h2 id="the-vision-the-research-to-src-pipeline"><a class="header" href="#the-vision-the-research-to-src-pipeline">The Vision: The “Research-to-src” Pipeline</a></h2>
 <p>The workflow focuses on a seamless transition from AI research to a production-ready mdbook page:</p>
 <ol>
 <li><strong>Generation:</strong> An LLM (currently Gemini Pro) generates a research report using the <strong>Master Prompt</strong>.</li>
-<li><strong>Ingestion:</strong> The user runs <code>mdbook-ingest --text --number XXX</code>.</li>
+<li><strong>Ingestion:</strong> The user runs <code>md-publish --text --number XXX</code>.</li>
 <li><strong>Renaming:</strong> The tool automatically identifies the “shielded” markdown file in <code>Downloads</code>, renames it to <code>XXX.md</code>, and moves it to the <code>src/</code> folder.</li>
 <li><strong>Surgical Fix:</strong> The tool triggers the internal sanitization logic to handle KaTeX, currency, and footnotes while stripping the “Shield”.</li>
 <li><strong>Synchronization:</strong> The tool automatically updates <code>SUMMARY.md</code> to include the new episode in the <code># Recent ..</code> section.</li>
-<li><strong>Media Enrichment:</strong> The user runs <code>mdbook-ingest --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
+<li><strong>Media Enrichment:</strong> The user runs <code>md-publish --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
 </ol>
 <h2 id="architectural-model-mdbook-extension"><a class="header" href="#architectural-model-mdbook-extension">Architectural Model: mdbook Extension</a></h2>
 <ul>

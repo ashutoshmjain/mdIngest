@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-011c1ac0.js";
+            window.path_to_searchindex_js = "searchindex-e8e847b5.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0d24d02b.js"></script>
@@ -176,16 +176,16 @@
                     <main>
                         <h1 id="ingestion-layer-roadmap-research-to-publish-workflow"><a class="header" href="#ingestion-layer-roadmap-research-to-publish-workflow">Ingestion Layer Roadmap: Research-to-Publish Workflow</a></h1>
 <h2 id="objective"><a class="header" href="#objective">Objective</a></h2>
-<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>mdbook-ingest</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
+<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>md-publish</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
 <h2 id="the-vision-the-research-to-src-pipeline"><a class="header" href="#the-vision-the-research-to-src-pipeline">The Vision: The “Research-to-src” Pipeline</a></h2>
 <p>The workflow focuses on a seamless transition from AI research to a production-ready mdbook page:</p>
 <ol>
 <li><strong>Generation:</strong> An LLM (currently Gemini Pro) generates a research report using the <strong>Master Prompt</strong>.</li>
-<li><strong>Ingestion:</strong> The user runs <code>mdbook-ingest --text --number XXX</code>.</li>
+<li><strong>Ingestion:</strong> The user runs <code>md-publish --text --number XXX</code>.</li>
 <li><strong>Renaming:</strong> The tool automatically identifies the “shielded” markdown file in <code>Downloads</code>, renames it to <code>XXX.md</code>, and moves it to the <code>src/</code> folder.</li>
 <li><strong>Surgical Fix:</strong> The tool triggers the internal sanitization logic to handle KaTeX, currency, and footnotes while stripping the “Shield”.</li>
 <li><strong>Synchronization:</strong> The tool automatically updates <code>SUMMARY.md</code> to include the new episode in the <code># Recent ..</code> section.</li>
-<li><strong>Media Enrichment:</strong> The user runs <code>mdbook-ingest --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
+<li><strong>Media Enrichment:</strong> The user runs <code>md-publish --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
 </ol>
 <h2 id="architectural-model-mdbook-extension"><a class="header" href="#architectural-model-mdbook-extension">Architectural Model: mdbook Extension</a></h2>
 <ul>
