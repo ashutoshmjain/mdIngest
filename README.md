@@ -52,11 +52,15 @@ Copy and paste this prompt into Gemini to generate ingestion-ready output:
 Please provide the final version of the report, delivered strictly according to these formatting constraints:
 
 1. Shield the Output from the Parser: Wrap the entire report—including the title, all sections, and the complete bibliography—inside a single Rust code block using a raw string literal wrapper (i.e. start with ```rust followed on the next line by r#" and end with "# followed by ```). This is non-negotiable for my parser.
-2. Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim.
-3. Full Bibliography Inclusion: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report, mapping every inline citation to its exact metadata (author, title, year, URL). This section MUST be inside the shield.
-4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters.
-5. Table Constraint: Use only single spaces between cell contents and the pipe '|' separators to prevent tabular rendering errors.
-6. ASCII Diagrams: For visual flowcharts or feedback loops, use clear ASCII markers (e.g., `+---+`, `===>`, `[ Box ]`). To avoid confusion with data tables, do not use the standard table separator line (`| --- |`) within a visual diagram.
+2. Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim. Use ONLY numbers, no letters.
+3. EXPLICIT & SERIALIZED BIBLIOGRAPHY: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report. This is the most critical part. 
+   - Every single inline citation [1], [2], etc., MUST map to a unique, full entry in the bibliography.
+   - Each entry MUST include: [Index Number], Author, Title, Year, and URL.
+   - DO NOT summarize or omit entries (e.g., "Citations [1-33] are in the repo"). Every reference MUST be fully written out inside the shield.
+   - If the report is long, prioritize completing the bibliography over descriptive filler.
+4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters. (e.g., use $x+y$ not $ x+y $).
+5. Table & Footnote Constraint: For the footnote table (if used), ensure it is standard Markdown. Do not use complex KaTeX environments for tables; keep them as Markdown tables inside the shield.
+6. ASCII Diagrams: For visual flowcharts or feedback loops, use clear ASCII markers (e.g., `+---+`, `===>`, `[ Box ]`). Wrap these in a separate code block IF they contain pipe characters that could confuse the Markdown table parser.
 ```
 
 ---
