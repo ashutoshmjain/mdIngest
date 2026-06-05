@@ -45,22 +45,44 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 
 ---
 
-## 🔑 The Master Ingestion Prompt
-Copy and paste this prompt into Gemini to generate ingestion-ready output:
+## 🔑 The Master Ingestion Protocol (The Secret Sauce)
+To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase Extraction Strategy**. This prevents "semantic compression" and ensures 100% complete bibliographies.
+
+### Phase A: Deep Research Extraction
+**Goal:** Extract the research body with maximum information density.
 
 ```text
-Please provide the final version of the report, delivered strictly according to these formatting constraints:
+Conduct a comprehensive deep-dive report on [TOPIC]. 
+Constraints:
+1. Provide a catchy five-word title as the H1 header.
+2. Embed precise inline citations [1], [2], [3] next to every technical claim or unique perspective.
+3. Prioritize raw information density and structural clarity (use headers, sub-headers, and bullet points).
+4. If a concept is complex, provide an ASCII-style flowchart or diagram using standard markers (+---+, ===>, |).
+5. DO NOT provide the bibliography or the shield yet. Just provide the full body of the research.
+```
 
-1. Shield the Output from the Parser: Wrap the entire report—including the title, all sections, and the complete bibliography—inside a single Rust code block using a triple-hash raw string literal wrapper (i.e. start with ```rust followed on the next line by r###" and end with "### followed by ```). This is non-negotiable for my parser as it prevents premature termination from internal quotes or hashes.
-2. Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim. Use ONLY numbers, no letters.
-3. EXPLICIT & SERIALIZED BIBLIOGRAPHY: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report. This is the most critical part. 
-   - Every single inline citation [1], [2], etc., MUST map to a unique, full entry in the bibliography.
-   - Each entry MUST include: [Index Number], Author, Title, Year, and URL.
-   - DO NOT summarize or omit entries (e.g., "Citations [1-33] are in the repo"). Every reference MUST be fully written out inside the shield.
-   - If the report is long, prioritize completing the bibliography over descriptive filler.
-4. LaTeX Constraint: Do not include any whitespace immediately adjacent to the '$' or '$$' math delimiters. (e.g., use $x+y$ not $ x+y $).
-5. Table & Footnote Constraint: For the footnote table (if used), ensure it is standard Markdown. Do not use complex KaTeX environments for tables; keep them as Markdown tables inside the shield.
-6. ASCII Diagrams: For visual flowcharts or feedback loops, use clear ASCII markers (e.g., `+---+`, `===>`, `[ Box ]`). Wrap these in a separate code block IF they contain pipe characters that could confuse the Markdown table parser.
+### Phase B: The Ingestion Shield (Non-Negotiable)
+**Goal:** Package the content for the `md-publish` engine with zero truncation.
+
+```text
+Excellent. Now, provide the FINAL version for my ingestion engine. You must deliver the ENTIRE report (Body + Bibliography) inside a single code block using this exact Rust Raw String Wrapper:
+
+```rust
+r###"
+[FULL BODY OF RESEARCH FROM PREVIOUS TURN]
+
+#### **Works cited**
+[1] Author, "Title", Year, URL
+[2] Author, "Title", Year, URL
+... (Provide EVERY unique reference used in the text)
+"###
+```
+
+Critical Technical Constraints:
+1. NO SEMANTIC COMPRESSION: Ensure blank lines between every header and paragraph. Do not collapse the bibliography into a single line.
+2. SERIALIZED INDEXING: Every [n] in the text MUST have a corresponding [n] entry in the bibliography.
+3. LATEX HARDENING: No whitespace allowed next to '$' delimiters (e.g. $x+y$).
+4. SHIELD INTEGRITY: The shield must start with r###" and end with "###.
 ```
 
 ---
