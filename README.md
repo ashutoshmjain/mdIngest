@@ -46,11 +46,9 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 ---
 
 ## 🔑 The Master Ingestion Protocol (The Secret Sauce)
-To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase Extraction Strategy**. This prevents "semantic compression" and ensures 100% complete bibliographies.
+To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase Extraction Strategy**. Copy the respective blocks below during your research session:
 
-### Phase A: Deep Research Extraction
-**Goal:** Extract the research body with maximum information density.
-
+### Turn 1: Research Extraction
 ```text
 Conduct a comprehensive deep-dive report on [TOPIC]. 
 Constraints:
@@ -61,9 +59,7 @@ Constraints:
 5. DO NOT provide the bibliography or the shield yet. Just provide the full body of the research.
 ```
 
-### Phase B: The Ingestion Shield (Non-Negotiable)
-**Goal:** Package the content for the `md-publish` engine with zero truncation.
-
+### Turn 2: Ingestion Shield
 ```text
 Excellent. Now, provide the FINAL version for my ingestion engine. You must deliver the ENTIRE report (Body + Bibliography) inside a single code block using this exact Rust Raw String Wrapper:
 
