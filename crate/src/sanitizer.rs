@@ -26,16 +26,23 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
 
     // 0.1 Strip Rust raw string artifacts and Gemini markdown markers (The "Shield")
     content = content.trim().to_string();
-    if content.starts_with("Rustr#\"") {
-        content = content[7..].to_string();
-    } else if content.starts_with("r#\"") {
-        content = content[3..].to_string();
+    
+    // Handle variable number of hashes in raw string: r#", r##", r###", etc.
+    let prefix_regex = Regex::new(r"^(?:Rust)?r(#+)\x22").unwrap();
+    let mut hash_count = 0;
+    
+    if let Some(caps) = prefix_regex.captures(&content) {
+        hash_count = caps.get(1).unwrap().as_str().len();
+        content = prefix_regex.replace(&content, "").to_string();
     }
 
-    if content.ends_with("\"#") {
-        content = content[..content.len()-2].to_string();
-    } else if content.ends_with("\"#\n") {
-        content = content[..content.len()-3].to_string();
+    if hash_count > 0 {
+        let suffix_pattern = format!(r"\x22{}", "#".repeat(hash_count));
+        if content.ends_with(&suffix_pattern) {
+            content = content[..content.len() - suffix_pattern.len()].to_string();
+        } else if content.ends_with(&format!("{}\n", suffix_pattern)) {
+            content = content[..content.len() - suffix_pattern.len() - 1].to_string();
+        }
     }
 
     let gemini_artifacts = Regex::new(r"(?m)^```(text|markdown|rust)?\s*$").unwrap();
@@ -55,8 +62,8 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     let mut in_markers = false;
     let mut paragraph_found = false;
     let h1_regex = Regex::new(r"^#\s").unwrap();
-    let image_regex = Regex::new(r"^!\[.*?\]").unwrap();
-    let center_regex = Regex::new(r"^<center>").unwrap();
+    let image_regex = Regex::new(r"(?i)^!\[.*?\]").unwrap();
+    let center_regex = Regex::new(r"(?i)^<center>").unwrap();
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -67,8 +74,9 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
                 clean_lines.push(line);
                 continue;
             }
-            if image_regex.is_match(trimmed) || center_regex.is_match(trimmed) {
-                // Strip this legacy media
+            // Strip legacy media (covers, links, etc.) 
+            // BUT PROTECT FOOTNOTE MARKERS [^n] which might start a line in the raw output
+            if (image_regex.is_match(trimmed) && !trimmed.starts_with("[^")) || center_regex.is_match(trimmed) {
                 continue;
             }
             if !trimmed.is_empty() && !trimmed.starts_with('#') {
@@ -76,6 +84,12 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
             }
         }
         
+        // Final protection: Strip ALL inline images from the entire file (Infographics-First standard)
+        // BUT PROTECT FOOTNOTE MARKERS [^n]
+        if image_regex.is_match(trimmed) && !in_markers && !trimmed.starts_with("[^") {
+            continue;
+        }
+
         clean_lines.push(line);
         if trimmed.contains("_END -->") { in_markers = false; }
     }
@@ -289,7 +303,7 @@ fn wrap_ascii_diagrams(content: String) -> String {
 
 /// Standardizes and re-indexes footnotes.
 fn fix_footnotes(content: String) -> String {
-    let header_regex = Regex::new(r"(?i)#### \*\*Works cited\*\*|#### \*\*References\*\*|## Bibliography|## References or Bibliography|## References").unwrap();
+    let header_regex = Regex::new(r"(?im)^#+\s+(\*\*Works cited\*\*|Works cited|References|Bibliography|References or Bibliography)").unwrap();
     let parts: Vec<&str> = header_regex.split(&content).collect();
     if parts.len() < 2 { return content; }
 
@@ -297,7 +311,8 @@ fn fix_footnotes(content: String) -> String {
     let refs_raw = parts[1];
     let header = "#### **Works cited**";
 
-    let ref_pattern = Regex::new(r"(?m)^\*?\s*(\*\*\[?(\d+)\]?\*\*|\*\*\*\*|\[(\d+)\])\s*").unwrap();
+    // Detect entries starting with [number], **[number]**, or even just the text
+    let ref_pattern = Regex::new(r"(?m)^(\*?\s*(\*\*\[?(\d+)\]?\*\*|\[(\d+)\])\s*|\s*$)").unwrap();
     
     let mut ref_entries = Vec::new();
     let matches: Vec<_> = ref_pattern.find_iter(refs_raw).collect();
@@ -342,7 +357,7 @@ fn fix_footnotes(content: String) -> String {
         let mut found = false;
         
         while let Some(ref_entry) = ref_entries.iter_mut().find(|r| r.old_num.as_ref() == Some(&old_num) && !r.processed) {
-            if found { aggregated_text.push_str(" | "); }
+            if found { aggregated_text.push_str("\n\n"); }
             
             let entry_text_clean = ref_entry.text.replace("`", "");
             let processed_text = url_regex.replace_all(&entry_text_clean, |caps: &regex::Captures| {

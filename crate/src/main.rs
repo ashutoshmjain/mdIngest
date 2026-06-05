@@ -9,7 +9,7 @@ use anyhow::{Result};
 use glob::glob;
 use std::path::PathBuf;
 use std::process::Command;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 #[derive(Debug, Deserialize)]
 struct IngestConfig {
@@ -126,11 +126,49 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
         let hardened = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(5));
         std::fs::write(format!("src/{}.md", number), hardened)?;
         eprintln!("✅ Ingested text to src/{}.md", number);
+        
+        // Sync SUMMARY.md
+        if let Err(e) = update_summary(number) {
+            eprintln!("⚠️ Failed to update SUMMARY.md: {}", e);
+        } else {
+            eprintln!("✅ Synchronized SUMMARY.md");
+        }
     }
     Ok(())
 }
 
-fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()> {
+fn update_summary(number: &str) -> Result<()> {
+    let summary_path = "src/SUMMARY.md";
+    let content = std::fs::read_to_string(summary_path)?;
+    let md_path = format!("src/{}.md", number);
+    
+    // Extract title from the newly created markdown file
+    let md_content = std::fs::read_to_string(&md_path)?;
+    let h1_regex = regex::Regex::new(r"(?m)^#\s+\d+\s*:\s*(.*)$").unwrap();
+    let title = if let Some(caps) = h1_regex.captures(&md_content) {
+        caps.get(1).unwrap().as_str().trim()
+    } else {
+        "Untitled"
+    };
+
+    let new_entry = format!("- [{} : {}]({}.md)", number, title, number);
+    
+    // Check if already in SUMMARY.md
+    if content.contains(&format!("({}.md)", number)) {
+        return Ok(());
+    }
+
+    // Insert after <!-- RECENT_START -->
+    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+    if let Some(pos) = lines.iter().position(|l| l.contains("<!-- RECENT_START -->")) {
+        lines.insert(pos + 1, new_entry);
+        std::fs::write(summary_path, lines.join("\n"))?;
+    }
+
+    Ok(())
+}
+
+fn ingest_image(number: &str, source: &str, _config: &IngestConfig) -> Result<()> {
     eprintln!("🎨 Ingesting image for episode {}...", number);
     let img_dir = "src/img";
     std::fs::create_dir_all(img_dir)?;
@@ -139,57 +177,16 @@ fn ingest_image(number: &str, source: &str, config: &IngestConfig) -> Result<()>
 
     if let Some(path) = images.first() {
         let dest = format!("{}/{}.png", img_dir, number);
-        std::fs::copy(path, &dest)?;
-        eprintln!("✅ Ingested cover art to {}", dest);
-
-        // Hybrid Layout Injection
-        let md_path = format!("src/{}.md", number);
-        if let Ok(content) = std::fs::read_to_string(&md_path) {
-            let podcast_html = config.podcast_html.as_deref().unwrap_or("");
-            let mut audio_feed = String::new();
-            audio_feed.push_str("\n<!-- AUDIO_FEED_START -->\n");
-            audio_feed.push_str(&format!("![Cover Image](img/{}.png)\n\n<center><h3>Audio Feed from <a href=\"https://notebooklm.google.com/\" target=\"_blank\" style=\"text-decoration: none; color: inherit; border-bottom: 1px solid #555;\">notebookLM</a></h3></center>\n\n{}\n", number, podcast_html));
-            audio_feed.push_str("<!-- AUDIO_FEED_END -->\n");
-
-            // Always strip existing block to ensure clean re-placement
-            let mut clean_content = if let (Some(s), Some(e)) = (content.find("<!-- AUDIO_FEED_START -->"), content.find("<!-- AUDIO_FEED_END -->")) {
-                let mut c = String::new();
-                c.push_str(&content[..s]);
-                c.push_str(&content[e + "<!-- AUDIO_FEED_END -->".len()..]);
-                c
-            } else {
-                content.clone()
-            };
-
-            // Re-calculate anchor point and insert
-            let final_content = if let Some(pos) = sanitizer::find_first_substantial_paragraph(&clean_content) {
-                let mut nc = String::new();
-                nc.push_str(&clean_content[..pos]);
-                nc.push_str(&audio_feed);
-                nc.push_str(&clean_content[pos..]);
-                nc
-            } else {
-                // Fallback to top (below H1)
-                let mut nc = String::new();
-                if let Some(h1_end) = clean_content.find('\n').map(|i| i + 1) {
-                    nc.push_str(&clean_content[..h1_end]);
-                    nc.push_str(&audio_feed);
-                    nc.push_str(&clean_content[h1_end..]);
-                } else {
-                    nc.push_str(&audio_feed);
-                    nc.push_str(&clean_content);
-                }
-                nc
-            };
-            
-            std::fs::write(&md_path, final_content)?;
-            eprintln!("✅ Injected audio feed into {}", md_path);
+        // Avoid truncating if copying from within the same folder (redundant check but safe)
+        if path.as_path() != std::path::Path::new(&dest) {
+            std::fs::copy(path, &dest)?;
         }
+        eprintln!("✅ Ingested cover art to {} (archived, no Markdown injection)", dest);
     }
     Ok(())
 }
 
-fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()> {
+fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()> {
     eprintln!("🎬 Ingesting video for episode {}...", number);
     
     let vid_dir = "src/vid";
@@ -220,16 +217,13 @@ fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()>
         return Ok(());
     }
 
-    // 3. Generate HTML
-    let default_visual_links = r#"
-<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">TikTok</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Instagram</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">YouTube</a><a href="https://open.spotify.com/show/07r9EZMLpFC7qwZwxsJ5P9" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Spotify</a></center>
+    // 3. Generate HTML (Visual Socials BELOW scroll)
+    let visual_links = r#"
+<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">▶ TikTok ◀</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">◈ Instagram ◈</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37q8rU8HKTLhdLPZQadcvx-K" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">⫸ YouTube ⫷</a></center>
 "#;
-    let visual_links = config.visual_html.as_deref().unwrap_or(default_visual_links);
 
     let mut html = String::new();
     html.push_str("\n<!-- VIDEO_STRIP_START -->\n");
-    html.push_str(&format!("\n<center><h3>Info Graphics feed from <a href=\"https://mosaic.so\" target=\"_blank\" style=\"text-decoration: none; color: inherit; border-bottom: 1px solid #555;\">Mosaic.SO</a></h3></center>\n{}\n", visual_links));
-    
     html.push_str("<div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\">\n");
 
     for path in local_vids.iter() {
@@ -243,6 +237,7 @@ fn ingest_video(number: &str, source: &str, config: &IngestConfig) -> Result<()>
 "#, filename, filename.trim_end_matches(".mp4")));
     }
     html.push_str("</div>\n");
+    html.push_str(&format!("{}\n", visual_links));
 
     html.push_str(r#"<script>
   window.oph_play_toggle = window.oph_play_toggle || function(btn) {

@@ -51,7 +51,7 @@ Copy and paste this prompt into Gemini to generate ingestion-ready output:
 ```text
 Please provide the final version of the report, delivered strictly according to these formatting constraints:
 
-1. Shield the Output from the Parser: Wrap the entire report—including the title, all sections, and the complete bibliography—inside a single Rust code block using a raw string literal wrapper (i.e. start with ```rust followed on the next line by r#" and end with "# followed by ```). This is non-negotiable for my parser.
+1. Shield the Output from the Parser: Wrap the entire report—including the title, all sections, and the complete bibliography—inside a single Rust code block using a triple-hash raw string literal wrapper (i.e. start with ```rust followed on the next line by r###" and end with "### followed by ```). This is non-negotiable for my parser as it prevents premature termination from internal quotes or hashes.
 2. Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim. Use ONLY numbers, no letters.
 3. EXPLICIT & SERIALIZED BIBLIOGRAPHY: You MUST include a complete, structured "References" or "Bibliography" section at the end of the report. This is the most critical part. 
    - Every single inline citation [1], [2], etc., MUST map to a unique, full entry in the bibliography.

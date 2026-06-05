@@ -3,6 +3,10 @@
 ## **The Mission: Developer & Tester Role**
 In this repository, the Gemini CLI agent is not merely a user but the **Lead Developer and Automation Tester**. Your primary goal is to iteratively harden the **md-publish** tool through real-world "episode intakes."
 
+### **Key Artifacts & Deliverables**
+1.  **The Ingestion Engine:** The Rust codebase (`md-publish`) for high-fidelity sanitization.
+2.  **The Master Ingestion Prompt:** The precisely engineered prompt (found in `README.md`) used to extract research from LLMs. This prompt is a **first-class deliverable**; its continuous refinement is as critical as the code itself to ensure zero-friction ingestion.
+
 ### **The Hardened Testing Workflow**
 Whenever a manual "surgical" fix is required to deliver an episode, you must treat it as a tool failure and follow this protocol:
 1.  **Root Cause Analysis (RCA):** Identify exactly why the Rust tool failed to process the asset correctly.
