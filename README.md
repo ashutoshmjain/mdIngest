@@ -47,7 +47,7 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 
 ## 🔑 Master Ingestion Protocol (The Secret Sauce)
 
-```text
+````text
 STEP 1: RESEARCH EXTRACTION
 --------------------------------------------------
 Conduct a comprehensive deep-dive report on [TOPIC]. 
@@ -78,7 +78,7 @@ Critical Technical Constraints:
 2. SERIALIZED INDEXING: Every [n] in the text MUST have a corresponding [n] entry in the bibliography.
 3. LATEX HARDENING: No whitespace allowed next to '$' delimiters.
 4. SHIELD INTEGRITY: The shield must start with r###" and end with "###.
-```
+````
 
 ---
 
