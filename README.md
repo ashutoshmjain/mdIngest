@@ -45,22 +45,21 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 
 ---
 
-## 🔑 The Master Ingestion Protocol (The Secret Sauce)
-To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase Extraction Strategy**. Copy the respective blocks below during your research session:
+## 🔑 Master Ingestion Protocol (The Secret Sauce)
 
-### Turn 1: Research Extraction
 ```text
+STEP 1: RESEARCH EXTRACTION
+--------------------------------------------------
 Conduct a comprehensive deep-dive report on [TOPIC]. 
 Constraints:
 1. Provide a catchy five-word title as the H1 header.
-2. Embed precise inline citations [1], [2], [3] next to every technical claim or unique perspective.
-3. Prioritize raw information density and structural clarity (use headers, sub-headers, and bullet points).
-4. If a concept is complex, provide an ASCII-style flowchart or diagram using standard markers (+---+, ===>, |).
+2. Embed precise inline citations [1], [2], [3] next to every technical claim.
+3. Prioritize raw information density and structural clarity.
+4. If a concept is complex, provide an ASCII-style flowchart or diagram (+---+, ===>, |).
 5. DO NOT provide the bibliography or the shield yet. Just provide the full body of the research.
-```
 
-### Turn 2: Ingestion Shield
-```text
+STEP 2: INGESTION SHIELD (.rs file)
+--------------------------------------------------
 Excellent. Now, provide the FINAL version for my ingestion engine. You must deliver the ENTIRE report (Body + Bibliography) inside a single code block using this exact Rust Raw String Wrapper:
 
 ```rust
@@ -75,9 +74,9 @@ r###"
 ```
 
 Critical Technical Constraints:
-1. NO SEMANTIC COMPRESSION: Ensure blank lines between every header and paragraph. Do not collapse the bibliography into a single line.
+1. NO SEMANTIC COMPRESSION: Ensure blank lines between every header and paragraph.
 2. SERIALIZED INDEXING: Every [n] in the text MUST have a corresponding [n] entry in the bibliography.
-3. LATEX HARDENING: No whitespace allowed next to '$' delimiters (e.g. $x+y$).
+3. LATEX HARDENING: No whitespace allowed next to '$' delimiters.
 4. SHIELD INTEGRITY: The shield must start with r###" and end with "###.
 ```
 
