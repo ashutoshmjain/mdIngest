@@ -43,15 +43,12 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
     - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
     - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
-## 🔑 Master Ingestion Protocol 2.0 (The JSON Edition)
+## 🔑 Master Ingestion Protocol (NotebookLM Optimized)
 
-For maximum reliability across Gemini, Claude, and GPT-4, use the **One-Shot JSON Capsule**. It is optimized for the "3,500-word sweet spot," ensuring high-density research and a complete bibliography fit within a single response.
-
-### 🚀 The JSON Ingestion Capsule (Final Export)
-Use this as the "Final Export" command. **IMPORTANT:** Save the output as a `.json` file containing ONLY the raw JSON object. Do NOT include markdown code block markers (```json) inside the file.
+Use this "Final Export" command once your collaborative research is ready for publication. Save the output as a `.json` file containing ONLY the raw JSON object.
 
 ```text
-Deliver the final version of our research strictly as a PURE JSON object (No markdown code block wrappers).
+Deliver the selected source as a PURE JSON object (No markdown code block wrappers).
 
 JSON SCHEMA:
 {
@@ -64,11 +61,10 @@ JSON SCHEMA:
 
 CRITICAL CONSTRAINTS:
 1. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
-2. SWEET SPOT CAPACITY: Target approximately 3,500 words.
-3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
-4. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
-5. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
-6. INDEXING: Every inline citation [1] must have a matching entry in the "references" array.
+2. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
+3. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (text\n...\n) inside the JSON body.
+4. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
+5. INDEXING: Every inline citation [1] must have a matching entry in the "references" array.
 ```
 
 ---
