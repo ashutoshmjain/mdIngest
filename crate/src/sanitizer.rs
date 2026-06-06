@@ -124,12 +124,18 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 "#;
 
     let lightning_widget = r#"
-<div style="display: flex; justify-content: center; margin: 30px 0;">
-    <a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 0 30px; height: 50px; line-height: 50px; text-align: center; text-decoration: none; display: inline-block; border-radius: 12px; font-weight: 800; font-family: sans-serif; border: 3px solid #E87F0E; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 1.1em; letter-spacing: 0.5px; box-sizing: border-box; white-space: nowrap;">⚡ ZAP WITH LIGHTNING</a>
-</div>
+<center>
+<lightning-widget
+  name='Thanks for supporting the publication'
+  accent='#f9ce00'
+  to='shutosha@primal.net'
+  image='https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp'
+/>
+</center>
+<script src='https://embed.twentyuno.net/js/app.js'></script>
 "#;
 
-    let social_block = format!("\n\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n", podcast_links, lightning_widget);
+    let social_block = format!("\n\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n", lightning_widget, podcast_links);
 
     let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
     if is_json_capsule {

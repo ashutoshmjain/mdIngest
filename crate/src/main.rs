@@ -242,11 +242,11 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     if local_vids.len() == 1 {
         let path = &local_vids[0];
         let filename = path.file_name().unwrap().to_str().unwrap();
-        html.push_str("<div class=\"video-single-container\" style=\"display: flex; justify-content: center; padding: 20px 0;\">\n");
+        html.push_str("<div class=\"video-single-container\" style=\"display: flex; justify-content: center; width: 100%; margin: 20px 0;\">\n");
         html.push_str(&format!(
-            r#"  <div style="flex: 0 0 95%; max-width: 800px; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 16/9; display: flex; flex-direction: column;">
+            r#"  <div style="width: 100%; max-width: 1000px; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 16/9; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
     <video src="vid/{}" style="width: 100%; height: 100%; object-fit: contain;" playsinline loop preload="auto" muted autoplay></video>
-    <button class="vid-toggle" onclick="window.oph_play_toggle(this)" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; font-size: 24px; z-index: 100;">🔇</button>
+    <button class="vid-toggle" onclick="window.oph_play_toggle(this)" style="position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; font-size: 24px; z-index: 100; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1.0)'">🔇</button>
   </div>
 "#, filename));
         html.push_str("</div>\n");
@@ -255,7 +255,7 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
         for path in local_vids.iter() {
             let filename = path.file_name().unwrap().to_str().unwrap();
             html.push_str(&format!(
-                r#"  <div style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column;">
+                r#"  <div style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
     <video src="vid/{}" style="width: 100%; height: 85%; object-fit: contain;" playsinline loop preload="auto" muted autoplay></video>
     <div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;">{}</div>
     <button class="vid-toggle" onclick="window.oph_play_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; font-size: 22px; z-index: 100;">🔇</button>
@@ -267,42 +267,45 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
     html.push_str(&format!("{}\n", visual_links));
 
     html.push_str(r#"<script>
-    window.oph_play_toggle = window.oph_play_toggle || function(btn) {
-    const parent = btn.parentElement;
-    const vid = parent.querySelector('video');
-    const container = btn.closest('.video-carousel-container, .video-single-container');
-    if (vid.muted) {
-      if (container) {
-        container.querySelectorAll('video').forEach(v => {
-          if (v !== vid) {
-            v.pause();
-            v.muted = true;
-            const otherBtn = v.parentElement.querySelector('.vid-toggle');
-            if (otherBtn) otherBtn.innerText = '🔇';
-          }
-        });
-      }
-      vid.muted = false;
-      vid.volume = 1.0;
-      vid.play().then(() => { btn.innerText = '🔊'; }).catch(e => console.error(e));
-    } else {
-      vid.pause();
-      vid.muted = true;
-      btn.innerText = '🔇';
-    }
-    };
-    (function() {
-    const init = () => {
-      const vids = document.querySelectorAll('.video-carousel-container video, .video-single-container video');
-      vids.forEach(v => { 
-        v.muted = true; 
-        v.play().catch(() => {}); 
+window.oph_play_toggle = function(btn) {
+  const parent = btn.parentElement;
+  const vid = parent.querySelector('video');
+  const container = btn.closest('.video-carousel-container, .video-single-container');
+  
+  if (vid.muted || vid.paused) {
+    if (container) {
+      container.querySelectorAll('video').forEach(v => {
+        if (v !== vid) {
+          v.pause();
+          v.muted = true;
+          const otherBtn = v.parentElement.querySelector('.vid-toggle');
+          if (otherBtn) otherBtn.innerText = '🔇';
+        }
       });
-    };
-    setTimeout(init, 500);
-    })();
-    </script>
-    "#);
+    }
+    vid.muted = false;
+    vid.volume = 1.0;
+    vid.play().then(() => { btn.innerText = '🔊'; }).catch(e => console.error('Play failed:', e));
+  } else {
+    vid.pause();
+    vid.muted = true;
+    btn.innerText = '🔇';
+  }
+};
+
+(function() {
+  const init = () => {
+    const vids = document.querySelectorAll('.video-carousel-container video, .video-single-container video');
+    vids.forEach(v => { 
+      v.muted = true; 
+      v.play().catch(() => {}); 
+    });
+  };
+  if (document.readyState === 'complete') { init(); }
+  else { window.addEventListener('load', init); }
+})();
+</script>
+"#);
 
     html.push_str("<!-- VIDEO_STRIP_END -->\n\n");
 
