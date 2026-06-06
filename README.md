@@ -43,12 +43,15 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
     - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
     - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
-## 🔑 Master Ingestion Protocol (NotebookLM Optimized)
+## 🔑 Master Ingestion Protocol (Gemini Safe Zone)
 
-Use this "Final Export" command once your collaborative research is ready for publication. Save the output as a `.json` file containing ONLY the raw JSON object.
+This protocol is optimized for the **2,000-word Safe Zone**. By keeping the narrative concise, it ensures Gemini delivers valid JSON, authentic citations (not generic), and perfect formatting in a single turn.
+
+### 🚀 The Final Export Capsule (One-Shot)
+Use this as the "Final Export" command once your research is ready. Save the output as a `.json` file containing ONLY the raw JSON object.
 
 ```text
-Deliver the selected source as a PURE JSON object (No markdown code block wrappers).
+Deliver our research strictly as a PURE JSON object (No markdown code block wrappers).
 
 JSON SCHEMA:
 {
@@ -60,11 +63,12 @@ JSON SCHEMA:
 }
 
 CRITICAL CONSTRAINTS:
-1. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
-2. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
-3. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (text\n...\n) inside the JSON body.
-4. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
-5. INDEXING: Every inline citation [1] must have a matching entry in the "references" array.
+1. SAFE ZONE CAPACITY: Target approximately 1,500 - 2,000 words. This ensures 100% authentic citations and valid JSON.
+2. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
+3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
+4. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (text\n...\n) inside the JSON body.
+5. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
+6. BODY MARKERS: You MUST embed the citation markers (e.g., [1], [2]) directly inside the sentences of the 'body' field.
 ```
 
 ---

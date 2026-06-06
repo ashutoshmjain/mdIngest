@@ -54,7 +54,6 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 
     // Prepare content for standard sanitization
     if is_json_capsule {
-        // If it's a JSON capsule, the "body" field IS the content
         content = json_body.unwrap();
     } else {
         // 0.1 Strip Rust shields (if any) for non-JSON content
@@ -85,32 +84,24 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
         String::from("Untitled")
     };
 
-    // Remove existing H1 from content to avoid duplication
     content = h1_regex_full.replace(&content, "").to_string().trim().to_string();
 
-    // Standardize title word limit
     let words: Vec<&str> = h1_title.split_whitespace().collect();
     if words.len() > word_limit {
         h1_title = words[..word_limit].join(" ");
     }
 
     // 2. Sanitization Pipeline
-    // 2.1 Invisible Character Sanitization
     content = content.replace('\u{0332}', "");
     let control_chars = Regex::new(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]").unwrap();
     content = control_chars.replace_all(&content, "").to_string();
 
-    // 2.2 Convert ASCII Tables
     content = convert_ascii_tables(content);
-
-    // 2.3 Wrap ASCII Diagrams
     content = wrap_ascii_diagrams(content);
 
-    // 2.4 Backslash cleanup
     let backslash_cleanup = Regex::new(r"\\([_.\-+!|>\[\]=])").unwrap();
     content = backslash_cleanup.replace_all(&content, "$1").to_string();
 
-    // 2.5 Preserve Math Blocks
     let math_block_regex = Regex::new(r"(?s)\$\$.*?\$\$").unwrap();
     let inline_math_regex = Regex::new(r"\$.*?\$").unwrap();
     let mut math_blocks = Vec::new();
@@ -133,7 +124,9 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 "#;
 
     let lightning_widget = r#"
-<center><a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; font-weight: bold;">⚡ Zap with Lightning</a></center>
+<div style="text-align: center; margin: 25px 0;">
+    <a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 14px 28px; text-align: center; text-decoration: none; display: inline-block; border-radius: 10px; font-weight: 900; font-family: sans-serif; border: 3px solid #E87F0E; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-size: 1.1em; letter-spacing: 0.5px;">⚡ ZAP WITH LIGHTNING</a>
+</div>
 "#;
 
     let social_block = format!("\n\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n", podcast_links, lightning_widget);
@@ -141,26 +134,32 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
     let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
     if is_json_capsule {
         if let Some(refs) = json_refs {
-            for r in refs {
+            let mut markers_found = false;
+            for r in &refs {
                 let marker = format!("[{}]", r.id);
-                let foot_marker = format!("[^{}]", r.id);
-                // Stochastic replacement of [n] with [^n] in the body
-                temp_content = temp_content.replace(&marker, &foot_marker);
-                
+                if temp_content.contains(&marker) { markers_found = true; break; }
+            }
+
+            for r in refs {
                 let mut ref_text = r.text.clone();
                 let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
                 ref_text = url_regex.replace_all(&ref_text, |c: &regex::Captures| {
                     let u = c.get(1).unwrap().as_str();
                     format!("[{}]({})", u, u)
                 }).to_string();
-                
-                refs_section.push_str(&format!("{}: {}\n\n", foot_marker, ref_text));
+
+                if markers_found {
+                    let marker = format!("[{}]", r.id);
+                    let foot_marker = format!("[^{}]", r.id);
+                    temp_content = temp_content.replace(&marker, &foot_marker);
+                    refs_section.push_str(&format!("{}: {}\n\n", foot_marker, ref_text));
+                } else {
+                    refs_section.push_str(&format!("{}. {}\n\n", r.id, ref_text));
+                }
             }
         }
     } else {
-        // Fallback to legacy footnote logic
         temp_content = fix_footnotes(temp_content);
-        // Note: fix_footnotes already appends the section
         refs_section = String::new(); 
     }
 
@@ -183,7 +182,6 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 pub fn find_first_substantial_paragraph(content: &str) -> Option<usize> {
     let mut in_code_block = false;
     let mut current_pos = 0;
-
     for line in content.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("```") {
@@ -247,15 +245,14 @@ fn wrap_ascii_diagrams(content: String) -> String {
                             break;
                         }
                     }
-                    if !is_indented || !next_is_diag {
-                        break;
-                    }
+                    if !is_indented || !next_is_diag { break; }
                 }
                 j += 1;
             }
             let is_multi_line = last_diag_idx > i;
             let contains_arrows = lines[i].contains("===>") || lines[i].contains("<===") || lines[i].contains("<====") || lines[i].starts_with("=====");
-            let has_table_separator = (i..=last_diag_idx).any(|k| lines[k].contains("--- |") || lines[k].contains("| ---"));
+            let has_table_separator = (i..=last_diag_idx).any(|k| lines[k].contains("--- |") || lines[k].contains("| ---") || (lines[k].contains('|') && lines[k].contains('-')));
+            
             if (is_multi_line || contains_arrows) && !has_table_separator {
                 result.push_str("\n```text\n");
                 for k in i..=last_diag_idx {
@@ -330,7 +327,6 @@ fn fix_footnotes(content: String) -> String {
             ref_entry.processed = true;
             found = true;
         }
-
         if found {
             let new_num = (new_refs.len() + 1).to_string();
             old_to_new.insert(old_num, new_num);
@@ -374,13 +370,13 @@ fn convert_ascii_tables(content: String) -> String {
     let mut lines = content.lines().peekable();
     while let Some(line) = lines.next() {
         let trimmed = line.trim();
-        let is_table_start = (trimmed.contains("+---") && trimmed.ends_with('+')) || (trimmed.starts_with('|') && trimmed.ends_with('|'));
+        let is_table_start = (trimmed.contains("+---") && trimmed.ends_with('+')) || (trimmed.starts_with('|') && (trimmed.ends_with('|') || trimmed.contains(" --- ")));
         if is_table_start {
             let mut table_data = Vec::new();
             table_data.push(line);
             while let Some(next) = lines.peek() {
                 let nt = next.trim();
-                if nt.starts_with('|') || (nt.contains("+---") && nt.ends_with('+')) || nt.is_empty() {
+                if nt.starts_with('|') || (nt.contains("+---") && nt.ends_with('+')) || nt.contains(" --- ") || nt.is_empty() {
                     table_data.push(lines.next().unwrap());
                 } else { break; }
             }
@@ -395,7 +391,7 @@ fn convert_ascii_tables(content: String) -> String {
             if !md_rows.is_empty() {
                 result.push('\n');
                 let mut start_idx = 0;
-                if md_rows[0].len() == 1 {
+                if md_rows[0].len() == 1 && md_rows.len() > 1 {
                     result.push_str(&format!("**{}**\n\n", md_rows[0][0]));
                     start_idx = 1;
                 }
