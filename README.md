@@ -44,39 +44,48 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
     - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
 ## 🔑 Master Ingestion Protocol 2.0 (The JSON Edition)
-This protocol supports two distinct workflows:
-1. **New Research:** Use both phases to extract and package a new topic.
-2. **Existing Research:** If you have already finalized a paper through weeks of iteration, use **Phase 2 only** as a standalone "Final Export" command to package your work.
 
-### Phase 1: Research Extraction (For New Topics)
-**Goal:** Extract the research body with maximum information density from a new query.
+For maximum reliability across Gemini, Claude, and GPT-4, use the **One-Shot JSON Capsule**. It is optimized for the "3,500-word sweet spot," ensuring high-density research and a complete bibliography fit within a single response.
 
-```text
-Conduct a comprehensive deep-dive report on [TOPIC]. 
-Constraints:
-1. Provide a catchy five-word title as the H1 header.
-2. Embed precise inline citations [1], [2], [3] next to every technical claim.
-3. Prioritize raw information density and structural clarity (headers, sub-headers, bullets).
-4. If a concept is complex, provide an ASCII-style flowchart or diagram (+---+, ===>, |).
-5. DO NOT provide the bibliography or JSON yet. Just provide the full body of the research.
-```
-
-### Phase 2: The JSON Ingestion Capsule (The "Final Export" Command)
-**Goal:** Package your finalized research for the `md-publish` engine with zero formatting loss. Use this command when your paper is ready for publication.
+### 🚀 The One-Shot JSON Ingestion Capsule (Primary)
+Use this as the "Final Export" command once your collaborative research is ready for publication.
 
 ```text
-Now, deliver the FINAL version of our research for my ingestion engine strictly as a single JSON object.
-Wrap the JSON inside a markdown code block labeled ```json.
+Deliver the final version of our research strictly as a single JSON object wrapped in a ```json code block.
 
 JSON SCHEMA:
 {
   "title": "A catchy five-word title for our paper",
-  "body": "The full research text we just finalized, using [1] style inline citations.",
+  "body": "The full research text with [1] style inline citations.",
   "references": [
     { "id": 1, "text": "Full citation (Author, Title, Year, URL)" }
   ]
 }
 
+CRITICAL CONSTRAINTS:
+1. SWEET SPOT CAPACITY: Target approximately 3,500 words of high-information-density narrative.
+2. JSON INTEGRITY: Prioritize the completion of the "references" array and the closing "}" brace. If you approach your output limit, prioritize completing the bibliography over descriptive filler in the body.
+3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters (e.g. $x+y$).
+4. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
+5. ESCAPING: Use proper JSON escaping for all internal quotes (\") and newlines (\n).
+6. INDEXING: Every inline citation [1] must have a matching entry in the "references" array.
+```
+
+---
+
+### 🛡️ The 2-Phase Fallback (For Ultra-Long Reports)
+If your report exceeds 5,000 words, Gemini may truncate the JSON. Use this two-turn strategy as a fail-safe:
+
+#### Phase 1: Research Extraction
+Extract the body only, focusing on depth and inline citations.
+
+```text
+Conduct a comprehensive deep-dive report on [TOPIC]. Provide the full body with inline citations [1], [2], but DO NOT provide the bibliography or JSON yet.
+```
+
+#### Phase 2: The JSON Capsule
+Package the body from Phase 1 along with the full bibliography into the JSON schema provided in the One-Shot prompt above.
+```
 CRITICAL PACKAGING CONSTRAINTS:
 1. LATEX/KATEX: No whitespace allowed next to '$' or '$$' delimiters (e.g. $x+y$).
 2. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
