@@ -43,42 +43,44 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
     - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
     - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
----
+## 🔑 Master Ingestion Protocol 2.0 (The JSON Edition)
+To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase JSON Strategy**. This prevents "semantic compression" and ensures 100% reliable indexing of math, diagrams, and references.
 
-## 🔑 Master Ingestion Protocol (The Secret Sauce)
+### Phase 1: Research Extraction
+**Goal:** Extract the research body with maximum information density.
 
-````text
-STEP 1: RESEARCH EXTRACTION
---------------------------------------------------
+```text
 Conduct a comprehensive deep-dive report on [TOPIC]. 
 Constraints:
 1. Provide a catchy five-word title as the H1 header.
 2. Embed precise inline citations [1], [2], [3] next to every technical claim.
-3. Prioritize raw information density and structural clarity.
+3. Prioritize raw information density and structural clarity (headers, sub-headers, bullets).
 4. If a concept is complex, provide an ASCII-style flowchart or diagram (+---+, ===>, |).
-5. DO NOT provide the bibliography or the shield yet. Just provide the full body of the research.
-
-STEP 2: INGESTION SHIELD (.rs file)
---------------------------------------------------
-Excellent. Now, provide the FINAL version for my ingestion engine. You must deliver the ENTIRE report (Body + Bibliography) inside a single code block using this exact Rust Raw String Wrapper:
-
-```rust
-r###"
-[FULL BODY OF RESEARCH FROM PREVIOUS TURN]
-
-#### **Works cited**
-[1] Author, "Title", Year, URL
-[2] Author, "Title", Year, URL
-... (Provide EVERY unique reference used in the text)
-"###
+5. DO NOT provide the bibliography or JSON yet. Just provide the full body of the research.
 ```
 
-Critical Technical Constraints:
-1. NO SEMANTIC COMPRESSION: Ensure blank lines between every header and paragraph.
-2. SERIALIZED INDEXING: Every [n] in the text MUST have a corresponding [n] entry in the bibliography.
-3. LATEX HARDENING: No whitespace allowed next to '$' delimiters.
-4. SHIELD INTEGRITY: The shield must start with r###" and end with "###.
-````
+### Phase 2: The JSON Ingestion Capsule
+**Goal:** Package the content for the `md-publish` engine with zero formatting loss.
+
+```text
+Now, deliver the FINAL version for my ingestion engine strictly as a single JSON object.
+Wrap the JSON inside a markdown code block labeled ```json.
+
+JSON SCHEMA:
+{
+  "title": "A catchy five-word title",
+  "body": "The full research text with [1] style inline citations.",
+  "references": [
+    { "id": 1, "text": "Full citation (Author, Title, Year, URL)" }
+  ]
+}
+
+CRITICAL PACKAGING CONSTRAINTS:
+1. LATEX/KATEX: No whitespace allowed next to '$' or '$$' delimiters (e.g. $x+y$).
+2. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
+3. ESCAPING: Use proper JSON escaping for all internal quotes (\") and newlines (\n).
+4. BIBLIOGRAPHY: Every inline citation [1] must have a matching entry in the "references" array.
+```
 
 ---
 

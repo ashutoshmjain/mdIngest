@@ -117,11 +117,25 @@ fn main() -> Result<()> {
 
 fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestConfig) -> Result<()> {
     eprintln!("📖 Ingesting text for episode {}...", number);
-    let mut files: Vec<PathBuf> = glob(&format!("{}/*.md", source))?.filter_map(Result::ok)
-        .filter(|p| !["SUMMARY.md", "cover.md"].contains(&p.file_name().unwrap().to_str().unwrap())).collect();
+    let mut files: Vec<PathBuf> = Vec::new();
+    
+    // Support .json, .rs, and .md
+    for ext in &["json", "rs", "md"] {
+        let pattern = format!("{}/*.{}", source, ext);
+        if let Ok(paths) = glob(&pattern) {
+            for path in paths.filter_map(Result::ok) {
+                let filename = path.file_name().unwrap().to_str().unwrap();
+                if !["SUMMARY.md", "cover.md"].contains(&filename) {
+                    files.push(path);
+                }
+            }
+        }
+    }
+    
     files.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
 
     if let Some(path) = files.first() {
+        eprintln!("📄 Found source: {}", path.display());
         let content = std::fs::read_to_string(path)?;
         let hardened = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(5));
         std::fs::write(format!("src/{}.md", number), hardened)?;

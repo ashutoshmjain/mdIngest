@@ -10,19 +10,55 @@
 use regex::Regex;
 use std::collections::HashMap;
 use html_escape::decode_html_entities;
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct GeminiCapsule {
+    title: String,
+    body: String,
+    references: Vec<GeminiReference>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeminiReference {
+    id: usize,
+    text: String,
+}
 
 /// The primary entry point for the Gemini-to-mdbook transformation.
-/// 
-/// This function executes a multi-stage sanitization pipeline:
-/// 1. Decodes HTML entities (to handle web-pasted content).
-/// 2. **Shield Stripping**: Removes the `r#"` and `"#` wrappers and Gemini backticks.
-/// 3. Title Sync: Enforces a word limit for H1 headers.
-/// 4. Unicode Sanitization: Strips invisible control characters and hidden artifacts.
-/// 5. Structural Wrapping: Detects ASCII tables/diagrams and applies correct Markdown formatting.
-/// 6. Footnote Hardening: Re-indexes and formats bibliography sections for KaTeX compatibility.
 pub fn process_content(mut content: String, ep_num: &str, title_override: Option<&str>, word_limit: usize) -> String {
     // 0. Decode HTML Entities early
     content = decode_html_entities(&content).to_string();
+
+    // 0.0 Detect JSON Capsule (The Secret Sauce 2.0)
+    let json_regex = Regex::new(r"(?s)```json\s*(\{.*?\})\s*```").unwrap();
+    if let Some(caps) = json_regex.captures(&content) {
+        let json_raw = caps.get(1).unwrap().as_str();
+        if let Ok(capsule) = serde_json::from_str::<GeminiCapsule>(json_raw) {
+            let mut body = capsule.body;
+            let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
+            
+            for r in capsule.references {
+                // Convert [n] to [^n] for mdbook
+                let marker = format!("[{}]", r.id);
+                let foot_marker = format!("[^{}]", r.id);
+                body = body.replace(&marker, &foot_marker);
+                
+                // Add to footer
+                let mut ref_text = r.text.clone();
+                // Auto-link URLs in reference text
+                let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
+                ref_text = url_regex.replace_all(&ref_text, |c: &regex::Captures| {
+                    let u = c.get(1).unwrap().as_str();
+                    format!("[{}]({})", u, u)
+                }).to_string();
+                
+                refs_section.push_str(&format!("{}: {}\n\n", foot_marker, ref_text));
+            }
+            
+            content = format!("# {}\n\n{}{}", capsule.title, body, refs_section);
+        }
+    }
 
     // 0.1 Strip Rust raw string artifacts and Gemini markdown markers (The "Shield")
     content = content.trim().to_string();
