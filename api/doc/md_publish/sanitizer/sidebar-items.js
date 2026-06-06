@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["convert_ascii_tables","find_first_substantial_paragraph","fix_footnotes","process_content","wrap_ascii_diagrams"],"struct":["RefEntry"]};
+window.SIDEBAR_ITEMS = {"fn":["convert_ascii_tables","find_first_substantial_paragraph","fix_footnotes","process_content","wrap_ascii_diagrams"],"struct":["GeminiCapsule","GeminiReference","RefEntry"]};
