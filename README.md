@@ -1,150 +1,80 @@
 # md-publish (The Ingestion Layer)
 
-**md-publish** is an opinionated Rust-based ingestion engine designed for high-fidelity research publishing. It is not a generic tool; it is the foundational bridge for a specific **4-Phase Research Process** (as seen on [deepDive.shutri.com](https://deepDive.shutri.com)) that moves content from AI-native drafting (Gemini 2.0/Pro) to a production-ready `mdbook`. 
+**md-publish** is a tool used to move high-fidelity research from an LLM (Gemini, ChatGPT, or Claude) into a production-ready `mdbook` environment. It handles formatting, mathematical proofs (KaTeX), and required metadata for publishing.
 
-When you run `md-publish`, you aren't just fixing Markdown or adding assets—you are **publishing the episode**. The tool handles structural sanitization, media injection, and the critical **synchronization of `SUMMARY.md`**, effectively making the chapter ready for local serving (e.g., via `mdbook serve`) the moment the command finishes.
+## The Workflow
 
-## 🧬 The Philosophy: The Opinionated Researcher
-To use this tool, the researcher must align their workflow with the **Ingestion Layer's** requirements. It automates the "last-mile" friction—KaTeX hardening, structural sanitization, and media enrichment—provided the input follows the **Master Ingestion Protocol**.
+### 1. Research Phase
+Conduct your research in a chat session with your preferred LLM. Ensure all facts, citations, and mathematical formulas are established within the chat context.
 
----
+### 2. Packaging Phase (The "Lossless Tunnel")
+Once the research is complete, use the **Master Packaging Prompt** (see below) to export the data. This forces the LLM to package the entire session as a **self-extracting Python script**. 
 
-## 🚀 The 4-Phase Research Process
+**What happens here:** The LLM uses its internal interpreter to compress your entire 10,000+ word session into a single, immutable Base64 payload embedded in a `.py` file. This prevents the LLM from "pruning" or summarizing the text during export.
 
-### Phase 1: Research & Export (The Gemini Protocol)
-The researcher conducts deep-dive research in Gemini (latest model). To export the results, they must use the **Master Ingestion Prompt** (see below).
-- **Format:** The output MUST be shielded using a Rust raw-string wrapper.
-- **Save As:** Save the shielded output as a `.rs` file in your `downloads_path` (e.g., `episode_241.rs`).
-
-### Phase 2: Text Ingestion (`--text`)
-The tool strips the "Shield," sanitizes the Markdown, and prepares the chapter.
-- **Command:** `md-publish --text XXX`
-- **Actions:** 
-    - Hardens KaTeX blocks (escapes `$` and fixes whitespace).
-    - Enforces a 5-word title limit (Smart Truncation).
-    - Re-indexes footnotes sequentially and aggregates duplicate sources.
-    - Synchronizes `SUMMARY.md` and the "Recent" articles list.
-
-### Phase 3: Media Ingestion (`--image`)
-The tool migrates cover art and injects social/monetization snippets.
-- **Setup:** Download your cover art (PNG/JPG) to the same downloads folder.
-- **Command:** `md-publish --image XXX`
-- **Actions:**
-    - Migrates the latest image to `src/img/XXX.png`.
-    - Injects **Spotify**, **Apple Podcasts**, and **YouTube** links immediately under the H1.
-    - Injects a **Lightning (Zap) Widget** at the end of the article.
-
-### Phase 4: Visual Ingestion (`--video`)
-The tool builds a **global cinematic infographic feed** (carousel) and injects it into the chapter.
-- **Setup:** Save your Mosaic SO infographics to your **downloads folder** following the naming convention `XXX-description.mp4`.
-- **Command:** `md-publish --video XXX`
-- **Actions:**
-    - Identifies matching videos starting with `XXX-` and migrates them.
-    - Rebuilds the **Global Cinematic Scroll Strip** containing ALL episodic infographics.
-    - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
-
-## 🔑 Master Ingestion Protocol (Gemini Safe Zone)
-
-This protocol is optimized for the **2,000-word Safe Zone** and uses a **References-First** strategy to prevent token exhaustion from cutting off your bibliography.
-
-### 🚀 The Final Export Capsule (One-Shot)
-Use this as the "Final Export" command once your research is ready. Save the output as a `.json` file containing ONLY the raw JSON object.
-
-```text
-Deliver our research strictly as a PURE JSON object. 
-**CRITICAL: Provide the "references" array FIRST in the JSON object.**
-
-JSON SCHEMA:
-{
-  "references": [
-    { "id": 1, "text": "Full citation (Author, Title, Year, URL)" }
-  ],
-  "title": "A catchy five-word title for our paper",
-  "body": "The full research text with [1] style inline citations."
-}
-
-CRITICAL CONSTRAINTS:
-1. REFERENCES FIRST: You MUST provide the full bibliography at the start of the JSON.
-2. AUTHENTIC SOURCES: Use the specific URLs and authors from our research session.
-3. SAFE ZONE CAPACITY: Target approximately 1,500 - 2,000 words.
-4. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
-5. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
-6. BODY MARKERS: You MUST embed the citation markers (e.g., [1], [2]) directly inside the sentences of the 'body' field.
-```
+### 3. Publishing Phase
+1.  **Extract the text:** Copy the Python script from the LLM and save it as `export.py`. Run it in your terminal:
+    ```bash
+    python3 export.py
+    ```
+    This will generate a file named `final_research.md` containing your 100% intact research.
+2.  **Run `md-publish`:** Rename `final_research.md` to your episode number (e.g., `241.md`) and place it in the `src/` folder. Then use the tool to inject production features:
+    ```bash
+    # Process text, KaTeX, and sync SUMMARY.md
+    md-publish --text 241
+    
+    # Inject Video Covers and Visual Links
+    md-publish --video 241
+    ```
 
 ---
 
-### 🛡️ The 2-Phase Fallback (For Ultra-Long Reports)
-If your report exceeds 5,000 words, Gemini may truncate the JSON. Use this two-turn strategy as a fail-safe:
+## The Master Packaging Prompt
 
-#### Phase 1: Research Extraction
-Extract the body only, focusing on depth and inline citations.
+Use this prompt in your LLM chat session to export your research:
 
-```text
-Conduct a comprehensive deep-dive report on [TOPIC]. Provide the full body with inline citations [1], [2], but DO NOT provide the bibliography or JSON yet.
-```
-
-#### Phase 2: The JSON Capsule
-Package the body from Phase 1 along with the full bibliography into the JSON schema provided in the One-Shot prompt above.
-```
-CRITICAL PACKAGING CONSTRAINTS:
-1. LATEX/KATEX: No whitespace allowed next to '$' or '$$' delimiters (e.g. $x+y$).
-2. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
-3. ESCAPING: Use proper JSON escaping for all internal quotes (\") and newlines (\n).
-4. BIBLIOGRAPHY: Every inline citation [1] must have a matching entry in the "references" array.
-```
-
----
-
-## ✨ Core Features
-
-### 📖 Modular Ingestion (`--text`)
-- **Shield Stripping:** Automatically handles Gemini's Rust-style raw string literals (`r#" ... "#`).
-- **Footnote Hardening:** Automatically combines multiple sources sharing the same index and flags missing entries.
-- **Unicode Sanitization:** Strips invisible control characters and hidden artifacts (like `\u{0332}`).
-- **ASCII Conversion:** Automatically wraps ASCII diagrams in code blocks and converts grid-style tables to Markdown.
-
-### 🖼️ Media & Socials (`--image`)
-- **Master Key Migration:** Enforces naming strictly to the Episode Number.
-- **Surgical Snippets:** Injects cover art and monetization widgets at precise semantic locations.
+> **Objective:** Convert the exhaustive research conducted in this session into a self-extracting Python payload to ensure 100% structural integrity and zero-loss transmission.
+> 
+> **1. Packaging Requirements:**
+> *   **Full Fidelity:** Package the exhaustive research in its entirety. Do not summarize or prune.
+> *   **Absolute KaTeX:** Wrap all mathematical notation and symbols in Absolute KaTeX delimiters: `$...$` for inline and `$$...$$` for block displays.
+> *   **Hyperlinked Bibliography:** Format every entry in the "Works Cited" section as a clickable Markdown link: `[^N]: [Author, Title, Year](URL)`.
+> *   **Footnote Mapping:** Ensure all `[^N]` markers are placed in the body text corresponding to the bibliography.
+>
+> **2. Technical Encoding:**
+> Generate a **Python Script** that performs the following:
+> 1. Assign the complete Markdown text to a variable named `payload_text`.
+> 2. Gzip-compress and Base64-encode the `payload_text`.
+> 3. Output the final Python script containing this encoded string and the logic to decode and write it to a file named `final_research.md`.
+> 
+> **Constraint:** Do not output standard chat text. Only output the self-extracting Python script.
 
 ---
 
-## ⚙️ Configuration (`book.toml`)
+## Features
 
-Configure `md-publish` by adding a section to your `book.toml`:
+### Text Ingestion (`--text`)
+- **KaTeX Hardening:** Fixes formatting for mathematical expressions.
+- **Citation Management:** Re-indexes footnotes and handles duplicate sources.
+- **Summary Sync:** Automatically adds the new file to `SUMMARY.md`.
+- **Audio Links:** Injets **Spotify**, **Apple Podcasts**, and **YouTube Music** links immediately under the title.
+- **Lightning Wallet:** Adds a Zap-compatible wallet widget (shutosha@primal.net) for reader tips.
+
+### Visual Ingestion (`--video`)
+We believe static cover images are obsolete. Instead, we use short-form video infographics to introduce research.
+- **Dynamic Layout Toggling:**
+    - **Single Video:** If only one MP4 is found (e.g., `241-Intro.mp4`), it is injected as a full-width, responsive, unmutable cover.
+    - **Horizontal Scroll:** If multiple MP4s are found, the utility creates a "Cinematic Scroll" horizontal strip for the reader to swipe through.
+- **Visual Social Links:** Injects buttons for **TikTok**, **Instagram**, and **YouTube (Vids/Shorts)** directly below the video area.
+
+---
+
+## Configuration (`book.toml`)
 
 ```toml
 [preprocessor.ingest]
 command = "md-publish"
-# Path to your browser's default download folder
-downloads_path = "/mnt/c/Users/ashut/Downloads"
-# Your lightning address for the Zap widget
+downloads_path = "/path/to/your/downloads"
 lightning_address = "shutosha@primal.net"
-# Maximum number of words for the H1 title
 title_word_limit = 5
 ```
-
----
-
-## 🛠️ Installation
-
-```bash
-# Build and install locally
-cargo build --release
-cargo install --path .
-```
-
-## 🚀 Usage
-
-```bash
-# Ingest full stack (with optional title override)
-md-publish --text 240 --title "A Catchy Five Word Title"
-md-publish --image 240
-md-publish --video 240
-```
-
----
-
-## ⚖️ License
-MIT License.
