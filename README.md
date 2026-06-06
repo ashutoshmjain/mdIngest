@@ -47,11 +47,11 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 
 For maximum reliability across Gemini, Claude, and GPT-4, use the **One-Shot JSON Capsule**. It is optimized for the "3,500-word sweet spot," ensuring high-density research and a complete bibliography fit within a single response.
 
-### 🚀 The One-Shot JSON Ingestion Capsule (Primary)
-Use this as the "Final Export" command once your collaborative research is ready for publication.
+### 🚀 The JSON Ingestion Capsule (Final Export)
+Use this as the "Final Export" command. **IMPORTANT:** Save the output as a `.json` file containing ONLY the raw JSON object. Do NOT include markdown code block markers (```json) inside the file.
 
 ```text
-Deliver the final version of our research strictly as a single JSON object wrapped in a ```json code block.
+Deliver the final version of our research strictly as a PURE JSON object (No markdown code block wrappers).
 
 JSON SCHEMA:
 {
@@ -63,11 +63,11 @@ JSON SCHEMA:
 }
 
 CRITICAL CONSTRAINTS:
-1. SWEET SPOT CAPACITY: Target approximately 3,500 words of high-information-density narrative.
-2. JSON INTEGRITY: Prioritize the completion of the "references" array and the closing "}" brace. If you approach your output limit, prioritize completing the bibliography over descriptive filler in the body.
-3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters (e.g. $x+y$).
+1. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
+2. SWEET SPOT CAPACITY: Target approximately 3,500 words.
+3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
 4. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (```text\n...\n```) inside the JSON body.
-5. ESCAPING: Use proper JSON escaping for all internal quotes (\") and newlines (\n).
+5. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
 6. INDEXING: Every inline citation [1] must have a matching entry in the "references" array.
 ```
 

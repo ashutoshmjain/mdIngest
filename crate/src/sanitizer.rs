@@ -30,34 +30,46 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     // 0. Decode HTML Entities early
     content = decode_html_entities(&content).to_string();
 
-    // 0.0 Detect JSON Capsule (The Secret Sauce 2.0)
-    let json_regex = Regex::new(r"(?s)```json\s*(\{.*?\})\s*```").unwrap();
-    if let Some(caps) = json_regex.captures(&content) {
-        let json_raw = caps.get(1).unwrap().as_str();
-        if let Ok(capsule) = serde_json::from_str::<GeminiCapsule>(json_raw) {
-            let mut body = capsule.body;
-            let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
-            
-            for r in capsule.references {
-                // Convert [n] to [^n] for mdbook
-                let marker = format!("[{}]", r.id);
-                let foot_marker = format!("[^{}]", r.id);
-                body = body.replace(&marker, &foot_marker);
-                
-                // Add to footer
-                let mut ref_text = r.text.clone();
-                // Auto-link URLs in reference text
-                let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
-                ref_text = url_regex.replace_all(&ref_text, |c: &regex::Captures| {
-                    let u = c.get(1).unwrap().as_str();
-                    format!("[{}]({})", u, u)
-                }).to_string();
-                
-                refs_section.push_str(&format!("{}: {}\n\n", foot_marker, ref_text));
+    // 0.0 Detect JSON Capsule (Pure JSON or JSON in code block)
+    let mut title = None;
+    let mut body = None;
+    let mut references = None;
+
+    // Try parsing as pure JSON first
+    if let Ok(capsule) = serde_json::from_str::<GeminiCapsule>(&content) {
+        title = Some(capsule.title);
+        body = Some(capsule.body);
+        references = Some(capsule.references);
+    } else {
+        // Fallback to regex for code block
+        let json_regex = Regex::new(r"(?s)```json\s*(\{.*?\})\s*```").unwrap();
+        if let Some(caps) = json_regex.captures(&content) {
+            let json_raw = caps.get(1).unwrap().as_str();
+            if let Ok(capsule) = serde_json::from_str::<GeminiCapsule>(json_raw) {
+                title = Some(capsule.title);
+                body = Some(capsule.body);
+                references = Some(capsule.references);
             }
-            
-            content = format!("# {}\n\n{}{}", capsule.title, body, refs_section);
         }
+    }
+
+    if let (Some(t), Some(mut b), Some(refs)) = (title, body, references) {
+        let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
+        for r in refs {
+            let marker = format!("[{}]", r.id);
+            let foot_marker = format!("[^{}]", r.id);
+            b = b.replace(&marker, &foot_marker);
+            
+            let mut ref_text = r.text.clone();
+            let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
+            ref_text = url_regex.replace_all(&ref_text, |c: &regex::Captures| {
+                let u = c.get(1).unwrap().as_str();
+                format!("[{}]({})", u, u)
+            }).to_string();
+            
+            refs_section.push_str(&format!("{}: {}\n\n", foot_marker, ref_text));
+        }
+        content = format!("# {}\n\n{}{}", t, b, refs_section);
     }
 
     // 0.1 Strip Rust raw string artifacts and Gemini markdown markers (The "Shield")
@@ -91,79 +103,34 @@ pub fn process_content(mut content: String, ep_num: &str, title_override: Option
     let image_def_regex = Regex::new(r"(?m)^\[image\d+\]: <data:image/.*?>\s*$").unwrap();
     content = image_def_regex.replace_all(&content, "").to_string();
 
-    // [NEW] Aggressive Legacy Media Stripper
-    // Remove any images or centered links at the top (before the first paragraph)
-    // that are not enclosed in our automated markers.
-    let mut clean_lines = Vec::new();
-    let mut in_markers = false;
-    let mut paragraph_found = false;
-    let h1_regex = Regex::new(r"^#\s").unwrap();
-    let image_regex = Regex::new(r"(?i)^!\[.*?\]").unwrap();
-    let center_regex = Regex::new(r"(?i)^<center>").unwrap();
+    // [NEW] Socials & Monetization Injection (Immediately after H1)
+    let podcast_links = r#"
+<center><a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Spotify</a><a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Apple Podcasts</a><a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Fountain.fm</a></center>
+"#;
 
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.contains("_START -->") { in_markers = true; }
-        
-        if !paragraph_found && !in_markers {
-            if h1_regex.is_match(trimmed) {
-                clean_lines.push(line);
-                continue;
-            }
-            // Strip legacy media (covers, links, etc.) 
-            // BUT PROTECT FOOTNOTE MARKERS [^n] which might start a line in the raw output
-            if (image_regex.is_match(trimmed) && !trimmed.starts_with("[^")) || center_regex.is_match(trimmed) {
-                continue;
-            }
-            if !trimmed.is_empty() && !trimmed.starts_with('#') {
-                paragraph_found = true;
-            }
-        }
-        
-        // Final protection: Strip ALL inline images from the entire file (Infographics-First standard)
-        // BUT PROTECT FOOTNOTE MARKERS [^n]
-        if image_regex.is_match(trimmed) && !in_markers && !trimmed.starts_with("[^") {
-            continue;
-        }
+    let lightning_widget = r#"
+<center><a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; font-weight: bold;">⚡ Zap with Lightning</a></center>
+"#;
 
-        clean_lines.push(line);
-        if trimmed.contains("_END -->") { in_markers = false; }
-    }
-    content = clean_lines.join("\n");
+    let injection_block = format!("\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n", podcast_links, lightning_widget);
 
-    // 1. Title Sync
+    // 1. Title Sync & Legacy Removal
     let h1_regex_full = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
-    
-    let display_title = if let Some(t) = title_override {
-        t.to_string()
-    } else if let Some(caps) = h1_regex_full.captures(&content) {
-        let raw_title = caps.get(1).unwrap().as_str().trim();
-        let clean_title = raw_title.trim_matches('*').trim();
-        
-        // Enforce word limit based on config
-        let words: Vec<&str> = clean_title.split_whitespace().collect();
-        if words.len() > word_limit {
-            let mut truncated = words[..word_limit].join(" ");
-            let stop_words = vec!["of", "the", "in", "and", "on", "a", "an", "with", "for", "to", "at", "by", "from"];
-            if let Some(last_word) = words[..word_limit].last() {
-                if stop_words.contains(&last_word.to_lowercase().as_str()) {
-                    truncated = words[..word_limit-1].join(" ");
-                }
-            }
-            truncated
-        } else {
-            clean_title.to_string()
-        }
-    } else {
-        "Untitled".to_string()
-    };
-    
-    let new_h1 = format!("# {} : {}", ep_num, display_title);
-    if h1_regex_full.is_match(&content) {
-        content = h1_regex_full.replace(&content, new_h1.as_str()).to_string();
-    } else {
-        content = format!("{}\n\n{}", new_h1, content);
+    let mut h1_title = String::from("Untitled");
+
+    if let Some(caps) = h1_regex_full.captures(&content) {
+        h1_title = caps.get(1).unwrap().as_str().trim().trim_matches('*').to_string();
+        content = h1_regex_full.replace(&content, "").to_string();
     }
+
+    // Standardize title word limit
+    let words: Vec<&str> = h1_title.split_whitespace().collect();
+    if words.len() > word_limit {
+        h1_title = words[..word_limit].join(" ");
+    }
+    
+    // Reconstruct with Injection Block
+    content = format!("# {} : {}{}{}", ep_num, h1_title, injection_block, content.trim());
 
     // 2. Invisible Character Sanitization
     content = content.replace('\u{0332}', "");
