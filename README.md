@@ -44,10 +44,12 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
     - Injects the scroll strip into the Markdown file with auto-focus on the current episode's content.
 
 ## 🔑 Master Ingestion Protocol 2.0 (The JSON Edition)
-To achieve high-fidelity output across Gemini, Claude, and GPT-4, use this **Two-Phase JSON Strategy**. This prevents "semantic compression" and ensures 100% reliable indexing of math, diagrams, and references.
+This protocol supports two distinct workflows:
+1. **New Research:** Use both phases to extract and package a new topic.
+2. **Existing Research:** If you have already finalized a paper through weeks of iteration, use **Phase 2 only** as a standalone "Final Export" command to package your work.
 
-### Phase 1: Research Extraction
-**Goal:** Extract the research body with maximum information density.
+### Phase 1: Research Extraction (For New Topics)
+**Goal:** Extract the research body with maximum information density from a new query.
 
 ```text
 Conduct a comprehensive deep-dive report on [TOPIC]. 
@@ -59,17 +61,17 @@ Constraints:
 5. DO NOT provide the bibliography or JSON yet. Just provide the full body of the research.
 ```
 
-### Phase 2: The JSON Ingestion Capsule
-**Goal:** Package the content for the `md-publish` engine with zero formatting loss.
+### Phase 2: The JSON Ingestion Capsule (The "Final Export" Command)
+**Goal:** Package your finalized research for the `md-publish` engine with zero formatting loss. Use this command when your paper is ready for publication.
 
 ```text
-Now, deliver the FINAL version for my ingestion engine strictly as a single JSON object.
+Now, deliver the FINAL version of our research for my ingestion engine strictly as a single JSON object.
 Wrap the JSON inside a markdown code block labeled ```json.
 
 JSON SCHEMA:
 {
-  "title": "A catchy five-word title",
-  "body": "The full research text with [1] style inline citations.",
+  "title": "A catchy five-word title for our paper",
+  "body": "The full research text we just finalized, using [1] style inline citations.",
   "references": [
     { "id": 1, "text": "Full citation (Author, Title, Year, URL)" }
   ]
