@@ -124,8 +124,8 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 "#;
 
     let lightning_widget = r#"
-<div style="text-align: center; margin: 25px 0;">
-    <a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 14px 28px; text-align: center; text-decoration: none; display: inline-block; border-radius: 10px; font-weight: 900; font-family: sans-serif; border: 3px solid #E87F0E; box-shadow: 0 4px 10px rgba(0,0,0,0.2); font-size: 1.1em; letter-spacing: 0.5px;">⚡ ZAP WITH LIGHTNING</a>
+<div style="display: flex; justify-content: center; margin: 30px 0;">
+    <a href="lightning:shutosha@primal.net" style="background-color: #F7931A; color: white; padding: 0 30px; height: 50px; line-height: 50px; text-align: center; text-decoration: none; display: inline-block; border-radius: 12px; font-weight: 800; font-family: sans-serif; border: 3px solid #E87F0E; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 1.1em; letter-spacing: 0.5px; box-sizing: border-box; white-space: nowrap;">⚡ ZAP WITH LIGHTNING</a>
 </div>
 "#;
 

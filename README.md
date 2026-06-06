@@ -45,29 +45,30 @@ The tool builds a **global cinematic infographic feed** (carousel) and injects i
 
 ## 🔑 Master Ingestion Protocol (Gemini Safe Zone)
 
-This protocol is optimized for the **2,000-word Safe Zone**. By keeping the narrative concise, it ensures Gemini delivers valid JSON, authentic citations (not generic), and perfect formatting in a single turn.
+This protocol is optimized for the **2,000-word Safe Zone** and uses a **References-First** strategy to prevent token exhaustion from cutting off your bibliography.
 
 ### 🚀 The Final Export Capsule (One-Shot)
 Use this as the "Final Export" command once your research is ready. Save the output as a `.json` file containing ONLY the raw JSON object.
 
 ```text
-Deliver our research strictly as a PURE JSON object (No markdown code block wrappers).
+Deliver our research strictly as a PURE JSON object. 
+**CRITICAL: Provide the "references" array FIRST in the JSON object.**
 
 JSON SCHEMA:
 {
-  "title": "A catchy five-word title for our paper",
-  "body": "The full research text with [1] style inline citations.",
   "references": [
     { "id": 1, "text": "Full citation (Author, Title, Year, URL)" }
-  ]
+  ],
+  "title": "A catchy five-word title for our paper",
+  "body": "The full research text with [1] style inline citations."
 }
 
 CRITICAL CONSTRAINTS:
-1. SAFE ZONE CAPACITY: Target approximately 1,500 - 2,000 words. This ensures 100% authentic citations and valid JSON.
-2. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
-3. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
-4. ASCII DIAGRAMS: Wrap all ASCII diagrams in their own code blocks (text\n...\n) inside the JSON body.
-5. ESCAPING: Ensure strict JSON escaping for internal quotes and newlines.
+1. REFERENCES FIRST: You MUST provide the full bibliography at the start of the JSON.
+2. AUTHENTIC SOURCES: Use the specific URLs and authors from our research session.
+3. SAFE ZONE CAPACITY: Target approximately 1,500 - 2,000 words.
+4. PURE JSON: Deliver only the raw JSON. Do not wrap in ```json.
+5. LATEX/KATEX: No whitespace allowed next to '$' or '$$' math delimiters.
 6. BODY MARKERS: You MUST embed the citation markers (e.g., [1], [2]) directly inside the sentences of the 'body' field.
 ```
 
