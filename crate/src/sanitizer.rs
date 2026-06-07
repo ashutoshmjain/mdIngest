@@ -118,7 +118,7 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 
     let mut temp_content = content_with_all_placeholders;
 
-    // 3. Socials & References Construction
+    // 3. Socials Construction
     let podcast_links = r#"
 <center><a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Spotify</a><a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Apple Podcasts</a><a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Fountain.fm</a></center>
 "#;
@@ -135,7 +135,7 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 <script src='https://embed.twentyuno.net/js/app.js'></script>
 "#;
 
-    let social_block = format!("\n\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n", lightning_widget, podcast_links);
+    let social_block = format!("\n\n---\n\n### Tips and Donations\n\nIf you enjoyed this research, consider supporting the project with a tip in **Sats**. It's a simple, global way to support independent research.\n\n<!-- SOCIALS_START -->\n{}{}\n<!-- SOCIALS_END -->\n\nTo send Sats, you'll need a [lightning wallet](https://lightningaddress.com/).\n\n---\n", lightning_widget, podcast_links);
 
     let mut refs_section = String::from("\n\n#### **Works cited**\n\n");
     if is_json_capsule {
@@ -165,7 +165,7 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
             }
         }
     } else {
-        temp_content = fix_footnotes(temp_content);
+        temp_content = fix_footnotes(temp_content, &social_block);
         refs_section = String::new(); 
     }
 
@@ -182,7 +182,12 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
     }
 
     // 6. Final Assembly
-    format!("# {} : {}\n\n{}{}{}{}", ep_num, h1_title, temp_content.trim(), social_block, refs_section, "\n").trim().to_string()
+    if is_json_capsule {
+        format!("# {} : {}\n\n{}{}{}{}", ep_num, h1_title, temp_content.trim(), social_block, refs_section, "\n").trim().to_string()
+    } else {
+        // For non-JSON (like our payload), fix_footnotes now handles the merge correctly
+        format!("# {} : {}\n\n{}", ep_num, h1_title, temp_content.trim()).trim().to_string()
+    }
 }
 
 pub fn find_first_substantial_paragraph(content: &str) -> Option<usize> {
@@ -282,48 +287,68 @@ fn wrap_ascii_diagrams(content: String) -> String {
     result
 }
 
-fn fix_footnotes(content: String) -> String {
+fn fix_footnotes(content: String, social_block: &str) -> String {
     let header_regex = Regex::new(r"(?im)^#+\s+(\*\*Works cited\*\*|Works cited|References|Bibliography|References or Bibliography)").unwrap();
     let parts: Vec<&str> = header_regex.split(&content).collect();
-    if parts.len() < 2 { return content; }
+    
+    // 1. Standardize Body Markers
+    let body_raw = parts[0];
+    
+    // Transform [N] or [^N] or [N, M] to standard [N][M] markers
+    // We strip the ^ if it exists to normalize to [N] for the internal index
+    let marker_regex = Regex::new(r"\[\^?(\d+(?:\s*[,\s]\s*\d+)*)\]").unwrap();
+    let body_normalized = marker_regex.replace_all(body_raw, |caps: &regex::Captures| {
+        let content = caps.get(1).unwrap().as_str();
+        let nums = re_split_nums(content);
+        nums.iter().map(|n| format!("[{}]", n)).collect::<Vec<_>>().join("")
+    }).to_string();
 
-    let body = parts[0];
+    if parts.len() < 2 { 
+        let mut res = body_normalized.trim().to_string();
+        res.push_str(social_block);
+        return res;
+    }
+
     let refs_raw = parts[1];
     let header = "#### **Works cited**";
 
-    let ref_pattern = Regex::new(r"(?m)^(\*?\s*(\*\*\[?(\d+)\]?\*\*|\[(\d+)\])\s*|\s*$)").unwrap();
+    // 2. Parse Bibliography
+    // Matches: "[N]: text" or "[^N]: text" or "N. text"
+    let ref_pattern = Regex::new(r"(?m)^(\*?\s*(\[?\^?(\d+)\]?[:\.]?)\s*|\s*$)").unwrap();
     let mut ref_entries = Vec::new();
     let matches: Vec<_> = ref_pattern.find_iter(refs_raw).collect();
     for (i, m) in matches.iter().enumerate() {
         let caps = ref_pattern.captures(m.as_str()).unwrap();
-        let old_num = caps.get(2).map(|n| n.as_str().to_string())
-            .or_else(|| caps.get(3).map(|n| n.as_str().to_string()));
+        let old_num = caps.get(3).map(|n| n.as_str().to_string());
         let start = m.end();
         let end = if i + 1 < matches.len() { matches[i+1].start() } else { refs_raw.len() };
         let text = refs_raw[start..end].trim().to_string();
-        ref_entries.push(RefEntry { old_num, text, processed: false });
-    }
-
-    if ref_entries.is_empty() { return content; }
-
-    let marker_pattern = Regex::new(r"\[(\d+(?:\s*,\s*\d+)*)\]").unwrap();
-    let mut unique_old_nums = Vec::new();
-    for caps in marker_pattern.captures_iter(body) {
-        let nums_str = caps.get(1).unwrap().as_str();
-        for n in nums_str.split(',') {
-            let n_trimmed = n.trim().to_string();
-            if !unique_old_nums.contains(&n_trimmed) { unique_old_nums.push(n_trimmed); }
+        if let Some(num) = old_num {
+            if !text.is_empty() {
+                ref_entries.push(RefEntry { old_num: Some(num), text, processed: false });
+            }
         }
     }
 
+    // 3. Build Sequential Index
     let mut old_to_new = HashMap::new();
     let mut new_refs = Vec::new();
     let url_regex = Regex::new(r"(https?://[^\s)\]]+[^.\s)\]])").unwrap();
+    
+    // Find all [N] markers in body and map to 1, 2, 3...
+    let norm_marker_regex = Regex::new(r"\[(\d+)\]").unwrap();
+    let mut unique_old_nums = Vec::new();
+    for caps in norm_marker_regex.captures_iter(&body_normalized) {
+        let n = caps.get(1).unwrap().as_str().to_string();
+        if !unique_old_nums.contains(&n) { unique_old_nums.push(n); }
+    }
+
     for old_num in unique_old_nums {
         let mut aggregated_text = String::new();
         let mut found = false;
-        while let Some(ref_entry) = ref_entries.iter_mut().find(|r| r.old_num.as_ref() == Some(&old_num) && !r.processed) {
-            if found { aggregated_text.push_str("\n\n"); }
+        // Collect all text pieces for this citation number
+        for ref_entry in ref_entries.iter_mut().filter(|r| r.old_num.as_ref() == Some(&old_num)) {
+            if found { aggregated_text.push_str(" "); }
             let entry_text_clean = ref_entry.text.replace("`", "");
             let processed_text = url_regex.replace_all(&entry_text_clean, |caps: &regex::Captures| {
                 let url = caps.get(1).unwrap().as_str();
@@ -333,29 +358,24 @@ fn fix_footnotes(content: String) -> String {
             ref_entry.processed = true;
             found = true;
         }
+        
+        let new_num = (new_refs.len() + 1).to_string();
+        old_to_new.insert(old_num.clone(), new_num);
         if found {
-            let new_num = (new_refs.len() + 1).to_string();
-            old_to_new.insert(old_num, new_num);
             new_refs.push(aggregated_text);
         } else {
-            let new_num = (new_refs.len() + 1).to_string();
-            old_to_new.insert(old_num.clone(), new_num);
             new_refs.push(format!("**TODO: Missing citation for index {}**", old_num));
         }
     }
 
-    let final_body = marker_pattern.replace_all(body, |caps: &regex::Captures| {
-        let nums_str = caps.get(1).unwrap().as_str();
-        let mut new_markers: Vec<String> = nums_str.split(',')
-            .map(|n| {
-                let n_trimmed = n.trim();
-                format!("[^{}]", old_to_new.get(n_trimmed).unwrap_or(&n_trimmed.to_string()))
-            }).collect();
-        new_markers.dedup();
-        new_markers.join(" ") 
-    });
+    // 4. Final Body and Footer Assembly
+    let final_body = norm_marker_regex.replace_all(&body_normalized, |caps: &regex::Captures| {
+        let n = caps.get(1).unwrap().as_str();
+        format!("[^{}] ", old_to_new.get(n).unwrap_or(&n.to_string())) // Added trailing space
+    }).to_string().replace(" ]", "]"); // Clean up trailing space if inside brackets (though markers are outside)
 
     let mut result = final_body.to_string();
+    result.push_str(social_block);
     result.push_str("\n\n");
     result.push_str(header);
     result.push_str("\n\n");
@@ -364,6 +384,15 @@ fn fix_footnotes(content: String) -> String {
     }
     result
 }
+
+
+fn re_split_nums(s: &str) -> Vec<String> {
+    let re = Regex::new(r"[,\s]+").unwrap();
+    re.split(s).map(|n| n.trim().to_string()).filter(|n| !n.is_empty()).collect()
+}
+
+
+
 
 struct RefEntry {
     old_num: Option<String>,
