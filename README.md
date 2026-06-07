@@ -10,6 +10,8 @@ Traditionally, research was confined to static papers in arcane archives. Today,
 ## The Vision
 We are moving away from the "static image and text" standard of the last century. This tool prioritizes **Video-as-Cover**, allowing researchers to introduce their work through engaging infographics. It is a bridge between rigorous academic depth and the reach of modern social media.
 
+**Live Example:** [What exactly is Immutability?](https://deepdive.shutri.com/241.html)
+
 ### Why this stack?
 We use **Python** scripts for the **Packaging Phase** because LLMs are, by design, exceptionally proficient at generating and executing Python code. This ensures a seamless, high-fidelity export from the LLM. For the **Publishing Phase**, we use **Rust** to ensure a bug-free, hardened, and high-performance ingestion flow that guarantees production integrity.
 
