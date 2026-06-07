@@ -17,6 +17,30 @@ We use **Python** scripts for the **Packaging Phase** because LLMs are, by desig
 
 For the **Publishing Phase**, we use **Rust**. As the native language of the `mdbook` ecosystem, Rust is the natural choice for building a high-performance **preprocessor**. An `mdbook` preprocessor acts as an automated middleware: it intercepts the Markdown source, performs complex transformations (like our KaTeX hardening, citation re-indexing, and widget injection), and passes the refined content to the renderer. This guarantees production integrity and ensures every research paper adheres to our "Gold Standard" without manual intervention.
 
+## Installation & Setup
+
+### Dependencies
+To build and run **md-publish**, you must have the following installed on your system:
+- **Rust & Cargo:** Required to compile the utility.
+- **mdbook:** The underlying publishing framework (`cargo install mdbook`).
+- **mdbook-katex:** Required for mathematical formula rendering (`cargo install mdbook-katex`).
+- **Python 3:** Required for executing the extraction payloads.
+
+### Installation
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/ashutoshmjain/mdIngest.git
+    cd mdIngest
+    ```
+2.  **Build the utility:**
+    ```bash
+    cargo build --release
+    ```
+3.  **Add to Path:** Copy the binary to your local bin or reference it directly:
+    ```bash
+    cp target/release/md-publish /usr/local/bin/
+    ```
+
 ---
 
 ## The Workflow
