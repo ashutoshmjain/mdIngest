@@ -21,9 +21,14 @@ For the **Publishing Phase**, we use **Rust**. As the native language of the `md
 
 ### Dependencies
 To build and run **md-publish**, you must have the following installed on your system:
-- **Rust & Cargo:** Required to compile the utility.
-- **mdbook:** The underlying publishing framework (`cargo install mdbook`).
-- **mdbook-katex:** Required for mathematical formula rendering (`cargo install mdbook-katex`).
+- **Rust & Cargo:** Required to compile the utility (v1.88.0+ recommended).
+- **mdbook:** The underlying publishing framework (**v0.5.3** required for current build).
+- **mdbook-katex:** Required for mathematical formula rendering (**v0.10.0-alpha** or higher).
+- **Specialized mdbook Crates:** The utility now leverages the modular `mdbook` 0.5 architecture:
+    - `mdbook-core`
+    - `mdbook-preprocessor`
+    - `mdbook-markdown`
+    - `mdbook-summary`
 - **Python 3:** Required for executing the extraction payloads.
 
 ### Installation
@@ -110,6 +115,10 @@ We believe static cover images are obsolete. Instead, we use short-form video in
 - **Dynamic Layout Toggling:**
     - **Single Video:** If only one MP4 is found for the Research Index, it is injected as a full-width, responsive, unmutable cover.
     - **Horizontal Scroll:** If multiple MP4s are found, the utility creates a "Cinematic Scroll" horizontal strip for the reader to swipe through.
+- **Intelligent Hierarchical Sequencing:** 
+    Videos are sequenced using a "Bucket" logic:
+    1.  **Priority 0:** `[Number].mp4` or `[Number]-Intro.mp4` always stays at the head.
+    2.  **Priority 1 (Buckets):** Indexed files are sorted lexicographically to allow nested ranges (e.g., `241-2` comes before `241-21`, which comes before `241-3`).
 - **Visual Social Links:** Injects buttons for **TikTok**, **Instagram**, and **YouTube** directly below the video area.
 
 ---

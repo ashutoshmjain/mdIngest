@@ -10,7 +10,10 @@ name = "md-publish"
 path = "crate/src/main.rs"
 
 [dependencies]
-mdbook = "0.4"
+mdbook-preprocessor = "0.5"
+mdbook-core = "0.5"
+mdbook-markdown = "0.5"
+mdbook-summary = "0.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.0", features = ["derive"] }
@@ -24,4 +27,4 @@ zip = "0.6"
 html2md = "0.2"
 scraper = "0.27.0"
 html-escape = "0.2"
-toml = "0.8"
+toml = "0.5"
