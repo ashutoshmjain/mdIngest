@@ -224,7 +224,33 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
             local_vids.push(path);
         }
     }
-    local_vids.sort(); // Consistent order
+
+    // Intelligent Sequence Sorting (Bucket Logic):
+    // Priority 0: Base episode or Intro (241.mp4, 241-Intro.mp4)
+    // Priority 1: All indexed files sorted as strings (241-2, 241-21, 241-3)
+    local_vids.sort_by(|a, b| {
+        let get_prio_and_key = |path: &std::path::PathBuf| -> (i32, String) {
+            let filename = path.file_name().unwrap().to_str().unwrap().to_lowercase();
+            let base = filename.strip_suffix(".mp4").unwrap_or(&filename);
+            
+            let suffix = if base.starts_with(number) {
+                &base[number.len()..]
+            } else {
+                base
+            };
+
+            if suffix.is_empty() || suffix == "-intro" || suffix == "-0" {
+                (0, filename)
+            } else {
+                // Return Priority 1 and the suffix itself for string-based bucket sorting
+                (1, filename)
+            }
+        };
+
+        let val_a = get_prio_and_key(a);
+        let val_b = get_prio_and_key(b);
+        val_a.cmp(&val_b)
+    });
 
     if local_vids.is_empty() {
         eprintln!("⚠️ No videos found for episode {}", number);
