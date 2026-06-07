@@ -13,7 +13,9 @@ We are moving away from the "static image and text" standard of the last century
 **Live Example:** [What exactly is Immutability?](https://deepdive.shutri.com/241.html)
 
 ### Why this stack?
-We use **Python** scripts for the **Packaging Phase** because LLMs are, by design, exceptionally proficient at generating and executing Python code. This ensures a seamless, high-fidelity export from the LLM. For the **Publishing Phase**, we use **Rust** to ensure a bug-free, hardened, and high-performance ingestion flow that guarantees production integrity.
+We use **Python** scripts for the **Packaging Phase** because LLMs are, by design, exceptionally proficient at generating and executing Python code. This ensures a seamless, high-fidelity export from the LLM. 
+
+For the **Publishing Phase**, we use **Rust**. As the native language of the `mdbook` ecosystem, Rust is the natural choice for building a high-performance **preprocessor**. An `mdbook` preprocessor acts as an automated middleware: it intercepts the Markdown source, performs complex transformations (like our KaTeX hardening, citation re-indexing, and widget injection), and passes the refined content to the renderer. This guarantees production integrity and ensures every research paper adheres to our "Gold Standard" without manual intervention.
 
 ---
 
