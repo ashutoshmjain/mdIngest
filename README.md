@@ -1,6 +1,16 @@
 # md-publish (The Ingestion Layer)
 
-**md-publish** is a tool used to move high-fidelity research from an LLM (Gemini, ChatGPT, or Claude) into a production-ready `mdbook` environment. It handles formatting, mathematical proofs (KaTeX), and required metadata for publishing.
+**md-publish** sits at the center of a new paradigm for deep research. 
+
+Traditionally, research was confined to static papers in arcane archives. Today, LLMs have democratized the generation of high-fidelity information. **md-publish** transforms this raw intelligence into a multi-modal publication that can be promoted like any modern media:
+- **Text:** Anchored on `mdbook` for deep, structured reading.
+- **Visual:** Introduced by short-form video overviews (created with tools like [Motion](https://motion.so)) for promotion on TikTok, Instagram, and YouTube.
+- **Audio:** Supplemented by audio overviews (via tools like NotebookLM) for distribution on Spotify, Apple Podcasts, and Fountain.
+
+## The Vision
+We are moving away from the "static image and text" standard of the last century. This tool prioritizes **Video-as-Cover**, allowing researchers to introduce their work through engaging infographics. It is a bridge between rigorous academic depth and the reach of modern social media.
+
+---
 
 ## The Workflow
 
