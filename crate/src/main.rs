@@ -103,16 +103,16 @@ fn main() -> Result<()> {
             ingest_video(&num, &video_src, &ingest_config)?; 
         }
     } else {
-        if args.len() > 1 && !args[1].starts_with('-') {
-            // Support positional number
-        } else {
-            // Standard preprocessor mode
-            let mut input = String::new();
-            std::io::Read::read_to_string(&mut std::io::stdin(), &mut input)?;
-            let _ = std::fs::write("DEBUG_preprocessor_input.json", &input);
-            let (_ctx, book) = mdbook_preprocessor::parse_input(input.as_bytes())?;
-            print!("{}", serde_json::to_string(&book)?);
-        }
+        // Standard preprocessor mode
+        let mut input = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut input)?;
+        
+        // Use the mdbook_preprocessor crate to parse correctly for 0.5.x
+        let (_ctx, book) = mdbook_preprocessor::parse_input(input.as_bytes())?;
+        
+        // Serialize and output the Book object
+        let output_json = serde_json::to_string(&book)?;
+        print!("{}", output_json);
     }
 
     Ok(())
