@@ -126,6 +126,188 @@ This approach guarantees that the CI only publishes what you have already verifi
 
 ---
 
+## PWA Setup (Highly Recommended)
+
+Transforming your `mdbook` into a Progressive Web App (PWA) provides an "app-like" experience, including offline reading, "Resume Reading" persistence, and home-screen installation.
+
+### 1. Project Structure
+Create a `pwa/` directory in your repository root to house the PWA assets:
+```text
+your-repo/
+├── pwa/
+│   ├── icons/
+│   │   ├── icon-192.png
+│   │   └── icon-512.png
+│   ├── manifest.json
+│   ├── sw-register.js
+│   └── sw-src.js
+├── workbox-config.js
+└── package.json
+```
+
+### 2. Configuration Files
+
+#### `pwa/manifest.json`
+```json
+{
+  "name": "Your Book Title",
+  "short_name": "Book",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2E2E2E",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+```
+
+#### `pwa/sw-register.js`
+This script handles service worker registration and update notifications.
+```javascript
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      reg.onupdatefound = () => {
+        const installingWorker = reg.installing;
+        installingWorker.onstatechange = () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New content available! Show an update button to the user.
+            showUpdateUI(reg.waiting);
+          }
+        };
+      };
+    });
+  });
+}
+
+function showUpdateUI(waitingWorker) {
+  const btn = document.createElement('button');
+  btn.innerHTML = '✨ New Content! Update Now';
+  Object.assign(btn.style, { position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: '1000' });
+  btn.onclick = () => {
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
+  };
+  document.body.appendChild(btn);
+}
+```
+
+#### `pwa/sw-src.js`
+The source for your service worker, utilizing Workbox for caching strategies.
+```javascript
+importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.4.1/workbox-sw.js');
+
+if (workbox) {
+  workbox.precaching.precacheAndRoute(self.__WB_MANIFEST || []);
+  
+  // Cache videos for 30 days
+  workbox.routing.registerRoute(
+    ({ request }) => request.destination === 'video',
+    new workbox.strategies.CacheFirst({
+      cacheName: 'videos',
+      plugins: [
+        new workbox.cacheableResponse.CacheableResponsePlugin({ statuses: [200] }),
+        new workbox.rangeRequests.RangeRequestsPlugin(),
+        new workbox.expiration.ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 30 * 24 * 60 * 60 }),
+      ],
+    })
+  );
+}
+```
+
+#### `workbox-config.js`
+```javascript
+module.exports = {
+  globDirectory: "book",
+  globPatterns: ["**/*.{html,js,css,png}"],
+  swSrc: "pwa/sw-src.js",
+  swDest: "book/sw.js",
+  globIgnores: ["sw.js"]
+};
+```
+
+### 3. Integrating with mdBook Theme
+Copy the default `index.hbs` to your `theme/` folder and add the following to the `<head>` section:
+```html
+<link rel="manifest" href="manifest.json">
+<script src="sw-register.js"></script>
+<script>
+    // Resume Reading Persistence
+    (function() {
+        const key = 'last-read-path';
+        if (window.location.pathname.length > 5) localStorage.setItem(key, window.location.href);
+        if (window.location.pathname.endsWith('/') || window.location.pathname.endsWith('index.html')) {
+            const last = localStorage.getItem(key);
+            if (last && last !== window.location.href) window.location.href = last;
+        }
+    })();
+</script>
+```
+
+### 4. Build Scripts (`package.json`)
+Add `workbox-cli` to your `devDependencies` and set up the build script:
+```json
+"scripts": {
+  "build:pwa": "mdbook build && cp pwa/manifest.json pwa/sw-register.js book/ && cp -r pwa/icons book/ && workbox injectManifest workbox-config.js"
+}
+```
+
+### 5. Complete GitHub Actions Workflow
+This workflow automates the entire process: stripping the preprocessor, building the book, and injecting the PWA manifest.
+
+```yaml
+name: Deploy mdBook PWA
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: '0.5.3'
+
+      - name: Install mdbook-katex
+        run: cargo install mdbook-katex --version 0.10.0-alpha
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install PWA Tools
+        run: npm install -g workbox-cli && npm ci
+
+      - name: Build PWA
+        run: |
+          # Disable preprocessor for CI
+          sed -i '/\[preprocessor.ingest\]/,/title_word_limit = 5/d' book.toml
+          npm run build:pwa
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./book
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: { pages: write, id-token: write }
+    environment: { name: github-pages }
+    steps:
+      - uses: actions/deploy-pages@v4
+```
+
+---
+
 ## Features
 
 ### Text Ingestion (`--text`)
