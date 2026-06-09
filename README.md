@@ -101,6 +101,31 @@ Constraint: Do not output standard chat text. Only output the self-extracting Py
 
 ---
 
+## CI/CD Integration (GitHub Actions)
+
+Since **md-publish** is designed as a local ingestion utility, it is not intended to run in your CI environment (e.g., GitHub Actions). Running it in CI would require a full Rust build environment and would risk "pipe deadlocks" or build hangs due to the scale of the preprocessor input.
+
+### The "Surgical Disable" Strategy
+To ensure your CI builds remain stable while preserving the `[preprocessor.ingest]` configuration for local use, you should surgically remove the preprocessor section from your `book.toml` during the CI build process.
+
+**Recommended Workflow:**
+1.  **Ingest Locally:** Run `md-publish` locally to sanitize and enrich your content.
+2.  **Commit Processes Assets:** Commit the resulting `src/*.md` files and the updated `SUMMARY.md`.
+3.  **Disable in CI:** Update your `.github/workflows/mdbook.yml` to remove the preprocessor section before running the build command.
+
+**GitHub Actions Snippet:**
+```yaml
+      - name: Build with mdBook
+        run: |
+          # Surgically remove the ingest preprocessor to prevent CI hangs
+          sed -i '/\[preprocessor.ingest\]/,/title_word_limit = 5/d' book.toml
+          mdbook build
+```
+
+This approach guarantees that the CI only publishes what you have already verified and hardened on your local machine, ensuring 100% fidelity between development and production.
+
+---
+
 ## Features
 
 ### Text Ingestion (`--text`)
