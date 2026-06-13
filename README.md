@@ -77,6 +77,54 @@ Once the research is complete, use the **Master Packaging Prompt** (see below) t
 
 ---
 
+## The Three-Pillar Taxonomy & Parking System
+
+As a research publication scales, managing the visual taxonomy and PWA health becomes critical. `md-publish` automatically enforces a "Three-Pillar" structural taxonomy within `SUMMARY.md` while guaranteeing absolute **URL Permanence** (zero broken external links).
+
+### The Three Pillars
+
+1.  **# Recent (The Active Flow)**
+    *   Contains the **21 most recent** numbered episodes (e.g., `242.md`, `241.md`), symbolizing Bitcoin's 21M scarcity.
+    *   These are the primary active files cached by the Progressive Web App (PWA) for immediate offline reading.
+2.  **# Archive (The Heritage)**
+    *   Older numbered episodes and all unnumbered "thematic" research are removed from the sidebar to keep the navigation lean.
+    *   They are dynamically cataloged in an auto-generated `src/archive.md` directory.
+    *   **PWA Health Strategy:** To prevent the offline PWA cache from bloating to hundreds of megabytes, items in the Archive link *directly* to the raw source files on your GitHub repository. They are strictly "Online Only."
+3.  **# WIP / Parked (Call for Collaboration)**
+    *   Drafts or incomplete episodes can be "parked." They are removed from the active `Recent` list and placed in a dedicated `src/parked.md` directory.
+    *   Parked files use a leading underscore (e.g., `_243.md`).
+    *   Like the Archive, Parked files link to GitHub, acting as an open call for community participation and review.
+
+### Immutability & "Cast in Stone"
+To protect URL integrity (e.g., existing links on YouTube or Spotify), an episode is considered **"Cast in Stone"** (locked) if an associated infographic video exists in the `src/vid/` directory.
+- Locked episodes **cannot** be parked or renumbered.
+- Only "draft" episodes (without videos) can transition into the Parked state.
+
+
+### Managing the Lifecycle (Commands)
+
+Use the following commands from your repository root to manage episode states:
+
+*   **List Parked Episodes:**
+    ```bash
+    md-publish --list-parked
+    ```
+    *Displays a terminal list of all currently parked episodes and their titles.*
+
+*   **Park an Episode:**
+    ```bash
+    md-publish --park [EPISODE_NUMBER]
+    ```
+    *Performs the immutability check. If safe, renames `src/[NUM].md` to `src/_[NUM].md` and updates the indexes.*
+
+*   **Unpark & Renumber an Episode:**
+    ```bash
+    md-publish --unpark [OLD_NUMBER] [NEW_NUMBER]
+    ```
+    *Restores the episode to the `Recent` list. It automatically renames the file and updates the H1 Markdown title inside the document.*
+
+---
+
 ## The Master Packaging Prompt
 
 Copy and paste this exact block into your LLM chat session to package your research:
