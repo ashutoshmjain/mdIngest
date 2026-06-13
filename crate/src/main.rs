@@ -240,7 +240,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
 
     final_lines.push("\n# WIP / Parked".to_string());
     if wip_parked.is_empty() {
-        final_lines.push("- [None at this moment. Join us on GitHub!](https://github.com/ashutoshmjain/deepDive)".to_string());
+        final_lines.push("- [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
         for ep in wip_parked {
             let display_num = ep.filename.trim_start_matches('_');
