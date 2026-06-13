@@ -19,6 +19,7 @@ struct IngestConfig {
     video_source: Option<String>,
     lightning_address: Option<String>,
     title_word_limit: Option<usize>,
+    recent_window_size: Option<usize>,
     podcast_html: Option<String>,
     visual_html: Option<String>,
 }
@@ -54,6 +55,7 @@ fn main() -> Result<()> {
         video_source: None,
         lightning_address: Some("shutosha@primal.net".to_string()),
         title_word_limit: Some(5),
+        recent_window_size: Some(21),
         podcast_html: None,
         visual_html: None,
     });
@@ -62,6 +64,9 @@ fn main() -> Result<()> {
     let mut do_text = false;
     let mut do_image = false;
     let mut do_video = false;
+    let mut do_park = None;
+    let mut do_unpark = None;
+    let mut do_list_parked = false;
     let mut title_override = None;
     let mut source = ingest_config.downloads_path.clone().unwrap_or_else(|| "/mnt/c/Users/ashut/Downloads".to_string());
 
@@ -71,6 +76,19 @@ fn main() -> Result<()> {
             "--text" => do_text = true,
             "--image" => do_image = true,
             "--video" => do_video = true,
+            "--park" => {
+                if i + 1 < args.len() {
+                    do_park = Some(args[i+1].clone());
+                    i += 1;
+                }
+            },
+            "--unpark" => {
+                if i + 2 < args.len() {
+                    do_unpark = Some((args[i+1].clone(), args[i+2].clone()));
+                    i += 2;
+                }
+            },
+            "--list-parked" => do_list_parked = true,
             "-t" | "--title" => {
                 if i + 1 < args.len() {
                     title_override = Some(args[i+1].as_str());
@@ -87,6 +105,18 @@ fn main() -> Result<()> {
             _ => {}
         }
         i += 1;
+    }
+
+    if do_list_parked {
+        return list_parked();
+    }
+
+    if let Some(num) = do_park {
+        return park_episode(&num, &ingest_config);
+    }
+
+    if let Some((old_num, new_num)) = do_unpark {
+        return unpark_episode(&old_num, &new_num, &ingest_config);
     }
 
     if let Some(num) = number {
@@ -145,7 +175,7 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
         eprintln!("✅ Ingested text to src/{}.md", number);
         
         // Sync SUMMARY.md
-        if let Err(e) = update_summary(number) {
+        if let Err(e) = update_summary(config) {
             eprintln!("⚠️ Failed to update SUMMARY.md: {}", e);
         } else {
             eprintln!("✅ Synchronized SUMMARY.md");
@@ -154,34 +184,92 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
     Ok(())
 }
 
-fn update_summary(number: &str) -> Result<()> {
+#[derive(Debug, Clone)]
+struct EpisodeEntry {
+    number: Option<u32>,
+    filename: String,
+    title: String,
+    mtime: std::time::SystemTime,
+}
+
+fn update_summary(config: &IngestConfig) -> Result<()> {
     let summary_path = "src/SUMMARY.md";
-    let content = std::fs::read_to_string(summary_path)?;
-    let md_path = format!("src/{}.md", number);
+    let window_size = config.recent_window_size.unwrap_or(21);
     
-    // Extract title from the newly created markdown file
-    let md_content = std::fs::read_to_string(&md_path)?;
-    let h1_regex = regex::Regex::new(r"(?m)^#\s+\d+\s*:\s*(.*)$").unwrap();
-    let title = if let Some(caps) = h1_regex.captures(&md_content) {
-        caps.get(1).unwrap().as_str().trim()
+    let mut all_files = Vec::new();
+    let pattern = "src/*.md";
+    for entry in glob(pattern)? {
+        if let Ok(path) = entry {
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            if ["SUMMARY.md", "cover.md"].contains(&filename) { continue; }
+            let base = filename.trim_end_matches(".md").trim();
+            let md_content = std::fs::read_to_string(&path)?;
+            let h1_regex = regex::Regex::new(r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$").unwrap();
+            let title = if let Some(caps) = h1_regex.captures(&md_content) {
+                caps.get(1).unwrap().as_str().trim().to_string()
+            } else { "Untitled".to_string() };
+            let mtime = std::fs::metadata(&path)?.modified()?;
+            let number = base.parse::<u32>().ok();
+            all_files.push(EpisodeEntry { number, filename: base.to_string(), title, mtime });
+        }
+    }
+
+    let mut numbered_active: Vec<_> = all_files.iter().filter(|e| e.number.is_some() && !e.filename.starts_with("_")).cloned().collect();
+    let mut wip_parked: Vec<_> = all_files.iter().filter(|e| e.filename.starts_with("_")).cloned().collect();
+
+    numbered_active.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
+    wip_parked.sort_by(|a, b| b.mtime.cmp(&a.mtime));
+
+    let recents: Vec<_> = numbered_active.iter().take(window_size).collect();
+    let overflow_numbered: Vec<_> = numbered_active.iter().skip(window_size).cloned().collect();
+
+    eprintln!("📊 Indexer: {} Recents, {} WIP", recents.len(), wip_parked.len());
+    
+    let original_content = std::fs::read_to_string(summary_path)?;
+    let mut final_lines = Vec::new();
+    
+    for line in original_content.lines() {
+        if line.contains("# Recent") || line.contains("<!-- RECENT_START -->") { break; }
+        final_lines.push(line.to_string());
+    }
+
+    final_lines.push("\n# Recent ..".to_string());
+    final_lines.push("<!-- RECENT_START -->".to_string());
+    for ep in recents { final_lines.push(format!("- [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename)); }
+    final_lines.push("<!-- RECENT_END -->".to_string());
+
+    final_lines.push("\n# WIP / Parked".to_string());
+    if wip_parked.is_empty() {
+        final_lines.push("- [None at this moment. Join us on GitHub!](https://github.com/ashutoshmjain/deepDive)".to_string());
     } else {
-        "Untitled"
-    };
-
-    let new_entry = format!("- [{} : {}]({}.md)", number, title, number);
-    
-    // Check if already in SUMMARY.md
-    if content.contains(&format!("({}.md)", number)) {
-        return Ok(());
+        for ep in wip_parked {
+            let display_num = ep.filename.trim_start_matches('_');
+            final_lines.push(format!("- [{} : {}]({}.md)", display_num, ep.title, ep.filename));
+        }
     }
 
-    // Insert after <!-- RECENT_START -->
-    let mut lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
-    if let Some(pos) = lines.iter().position(|l| l.contains("<!-- RECENT_START -->")) {
-        lines.insert(pos + 1, new_entry);
-        std::fs::write(summary_path, lines.join("\n"))?;
+    final_lines.push("\n# Archive".to_string());
+    if !overflow_numbered.is_empty() {
+        final_lines.push("## Older Episodes".to_string());
+        for ep in overflow_numbered {
+            final_lines.push(format!("- [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
+        }
     }
 
+    let mut in_thematic_zone = false;
+    let mut thematic_buffer = Vec::new();
+    let num_regex = regex::Regex::new(r"\d+\.md").unwrap();
+    for line in original_content.lines() {
+        if line.contains("<!-- RECENT_END -->") { in_thematic_zone = true; continue; }
+        if in_thematic_zone {
+            if line.contains("# Recent") || line.contains("# WIP") || line.contains("# Archive") || line.contains("# Repository") { continue; }
+            if num_regex.is_match(line) { continue; }
+            if thematic_buffer.is_empty() && line.trim().is_empty() { continue; }
+            thematic_buffer.push(line.to_string());
+        }
+    }
+    final_lines.extend(thematic_buffer);
+    std::fs::write(summary_path, final_lines.join("\n"))?;
     Ok(())
 }
 
@@ -378,5 +466,50 @@ fn run_doctor() -> Result<()> {
         Ok(out) => eprintln!("✅ mdbook-katex: {}", String::from_utf8_lossy(&out.stdout).trim()),
         Err(_) => eprintln!("❌ mdbook-katex: Not found"),
     }
+    Ok(())
+}
+
+fn list_parked() -> Result<()> {
+    eprintln!("🅿️  Currently Parked Episodes:");
+    for entry in glob("src/_[0-9]*.md")? {
+        if let Ok(path) = entry {
+            let filename = path.file_name().unwrap().to_str().unwrap();
+            let base = filename.trim_end_matches(".md");
+            let content = std::fs::read_to_string(&path)?;
+            let h1_regex = regex::Regex::new(r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$").unwrap();
+            let title = if let Some(caps) = h1_regex.captures(&content) { caps.get(1).unwrap().as_str().trim() } else { "Untitled" };
+            println!("  [{}] : {}", &base[1..], title);
+        }
+    }
+    Ok(())
+}
+
+fn park_episode(number: &str, config: &IngestConfig) -> Result<()> {
+    let videos: Vec<_> = glob(&format!("src/vid/{}*.mp4", number))?.filter_map(Result::ok).collect();
+    if !videos.is_empty() {
+        eprintln!("❌ Cannot park episode {}: It has infographic videos and is 'cast in stone'.", number);
+        anyhow::bail!("Episode is immutable");
+    }
+    let src = format!("src/{}.md", number);
+    let dest = format!("src/_{}.md", number);
+    if std::path::Path::new(&src).exists() {
+        std::fs::rename(&src, &dest)?;
+        eprintln!("✅ Parked episode {} -> {}", src, dest);
+        update_summary(config)?; 
+    } else {
+        eprintln!("⚠️ Episode {} not found in src/", number);
+    }
+    Ok(())
+}
+
+fn unpark_episode(old_number: &str, new_number: &str, config: &IngestConfig) -> Result<()> {
+    let src = format!("src/_{}.md", old_number);
+    let dest = format!("src/{}.md", new_number);
+    if !std::path::Path::new(&src).exists() { anyhow::bail!("Source not found"); }
+    std::fs::rename(&src, &dest)?;
+    let mut content = std::fs::read_to_string(&dest)?;
+    content = content.replace(&format!("# {}", old_number), &format!("# {}", new_number));
+    std::fs::write(&dest, content)?;
+    update_summary(config)?;
     Ok(())
 }
