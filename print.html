@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-e8e847b5.js";
+            window.path_to_searchindex_js = "searchindex-3463304e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0d24d02b.js"></script>
+        <script src="toc-90304555.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -279,136 +279,25 @@ md-publish --video --number 240
 <h2 id="-license"><a class="header" href="#-license">⚖️ License</a></h2>
 <p>MIT License.</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="deepdive-creative-workflow-the-opinionated-researcher"><a class="header" href="#deepdive-creative-workflow-the-opinionated-researcher">DeepDive Creative Workflow: The Opinionated Researcher</a></h1>
-<p>This document outlines the <strong>4-Phase Research Process</strong> for producing high-fidelity research episodes using the <code>md-publish</code> tool.</p>
-<hr>
-<h2 id="phase-1-research--export-the-gemini-protocol-1"><a class="header" href="#phase-1-research--export-the-gemini-protocol-1">Phase 1: Research &amp; Export (The Gemini Protocol)</a></h2>
-<ol>
-<li><strong>Research:</strong> Conduct deep-dive research in Google Gemini (2.0/Pro).</li>
-<li><strong>Finalize:</strong> Use the <strong>Master Ingestion Prompt</strong> to generate a shielded, production-ready report.
-<blockquote>
-<p><strong>Master Ingestion Prompt:</strong>
-“Please provide the final version of the report, delivered strictly according to these formatting constraints:</p>
-<ol>
-<li>Shield the Output from the Parser: Wrap the entire report inside a single Rust code block using a raw string literal wrapper (i.e. start with <code>rust followed on the next line by r#" and end with "# followed by </code>). This guarantees my interface compiles it strictly as a static code array, preserving raw ‘#’ characters and ‘$$’ math signs.</li>
-<li>Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim.</li>
-<li>Formal Bibliography: Provide a complete, structured “References” or “Bibliography” section at the end of the report, mapping every inline citation to its exact author, paper title, year, and URL from the retrieved sources.</li>
-<li>LaTeX Constraint: Do not include any whitespace immediately adjacent to the ‘$’ or ‘$$’ math delimiters.</li>
-<li>Table Constraint: Use only single spaces between cell contents and the pipe ‘|’ separators to prevent tabular rendering errors.“</li>
-</ol>
-</blockquote>
-</li>
-<li><strong>Export:</strong> Copy the entire shielded block (including <code>```rust</code> and <code>r#"...</code> artifacts) and save it as a <code>.rs</code> file (e.g., <code>ep241.rs</code>) in your <code>Downloads</code> folder.</li>
-</ol>
-<h2 id="phase-2-text-ingestion---text-1"><a class="header" href="#phase-2-text-ingestion---text-1">Phase 2: Text Ingestion (<code>--text</code>)</a></h2>
-<ol>
-<li><strong>Run Ingestion:</strong> Execute the tool to sanitize and index the chapter.
-<pre><code class="language-bash">md-publish --text --number XXX
+<h1 id="the-mempool-unconfirmed-research"><a class="header" href="#the-mempool-unconfirmed-research">The Mempool (Unconfirmed Research)</a></h1>
+<p>In a blockchain, the mempool is where transactions wait to be verified. Here, the Mempool contains our raw, unconfirmed ideas. These episodes are currently being researched, debated, and refined. We invite you to act as a validating node—review the research on our GitHub and email your consensus or objections to amj@shutri.com before we mine the next block.</p>
+<h3 id="offline-access--contribution"><a class="header" href="#offline-access--contribution">Offline Access &amp; Contribution</a></h3>
+<p>To work on these episodes locally, clone the repository:</p>
+<pre><code class="language-bash">git clone https://github.com/ashutoshmjain/deepDive.git
 </code></pre>
-</li>
-<li><strong>Verification:</strong> Verify that <code>src/XXX.md</code> has been created with hardened KaTeX, sequential footnotes, and the correct H1 title.</li>
-</ol>
-<h2 id="phase-3-media-ingestion---image-1"><a class="header" href="#phase-3-media-ingestion---image-1">Phase 3: Media Ingestion (<code>--image</code>)</a></h2>
-<ol>
-<li><strong>Cover Art:</strong> Generate or source a cover image (PNG/JPG) and save it to your <code>Downloads</code> folder.</li>
-<li><strong>Run Ingestion:</strong> Execute the image ingestion command.
-<pre><code class="language-bash">md-publish --image --number XXX
-</code></pre>
-</li>
-<li><strong>Syndication:</strong> This step automatically injects <strong>Spotify</strong>, <strong>Apple Podcasts</strong>, and <strong>YouTube</strong> links, along with a <strong>Lightning Zap Widget</strong>.</li>
-</ol>
-<h2 id="phase-4-visual-ingestion---video-1"><a class="header" href="#phase-4-visual-ingestion---video-1">Phase 4: Visual Ingestion (<code>--video</code>)</a></h2>
-<ol>
-<li><strong>Infographics:</strong> Generate infographics using Mosaic AI Video Editor.</li>
-<li><strong>Setup:</strong> Save the resulting <code>.mp4</code> files to your <strong>Downloads</strong> folder following the strict naming convention: <code>XXX-description.mp4</code>.</li>
-<li><strong>Run Ingestion:</strong> Execute the video ingestion command to rebuild the <strong>global cinematic infographic feed</strong> and inject it into the chapter with auto-focus logic.
-<pre><code class="language-bash">md-publish --video --number XXX
-</code></pre>
-</li>
-</ol>
-<hr>
-<h2 id="global-distribution-workflow-post-ingestion"><a class="header" href="#global-distribution-workflow-post-ingestion">Global Distribution Workflow (Post-Ingestion)</a></h2>
-<ol>
-<li><strong>Audio Production:</strong> Create Audio Overviews (Deep Dives) in NotebookLM.</li>
-<li><strong>Podcast Syndication:</strong> Publish audio on Spotify (auto-syndicates via RSS to YouTube, Apple, Fountain).</li>
-<li><strong>Static Video:</strong> YouTube converts the audio feed into a static video.</li>
-<li><strong>Final Build:</strong> Run <code>mdbook build</code> to deploy the final multimedia research paper to GitHub Pages.</li>
-</ol>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="ingestion-layer-roadmap-research-to-publish-workflow"><a class="header" href="#ingestion-layer-roadmap-research-to-publish-workflow">Ingestion Layer Roadmap: Research-to-Publish Workflow</a></h1>
-<h2 id="objective"><a class="header" href="#objective">Objective</a></h2>
-<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>md-publish</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
-<h2 id="the-vision-the-research-to-src-pipeline"><a class="header" href="#the-vision-the-research-to-src-pipeline">The Vision: The “Research-to-src” Pipeline</a></h2>
-<p>The workflow focuses on a seamless transition from AI research to a production-ready mdbook page:</p>
-<ol>
-<li><strong>Generation:</strong> An LLM (currently Gemini Pro) generates a research report using the <strong>Master Prompt</strong>.</li>
-<li><strong>Ingestion:</strong> The user runs <code>md-publish --text --number XXX</code>.</li>
-<li><strong>Renaming:</strong> The tool automatically identifies the “shielded” markdown file in <code>Downloads</code>, renames it to <code>XXX.md</code>, and moves it to the <code>src/</code> folder.</li>
-<li><strong>Surgical Fix:</strong> The tool triggers the internal sanitization logic to handle KaTeX, currency, and footnotes while stripping the “Shield”.</li>
-<li><strong>Synchronization:</strong> The tool automatically updates <code>SUMMARY.md</code> to include the new episode in the <code># Recent ..</code> section.</li>
-<li><strong>Media Enrichment:</strong> The user runs <code>md-publish --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
-</ol>
-<h2 id="architectural-model-mdbook-extension"><a class="header" href="#architectural-model-mdbook-extension">Architectural Model: mdbook Extension</a></h2>
-<ul>
-<li><strong>Configuration:</strong> Source folders (Downloads), destination (<code>src/</code>), and script paths are managed via <code>book.toml</code>.</li>
-<li><strong>Scope:</strong> <strong>Text-only CLI Tool</strong>. No web server or UI components.</li>
-<li><strong>Technology Stack:</strong> <strong>Rust</strong>. The tool functions as both a standalone CLI and an mdbook preprocessor.</li>
-</ul>
-<h2 id="the-roadmap-refined-baby-steps"><a class="header" href="#the-roadmap-refined-baby-steps">The Roadmap: Refined Baby Steps</a></h2>
-<h3 id="baby-step-1-the-ingestion-bridge"><a class="header" href="#baby-step-1-the-ingestion-bridge">Baby Step 1: The “Ingestion Bridge”</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate the move and rename from <code>Downloads</code> to <code>src/</code>.</li>
-<li><strong>Logic:</strong> Identify the newest <code>.md</code> file in <code>Downloads</code> and move/rename it based on the provided episode number.</li>
-</ul>
-<h3 id="baby-step-2-native-sanitization-logic"><a class="header" href="#baby-step-2-native-sanitization-logic">Baby Step 2: Native Sanitization Logic</a></h3>
-<ul>
-<li><strong>Goal:</strong> Harden and sanitize the Markdown immediately after ingestion.</li>
-<li><strong>Logic:</strong> Execute the internal <code>sanitizer.rs</code> logic (KaTeX hardening, shield stripping, title limits) during the ingestion pass.</li>
-</ul>
-<h3 id="baby-step-3-summarymd-sync"><a class="header" href="#baby-step-3-summarymd-sync">Baby Step 3: SUMMARY.md Sync</a></h3>
-<ul>
-<li><strong>Goal:</strong> Zero-touch update of the book’s table of contents.</li>
-<li><strong>Logic:</strong> Append the new entry to the <code>SUMMARY.md</code> file.</li>
-</ul>
-<h3 id="baby-step-4-image--social-ingestion"><a class="header" href="#baby-step-4-image--social-ingestion">Baby Step 4: Image &amp; Social Ingestion</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate cover image migration and insert social/monetization widgets.</li>
-<li><strong>Logic:</strong>
-<ol>
-<li>Identify latest image in <code>Downloads</code>.</li>
-<li>Move to <code>src/img/XXX.png</code>.</li>
-<li>Update <code>src/XXX.md</code>:
-<ul>
-<li>Insert image after H1.</li>
-<li>Insert centered podcast links snippet.</li>
-<li>Insert lightning/wallet widget (shutosha@primal.net) above references.</li>
-</ul>
-</li>
-</ol>
-</li>
-</ul>
-<h3 id="baby-step-5-video-ingestion-the-cinematic-scroll-strip"><a class="header" href="#baby-step-5-video-ingestion-the-cinematic-scroll-strip">Baby Step 5: Video Ingestion (The Cinematic Scroll Strip)</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate infographic video migration and present them in a high-engagement carousel.</li>
-<li><strong>Logic:</strong>
-<ol>
-<li><strong>Master Key Discovery:</strong> Search <code>Downloads</code> for all files matching <code>XXX-*.mp4</code> (where XXX is the episode number).</li>
-<li><strong>Asset Migration:</strong> Move all matching videos to <code>src/vid/</code>.</li>
-<li><strong>The “Scroll Strip” Layout:</strong> Inject a horizontal scrollable <code>&lt;div&gt;</code> immediately <strong>above the Wallet/Tips widget</strong>.</li>
-<li><strong>Layout Specs:</strong>
-<ul>
-<li><strong>Flexbox Carousel:</strong> Videos arranged side-by-side.</li>
-<li><strong>Scroll Snapping:</strong> Enabled (<code>scroll-snap-type: x mandatory</code>) so videos center perfectly on swipe/scroll.</li>
-<li><strong>Visual Hint:</strong> First video takes ~85% width to reveal the edge of the next one.</li>
-<li><strong>Interactive:</strong> Individual floating toggle-mute buttons for each video.</li>
-</ul>
-</li>
-<li><strong>Rationale:</strong> Provides a modern, “native app” feel for infographics that drives visual momentum directly into the “Zap with Sats” conversion point.</li>
-</ol>
-</li>
-</ul>
+<h1 id="join-us-on-github"><a class="header" href="#join-us-on-github">Join us on GitHub</a></h1>
+<p><a href="https://github.com/ashutoshmjain/deepDive">Click here to visit the repository</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="technical-api-docs-rust"><a class="header" href="#technical-api-docs-rust">Technical API Docs (Rust)</a></h1>
+<h1 id="current-block"><a class="header" href="#current-block">Current Block</a></h1>
+<p>This block contains the active research episodes, instantly available for offline reading in the Progressive Web App. Once this block reaches 21 episodes, it is mined and moved to Deep Storage.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="deep-storage-the-immutable-ledger"><a class="header" href="#deep-storage-the-immutable-ledger">Deep Storage (The Immutable Ledger)</a></h1>
+<p>Everything here is organized in Deep Storage. This ledger contains our complete, immutable history. You can expand the folders in the sidebar to browse older <strong>Verified Blocks</strong>, or explore the unnumbered <strong>Genesis Concepts</strong> that built the foundation of our current research framework.</p>
+<h3 id="collaboration--offline-access"><a class="header" href="#collaboration--offline-access">Collaboration &amp; Offline Access</a></h3>
+<p>For full offline access to the entire history, or to collaborate on research, please clone our GitHub repository:</p>
+<pre><code class="language-bash">git clone https://github.com/ashutoshmjain/deepDive.git
+</code></pre>
 
                     </main>
 

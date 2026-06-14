@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Project Roadmap - md-publish: The Ingestion Layer</title>
+        <title>None at this moment. Join us on GitHub! - md-publish: The Ingestion Layer</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-e8e847b5.js";
+            window.path_to_searchindex_js = "searchindex-3463304e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0d24d02b.js"></script>
+        <script src="toc-90304555.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -174,88 +174,18 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="ingestion-layer-roadmap-research-to-publish-workflow"><a class="header" href="#ingestion-layer-roadmap-research-to-publish-workflow">Ingestion Layer Roadmap: Research-to-Publish Workflow</a></h1>
-<h2 id="objective"><a class="header" href="#objective">Objective</a></h2>
-<p>Evolve the deepDive publishing workflow into a streamlined CLI tool named <strong>md-publish</strong>. The core goal is to serve as the <strong>Ingestion Layer</strong> in an agentic research-to-publish workflow, automating the transfer, sanitization, and media-enrichment of AI-generated reports.</p>
-<h2 id="the-vision-the-research-to-src-pipeline"><a class="header" href="#the-vision-the-research-to-src-pipeline">The Vision: The “Research-to-src” Pipeline</a></h2>
-<p>The workflow focuses on a seamless transition from AI research to a production-ready mdbook page:</p>
-<ol>
-<li><strong>Generation:</strong> An LLM (currently Gemini Pro) generates a research report using the <strong>Master Prompt</strong>.</li>
-<li><strong>Ingestion:</strong> The user runs <code>md-publish --text --number XXX</code>.</li>
-<li><strong>Renaming:</strong> The tool automatically identifies the “shielded” markdown file in <code>Downloads</code>, renames it to <code>XXX.md</code>, and moves it to the <code>src/</code> folder.</li>
-<li><strong>Surgical Fix:</strong> The tool triggers the internal sanitization logic to handle KaTeX, currency, and footnotes while stripping the “Shield”.</li>
-<li><strong>Synchronization:</strong> The tool automatically updates <code>SUMMARY.md</code> to include the new episode in the <code># Recent ..</code> section.</li>
-<li><strong>Media Enrichment:</strong> The user runs <code>md-publish --image --number XXX</code> (and eventually <code>--video</code>) to migrate assets and inject high-engagement visual snippets.</li>
-</ol>
-<h2 id="architectural-model-mdbook-extension"><a class="header" href="#architectural-model-mdbook-extension">Architectural Model: mdbook Extension</a></h2>
-<ul>
-<li><strong>Configuration:</strong> Source folders (Downloads), destination (<code>src/</code>), and script paths are managed via <code>book.toml</code>.</li>
-<li><strong>Scope:</strong> <strong>Text-only CLI Tool</strong>. No web server or UI components.</li>
-<li><strong>Technology Stack:</strong> <strong>Rust</strong>. The tool functions as both a standalone CLI and an mdbook preprocessor.</li>
-</ul>
-<h2 id="the-roadmap-refined-baby-steps"><a class="header" href="#the-roadmap-refined-baby-steps">The Roadmap: Refined Baby Steps</a></h2>
-<h3 id="baby-step-1-the-ingestion-bridge"><a class="header" href="#baby-step-1-the-ingestion-bridge">Baby Step 1: The “Ingestion Bridge”</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate the move and rename from <code>Downloads</code> to <code>src/</code>.</li>
-<li><strong>Logic:</strong> Identify the newest <code>.md</code> file in <code>Downloads</code> and move/rename it based on the provided episode number.</li>
-</ul>
-<h3 id="baby-step-2-native-sanitization-logic"><a class="header" href="#baby-step-2-native-sanitization-logic">Baby Step 2: Native Sanitization Logic</a></h3>
-<ul>
-<li><strong>Goal:</strong> Harden and sanitize the Markdown immediately after ingestion.</li>
-<li><strong>Logic:</strong> Execute the internal <code>sanitizer.rs</code> logic (KaTeX hardening, shield stripping, title limits) during the ingestion pass.</li>
-</ul>
-<h3 id="baby-step-3-summarymd-sync"><a class="header" href="#baby-step-3-summarymd-sync">Baby Step 3: SUMMARY.md Sync</a></h3>
-<ul>
-<li><strong>Goal:</strong> Zero-touch update of the book’s table of contents.</li>
-<li><strong>Logic:</strong> Append the new entry to the <code>SUMMARY.md</code> file.</li>
-</ul>
-<h3 id="baby-step-4-image--social-ingestion"><a class="header" href="#baby-step-4-image--social-ingestion">Baby Step 4: Image &amp; Social Ingestion</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate cover image migration and insert social/monetization widgets.</li>
-<li><strong>Logic:</strong>
-<ol>
-<li>Identify latest image in <code>Downloads</code>.</li>
-<li>Move to <code>src/img/XXX.png</code>.</li>
-<li>Update <code>src/XXX.md</code>:
-<ul>
-<li>Insert image after H1.</li>
-<li>Insert centered podcast links snippet.</li>
-<li>Insert lightning/wallet widget (shutosha@primal.net) above references.</li>
-</ul>
-</li>
-</ol>
-</li>
-</ul>
-<h3 id="baby-step-5-video-ingestion-the-cinematic-scroll-strip"><a class="header" href="#baby-step-5-video-ingestion-the-cinematic-scroll-strip">Baby Step 5: Video Ingestion (The Cinematic Scroll Strip)</a></h3>
-<ul>
-<li><strong>Goal:</strong> Automate infographic video migration and present them in a high-engagement carousel.</li>
-<li><strong>Logic:</strong>
-<ol>
-<li><strong>Master Key Discovery:</strong> Search <code>Downloads</code> for all files matching <code>XXX-*.mp4</code> (where XXX is the episode number).</li>
-<li><strong>Asset Migration:</strong> Move all matching videos to <code>src/vid/</code>.</li>
-<li><strong>The “Scroll Strip” Layout:</strong> Inject a horizontal scrollable <code>&lt;div&gt;</code> immediately <strong>above the Wallet/Tips widget</strong>.</li>
-<li><strong>Layout Specs:</strong>
-<ul>
-<li><strong>Flexbox Carousel:</strong> Videos arranged side-by-side.</li>
-<li><strong>Scroll Snapping:</strong> Enabled (<code>scroll-snap-type: x mandatory</code>) so videos center perfectly on swipe/scroll.</li>
-<li><strong>Visual Hint:</strong> First video takes ~85% width to reveal the edge of the next one.</li>
-<li><strong>Interactive:</strong> Individual floating toggle-mute buttons for each video.</li>
-</ul>
-</li>
-<li><strong>Rationale:</strong> Provides a modern, “native app” feel for infographics that drives visual momentum directly into the “Zap with Sats” conversion point.</li>
-</ol>
-</li>
-</ul>
+                        <h1 id="join-us-on-github"><a class="header" href="#join-us-on-github">Join us on GitHub</a></h1>
+<p><a href="https://github.com/ashutoshmjain/deepDive">Click here to visit the repository</a></p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="workflow.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="mempool.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="api/mdbook_ingest/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="current.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -265,11 +195,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="workflow.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="mempool.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="api/mdbook_ingest/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="current.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

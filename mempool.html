@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Opinionated Workflow - md-publish: The Ingestion Layer</title>
+        <title>The Mempool (WIP) - md-publish: The Ingestion Layer</title>
 
 
         <!-- Custom HTML head -->
@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-e8e847b5.js";
+            window.path_to_searchindex_js = "searchindex-3463304e.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0d24d02b.js"></script>
+        <script src="toc-90304555.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -174,61 +174,12 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="deepdive-creative-workflow-the-opinionated-researcher"><a class="header" href="#deepdive-creative-workflow-the-opinionated-researcher">DeepDive Creative Workflow: The Opinionated Researcher</a></h1>
-<p>This document outlines the <strong>4-Phase Research Process</strong> for producing high-fidelity research episodes using the <code>md-publish</code> tool.</p>
-<hr>
-<h2 id="phase-1-research--export-the-gemini-protocol"><a class="header" href="#phase-1-research--export-the-gemini-protocol">Phase 1: Research &amp; Export (The Gemini Protocol)</a></h2>
-<ol>
-<li><strong>Research:</strong> Conduct deep-dive research in Google Gemini (2.0/Pro).</li>
-<li><strong>Finalize:</strong> Use the <strong>Master Ingestion Prompt</strong> to generate a shielded, production-ready report.
-<blockquote>
-<p><strong>Master Ingestion Prompt:</strong>
-“Please provide the final version of the report, delivered strictly according to these formatting constraints:</p>
-<ol>
-<li>Shield the Output from the Parser: Wrap the entire report inside a single Rust code block using a raw string literal wrapper (i.e. start with <code>rust followed on the next line by r#" and end with "# followed by </code>). This guarantees my interface compiles it strictly as a static code array, preserving raw ‘#’ characters and ‘$$’ math signs.</li>
-<li>Direct Citations: Embed precise source-id identifiers (e.g. [1, 2]) directly inline next to each claim.</li>
-<li>Formal Bibliography: Provide a complete, structured “References” or “Bibliography” section at the end of the report, mapping every inline citation to its exact author, paper title, year, and URL from the retrieved sources.</li>
-<li>LaTeX Constraint: Do not include any whitespace immediately adjacent to the ‘$’ or ‘$$’ math delimiters.</li>
-<li>Table Constraint: Use only single spaces between cell contents and the pipe ‘|’ separators to prevent tabular rendering errors.“</li>
-</ol>
-</blockquote>
-</li>
-<li><strong>Export:</strong> Copy the entire shielded block (including <code>```rust</code> and <code>r#"...</code> artifacts) and save it as a <code>.rs</code> file (e.g., <code>ep241.rs</code>) in your <code>Downloads</code> folder.</li>
-</ol>
-<h2 id="phase-2-text-ingestion---text"><a class="header" href="#phase-2-text-ingestion---text">Phase 2: Text Ingestion (<code>--text</code>)</a></h2>
-<ol>
-<li><strong>Run Ingestion:</strong> Execute the tool to sanitize and index the chapter.
-<pre><code class="language-bash">md-publish --text --number XXX
+                        <h1 id="the-mempool-unconfirmed-research"><a class="header" href="#the-mempool-unconfirmed-research">The Mempool (Unconfirmed Research)</a></h1>
+<p>In a blockchain, the mempool is where transactions wait to be verified. Here, the Mempool contains our raw, unconfirmed ideas. These episodes are currently being researched, debated, and refined. We invite you to act as a validating node—review the research on our GitHub and email your consensus or objections to amj@shutri.com before we mine the next block.</p>
+<h3 id="offline-access--contribution"><a class="header" href="#offline-access--contribution">Offline Access &amp; Contribution</a></h3>
+<p>To work on these episodes locally, clone the repository:</p>
+<pre><code class="language-bash">git clone https://github.com/ashutoshmjain/deepDive.git
 </code></pre>
-</li>
-<li><strong>Verification:</strong> Verify that <code>src/XXX.md</code> has been created with hardened KaTeX, sequential footnotes, and the correct H1 title.</li>
-</ol>
-<h2 id="phase-3-media-ingestion---image"><a class="header" href="#phase-3-media-ingestion---image">Phase 3: Media Ingestion (<code>--image</code>)</a></h2>
-<ol>
-<li><strong>Cover Art:</strong> Generate or source a cover image (PNG/JPG) and save it to your <code>Downloads</code> folder.</li>
-<li><strong>Run Ingestion:</strong> Execute the image ingestion command.
-<pre><code class="language-bash">md-publish --image --number XXX
-</code></pre>
-</li>
-<li><strong>Syndication:</strong> This step automatically injects <strong>Spotify</strong>, <strong>Apple Podcasts</strong>, and <strong>YouTube</strong> links, along with a <strong>Lightning Zap Widget</strong>.</li>
-</ol>
-<h2 id="phase-4-visual-ingestion---video"><a class="header" href="#phase-4-visual-ingestion---video">Phase 4: Visual Ingestion (<code>--video</code>)</a></h2>
-<ol>
-<li><strong>Infographics:</strong> Generate infographics using Mosaic AI Video Editor.</li>
-<li><strong>Setup:</strong> Save the resulting <code>.mp4</code> files to your <strong>Downloads</strong> folder following the strict naming convention: <code>XXX-description.mp4</code>.</li>
-<li><strong>Run Ingestion:</strong> Execute the video ingestion command to rebuild the <strong>global cinematic infographic feed</strong> and inject it into the chapter with auto-focus logic.
-<pre><code class="language-bash">md-publish --video --number XXX
-</code></pre>
-</li>
-</ol>
-<hr>
-<h2 id="global-distribution-workflow-post-ingestion"><a class="header" href="#global-distribution-workflow-post-ingestion">Global Distribution Workflow (Post-Ingestion)</a></h2>
-<ol>
-<li><strong>Audio Production:</strong> Create Audio Overviews (Deep Dives) in NotebookLM.</li>
-<li><strong>Podcast Syndication:</strong> Publish audio on Spotify (auto-syndicates via RSS to YouTube, Apple, Fountain).</li>
-<li><strong>Static Video:</strong> YouTube converts the audio feed into a static video.</li>
-<li><strong>Final Build:</strong> Run <code>mdbook build</code> to deploy the final multimedia research paper to GitHub Pages.</li>
-</ol>
 
                     </main>
 
@@ -238,7 +189,7 @@
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="roadmap.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="github.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -252,7 +203,7 @@
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="roadmap.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="github.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
