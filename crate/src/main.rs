@@ -27,7 +27,6 @@ struct IngestConfig {
 
 #[derive(Debug, Deserialize)]
 struct BookConfig {
-    wip_threshold: Option<u32>, // The episode number that ends Block 1
     preprocessor: Option<PreprocessorConfig>,
 }
 
@@ -50,7 +49,7 @@ fn main() -> Result<()> {
     if args.len() > 1 && args[1] == "doctor" { return run_doctor(); }
 
     let config_content = std::fs::read_to_string("book.toml").unwrap_or_default();
-    let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { wip_threshold: Some(240), preprocessor: None });
+    let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { preprocessor: None });
     let ingest_config = book_config.preprocessor.and_then(|p| p.ingest).unwrap_or(IngestConfig {
         downloads_path: Some("/mnt/c/Users/ashut/Downloads".to_string()),
         text_source: None,
@@ -141,21 +140,22 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
     Ok(())
 }
 
-fn update_summary(config: &IngestConfig) -> Result<()> {
+fn update_summary(_config: &IngestConfig) -> Result<()> {
     let summary_path = "src/SUMMARY.md";
-    
-    // Pivot and Block Size logic
     let pivot = 220;
     let block_size = 21;
     
     let mut all_files = Vec::new();
     let mut wip_parked = Vec::new();
     
+    let concept_files = ["bitcoin", "intelligence", "digital credit", "capital", "physics", "culture"];
+    let skip_files = ["SUMMARY.md", "cover.md", "archive.md", "parked.md", "vault.md", "mempool.md", "github.md", "current.md", "genesis.md", "block1.md", "block2.md", "block3.md", "bitcoin.md", "intelligence.md", "digital credit.md", "capital.md", "physics.md", "culture.md"];
+
     let pattern = "src/*.md";
     for entry in glob(pattern)? {
         if let Ok(path) = entry {
             let filename = path.file_name().unwrap().to_str().unwrap();
-            if ["SUMMARY.md", "cover.md", "archive.md", "parked.md", "vault.md", "mempool.md", "github.md", "current.md"].contains(&filename) { continue; }
+            if skip_files.contains(&filename) { continue; }
             let base = filename.trim_end_matches(".md").trim();
             let md_content = std::fs::read_to_string(&path)?;
             let h1_regex = regex::Regex::new(r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$").unwrap();
@@ -173,21 +173,13 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         }
     }
 
-    // Sort WIP
     wip_parked.sort_by(|a, b| b.mtime.cmp(&a.mtime));
 
-    // Calculate Blocks
-    // Current Block = Max Block ID
-    // All others = Deep Storage
     let mut block_map: BTreeMap<i32, Vec<EpisodeEntry>> = BTreeMap::new();
-    let mut thematic_episodes = Vec::new();
-
     for ep in all_files {
         if let Some(num) = ep.number {
             let block_id = ((num as i32 - pivot) / block_size) + 1;
             block_map.entry(block_id).or_insert_with(Vec::new).push(ep);
-        } else {
-            thematic_episodes.push(ep);
         }
     }
 
@@ -195,18 +187,20 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     let mut blocks: Vec<_> = block_map.into_iter().collect();
     blocks.sort_by(|a, b| b.0.cmp(&a.0));
 
-    eprintln!("𓄊 Indexer: Current Block ID: {}, Blocks found: {}", current_block_id, blocks.len());
+    eprintln!("𓄊 Indexer: current block ID: {}, Blocks found: {}", current_block_id, blocks.len());
 
     let original_content = std::fs::read_to_string(summary_path)?;
     let mut final_lines = Vec::new();
     
     for line in original_content.lines() {
-        if line.contains("- [The Mempool") || line.contains("- [Current Block") || line.contains("- [Deep Storage") || line.contains("<!-- RECENT_START -->") { break; }
+        let l = line.to_lowercase();
+        if l.contains("- [mempool") || l.contains("- [block template") || l.contains("- [chain") { break; }
         final_lines.push(line.to_string());
     }
 
-    // 1. Section: The Mempool
-    final_lines.push("\n- [mempool](mempool.md)".to_string());
+    // 1. mempool
+    final_lines.push("".to_string());
+    final_lines.push("- [mempool](mempool.md)".to_string());
     if wip_parked.is_empty() {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
@@ -216,71 +210,110 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         }
     }
 
-    // 2. Section: Current Block
-    final_lines.push("\n<!-- RECENT_START -->".to_string());
+    // 2. block template
+    final_lines.push("".to_string());
     final_lines.push("- [block template](current.md)".to_string());
-    if let Some((id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
+    if let Some((_id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
         eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps {
             final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
         }
     }
-    final_lines.push("<!-- RECENT_END -->".to_string());
 
-    // 3. Section: Deep Storage
-    final_lines.push("\n- [chain](archive.md)".to_string());
-    for (id, mut eps) in blocks {
-        if id == current_block_id { continue; }
-        final_lines.push(format!("    - [block {}]()", id));
-        eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
-        for ep in eps {
+    // 3. chain
+    final_lines.push("".to_string());
+    final_lines.push("- [chain](archive.md)".to_string());
+    for (id, eps) in &blocks {
+        if *id == current_block_id { continue; }
+        
+        let block_link = if std::path::Path::new(&format!("src/block{}.md", id)).exists() {
+            format!("block{}.md", id)
+        } else {
+            String::new()
+        };
+        
+        final_lines.push(format!("    - [block {}]({})", id, block_link));
+        let mut eps_sorted = eps.clone();
+        eps_sorted.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
+        for ep in eps_sorted {
             final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
         }
     }
 
-    // 4. Append Thematic Heritage
+    // 4. genesis
+    final_lines.push("".to_string());
+    final_lines.push("- [genesis](genesis.md)".to_string());
+    
     let mut in_thematic_zone = false;
     let mut thematic_buffer = Vec::new();
     let num_regex = regex::Regex::new(r"\d+\.md").unwrap();
-    let skip_strings = ["# WIP", "# Archive", "# Repository", "parked.md", "mempool.md", "Deep Storage", "The Network", "Verified Blocks", "Older Episodes", "github.md", "# Recent Blocks", "# The Mempool", "- [The Mempool", "Current Block", "current.md", "- [The Archive", "Block ", "- [Deep Storage"];
+    let skip_strings = ["wip", "archive", "repository", "parked.md", "mempool.md", "deep storage", "network", "verified blocks", "older episodes", "github.md", "recent blocks", "mempool", "current block", "block template", "current.md", "genesis", "chain", "block1.md", "block2.md", "block3.md", "bitcoin.md", "intelligence.md", "digital credit.md", "capital.md", "physics.md", "culture.md"];
     
+    // Recovery Logic: We strictly look for the line AFTER the last episodic entry.
+    // The episodic entries end with "220 : AI Made Me a Believer".
     for line in original_content.lines() {
-        if line.contains("<!-- RECENT_END -->") { in_thematic_zone = true; continue; }
+        if line.to_lowercase().contains("220 : ai made me a believer") { in_thematic_zone = true; continue; }
         if in_thematic_zone {
+            let l = line.to_lowercase();
+            // Skip headers we already generated or meta files
             let mut skip = false;
             for s in &skip_strings {
-                if line.contains(s) { skip = true; break; }
+                if l.contains(s) && (l.contains("[]") || l.contains("()") || l.contains(".md")) { 
+                    // This is likely a generated node, but we should be careful.
+                    // If it's a concept summary like bitcoin.md, we will re-generate it to ensure link integrity.
+                    skip = true; 
+                    break; 
+                }
             }
             if skip { continue; }
             if num_regex.is_match(line) { continue; }
             
-            // Normalize indentation
             let mut mod_line = line.to_string();
-            if mod_line.starts_with("  - [") && !mod_line.starts_with("    - [") {
-                mod_line = mod_line.replacen("  - [", "    - [", 1);
+            let trimmed = mod_line.trim();
+            if trimmed.starts_with("- [") {
+                // If it's just a folder link without an md file, it's a thematic category header.
+                if trimmed.contains("()") || trimmed.contains("[]") {
+                    mod_line = format!("    {}", trimmed);
+                } else {
+                    // It's a thematic article.
+                    mod_line = format!("        {}", trimmed);
+                }
             }
-            if mod_line.starts_with("      - [") && !mod_line.starts_with("        - [") {
-                mod_line = mod_line.replacen("      - [", "        - [", 1);
-            }
-            
+
             if thematic_buffer.is_empty() && mod_line.trim().is_empty() { continue; }
             thematic_buffer.push(mod_line);
         }
     }
+    
+    // Seed the foundational structure if recovery failed
+    if thematic_buffer.is_empty() {
+        for c in &concept_files {
+            let link = if std::path::Path::new(&format!("src/{}.md", c)).exists() {
+                format!("{}.md", c)
+            } else {
+                String::new()
+            };
+            thematic_buffer.push(format!("    - [{}]({})", c, link));
+        }
+    }
+
     final_lines.extend(thematic_buffer);
     std::fs::write(summary_path, final_lines.join("\n"))?;
     
-    // Create core pages
-    let mempool_content = format!("# The Mempool (Unconfirmed Research)\n\nIn a blockchain, the mempool is where transactions wait to be verified. Here, the Mempool contains our raw, unconfirmed ideas. These episodes are currently being researched, debated, and refined. We invite you to act as a validating node—review the research on our GitHub and email your consensus or objections to amj@shutri.com before we mine the next block.\n\n### Offline Access & Contribution\nTo work on these episodes locally, clone the repository:\n\n```bash\ngit clone https://github.com/ashutoshmjain/deepDive.git\n```\n");
+    // Write narratives
+    let mempool_content = "# mempool\n\nthe title \"mempool\" is a deliberate choice from the architecture of decentralized systems. it represents the space where transactions wait for verification—a high-entropy zone of pure potential. in our context, the mempool is the catchment of all active research. it is where we catch the signals of the world before they are filtered and mined into history. we inhabit this space to acknowledge that discovery is a process of refinement, not a sudden event. here, ideas are raw. they are the unconfirmed drafts that have been pulled from the digital noise, awaiting the validation of our network of experts. \n\nwhat you find here is the \"mempool of thought.\" these are the episodes currently being researched, debated, and refined. we do not work in isolation. we treat our readers and collaborators as validating nodes. this is the layer of discovery where we invite the network to challenge the signal. the mempool is where we collaborate with domain experts to ensure the fidelity of our research. it is a space of open participation. we believe that for knowledge to be sovereign, it must be hardened by scrutiny before it becomes part of the permanent ledger. \n\nwhen you explore the mempool, you are seeing the research in its most vulnerable and honest state. once these drafts are refined, they move to the block template, but while they are here, they are the living breath of the project. if you are an expert, a researcher, or a seeker who has found a signal we missed, your contribution is the consensus mechanism we rely on. we act as the filter, but the network provides the proof. this is where we build the truth, one unconfirmed transaction at a time.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **catchment rule**: this subtree is the high-entropy zone for raw research and parked episodes.\n- **collaboration**: agents should prioritize expert input and external signals when refining drafts here.\n- **renumbering**: episodes here may be renumbered or renamed as they are not yet 'cast in stone'.\n- **participation**: always maintain the link to the call for participation and github.\n";
     std::fs::write("src/mempool.md", mempool_content)?;
 
-    let archive_content = format!("# Deep Storage (The Immutable Ledger)\n\nEverything here is organized in Deep Storage. This ledger contains our complete, immutable history. You can expand the folders in the sidebar to browse older **Verified Blocks**, or explore the unnumbered **Genesis Concepts** that built the foundation of our current research framework.\n\n### Collaboration & Offline Access\nFor full offline access to the entire history, or to collaborate on research, please clone our GitHub repository:\n\n```bash\ngit clone https://github.com/ashutoshmjain/deepDive.git\n```\n");
-    std::fs::write("src/archive.md", archive_content)?;
-    
-    let current_content = format!("# Current Block\n\nThis block contains the active research episodes, instantly available for offline reading in the Progressive Web App. Once this block reaches 21 episodes, it is mined and moved to Deep Storage.\n");
+    let current_content = "# block template\n\nthe block template is the miner’s canvas. as miners of knowledge, we don't merely aggregate information; we select for signals that deserve to be etched into the chain. \n\nour block space is strictly governed by the law of 21. this 21-episode limit is our proof-of-work—a scarcity that forces us to filter out the noise of the ephemeral and prioritize high-fidelity research. each slot in this template is a precious transaction of truth. \n\nwe are currently mining the next block. as we select finalized episodes from the mempool, they fill the template. once the 21st episode is confirmed, the block is locked and moved to the immutable chain. while in the template, the research is active and volatile, waiting for the consensus of time.\n\nthe template is where the ephemeral becomes historical. as a miner of knowledge, our goal is to ensure that the 21 episodes selected for this block represent the highest possible density of truth. we are not building a library of volume; we are mining a ledger of value. the block template is the tip of the spear, the place where the future of our research is being forged into the permanent record of our past.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **scarcity rule**: the block space is strictly limited to 21 episodes.\n- **mining logic**: once the 21st episode is confirmed, this entire block must be moved to the 'chain' subtree as a numbered block (e.g., block 2).\n- **volatility**: research here is finalizing. minor polish is allowed, but the core thesis should be stable.\n- **exclusivity**: only select high-fidelity signals from the mempool for inclusion in this template.\n";
     std::fs::write("src/current.md", current_content)?;
 
-    std::fs::write("src/github.md", "# Join us on GitHub\n\n[Click here to visit the repository](https://github.com/ashutoshmjain/deepDive)")?;
+    let archive_content = "# chain\n\nthe chain is our commitment to permanence. once a block of 21 episodes is mined, it is moved here to become part of the immutable ledger. \n\neach link in the chain represents a verified epoch of research. we stack these blocks in descending order, creating a vertical record of our shared discovery. here, the volatile signals of the block template become the historical capital of the project.\n\ndescend into the ledger to explore the verified blocks, or go deeper to reach the genesis layer—the non-episodic root of our entire knowledge architecture.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **immutability rule**: episodes in this subtree are 'cast in stone'. zero editing of source content is permitted.\n- **ledger order**: blocks must be maintained in descending numerical order.\n- **summarization only**: agents may create or update block-level summary pages (e.g., block 1 description) but must never touch the underlying episodic transactions.\n- **permanence**: ensure url paths never change to prevent breaking external links.\n";
+    std::fs::write("src/archive.md", archive_content)?;
+
+    let genesis_content = "# genesis\n\ngenesis is the discovery layer that pre-dates the chain. we believe that before one can build a true blockchain of knowledge, there is a bare minimum of thematic understanding required. this is not episodic; it is foundational.\n\nwe characterize genesis through three absolute pillars:\n1. **bitcoin**: the discovery of mathematical scarcity and sovereign value. without understanding the architecture of truth in money, one cannot anchor research in reality.\n2. **intelligence**: the exploration of how we process and compress the universe. this is the \"how\" of our discovery.\n3. **digital credit**: the bridge between trust and code. it is the mechanism through which value flows in a decentralized world.\n\ngenesis is where the internal flavor of our project is expressed. it is the subtle, non-episodic root from which every numbered block grows. you must know the genesis to understand the chain.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **foundational rule**: this subtree contains only non-episodic, thematic research. \n- **no numbers**: episodes in this section do not have block numbers or sequential IDs.\n- **thematic integrity**: maintain the three absolute pillars (bitcoin, intelligence, digital credit) as the root discovery layer.\n- **artistic flavor**: prioritize subtle, deep discovery over high-frequency updates.\n";
+    std::fs::write("src/genesis.md", genesis_content)?;
+
+    std::fs::write("src/github.md", "# join us on github\n\n[Click here to visit the repository](https://github.com/ashutoshmjain/deepDive)")?;
     Ok(())
 }
 
