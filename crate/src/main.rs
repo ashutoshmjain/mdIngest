@@ -180,8 +180,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         final_lines.push(line.to_string());
     }
 
-    final_lines.push("\n# The Mempool (Unconfirmed)".to_string());
-    final_lines.push("- [WIP / Call for Participation](mempool.md)".to_string());
+    final_lines.push("\n- [The Mempool (WIP)](mempool.md)".to_string());
     if wip_parked.is_empty() {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
@@ -191,14 +190,12 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         }
     }
 
-    final_lines.push("\n# Current Block (21 Episodes)".to_string());
     final_lines.push("<!-- RECENT_START -->".to_string());
     final_lines.push("- [Current Block](current.md)".to_string());
     for ep in recents { final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename)); }
     final_lines.push("<!-- RECENT_END -->".to_string());
 
-    final_lines.push("\n# Deep Storage (The Ledger)".to_string());
-    final_lines.push("- [The Archive](archive.md)".to_string());
+    final_lines.push("\n- [Deep Storage (Archive)](archive.md)".to_string());
     if !overflow_numbered.is_empty() {
         final_lines.push("    - [Verified Blocks (Older Episodes)]()".to_string());
         for ep in overflow_numbered {
