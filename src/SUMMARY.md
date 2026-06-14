@@ -1,18 +1,12 @@
 # Summary
 
-[The Ingestion Layer](./cover.md)
+- [deepDive](./cover.md)
 
----
+- [The Mempool (WIP)](mempool.md)
+    - [None at this moment. Join us on GitHub!](github.md)
 
-# The Manual
-
-- [Opinionated Workflow](./workflow.md)
-- [Project Roadmap](./roadmap.md)
-- [Technical API Docs (Rust)](./api/mdbook_ingest/index.html)
-
----
-
-# Recent Articles
+- [Current Block](current.md)
 <!-- RECENT_START -->
-
 <!-- RECENT_END -->
+
+- [Deep Storage (Archive)](archive.md)
