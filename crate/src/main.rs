@@ -192,8 +192,8 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     }
 
     final_lines.push("\n# Current Block (21 Episodes)".to_string());
-    final_lines.push("- [Current Block](current.md)".to_string());
     final_lines.push("<!-- RECENT_START -->".to_string());
+    final_lines.push("- [Current Block](current.md)".to_string());
     for ep in recents { final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename)); }
     final_lines.push("<!-- RECENT_END -->".to_string());
 
