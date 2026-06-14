@@ -206,7 +206,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     }
 
     // 1. Section: The Mempool
-    final_lines.push("\n- [The Mempool (WIP)](mempool.md)".to_string());
+    final_lines.push("\n- [mempool](mempool.md)".to_string());
     if wip_parked.is_empty() {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
@@ -217,8 +217,8 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     }
 
     // 2. Section: Current Block
-    final_lines.push("\n- [Current Block](current.md)".to_string());
-    final_lines.push("<!-- RECENT_START -->".to_string());
+    final_lines.push("\n<!-- RECENT_START -->".to_string());
+    final_lines.push("- [block template](current.md)".to_string());
     if let Some((id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
         eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps {
@@ -228,10 +228,10 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     final_lines.push("<!-- RECENT_END -->".to_string());
 
     // 3. Section: Deep Storage
-    final_lines.push("\n- [Deep Storage (Archive)](archive.md)".to_string());
+    final_lines.push("\n- [chain](archive.md)".to_string());
     for (id, mut eps) in blocks {
         if id == current_block_id { continue; }
-        final_lines.push(format!("    - [Block {}]()", id));
+        final_lines.push(format!("    - [block {}]()", id));
         eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps {
             final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
