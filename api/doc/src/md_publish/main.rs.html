@@ -206,7 +206,7 @@
 <a href=#206 id=206 data-nosnippet>206</a>    }
 <a href=#207 id=207 data-nosnippet>207</a>
 <a href=#208 id=208 data-nosnippet>208</a>    <span class="comment">// 1. Section: The Mempool
-<a href=#209 id=209 data-nosnippet>209</a>    </span>final_lines.push(<span class="string">"\n- [The Mempool (WIP)](mempool.md)"</span>.to_string());
+<a href=#209 id=209 data-nosnippet>209</a>    </span>final_lines.push(<span class="string">"\n- [mempool](mempool.md)"</span>.to_string());
 <a href=#210 id=210 data-nosnippet>210</a>    <span class="kw">if </span>wip_parked.is_empty() {
 <a href=#211 id=211 data-nosnippet>211</a>        final_lines.push(<span class="string">"    - [None at this moment. Join us on GitHub!](github.md)"</span>.to_string());
 <a href=#212 id=212 data-nosnippet>212</a>    } <span class="kw">else </span>{
@@ -217,8 +217,8 @@
 <a href=#217 id=217 data-nosnippet>217</a>    }
 <a href=#218 id=218 data-nosnippet>218</a>
 <a href=#219 id=219 data-nosnippet>219</a>    <span class="comment">// 2. Section: Current Block
-<a href=#220 id=220 data-nosnippet>220</a>    </span>final_lines.push(<span class="string">"\n- [Current Block](current.md)"</span>.to_string());
-<a href=#221 id=221 data-nosnippet>221</a>    final_lines.push(<span class="string">"&lt;!-- RECENT_START --&gt;"</span>.to_string());
+<a href=#220 id=220 data-nosnippet>220</a>    </span>final_lines.push(<span class="string">"\n&lt;!-- RECENT_START --&gt;"</span>.to_string());
+<a href=#221 id=221 data-nosnippet>221</a>    final_lines.push(<span class="string">"- [block template](current.md)"</span>.to_string());
 <a href=#222 id=222 data-nosnippet>222</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>((id, eps)) = blocks.iter_mut().find(|(id, <span class="kw">_</span>)| <span class="kw-2">*</span>id == current_block_id) {
 <a href=#223 id=223 data-nosnippet>223</a>        eps.sort_by(|a, b| b.number.unwrap().cmp(<span class="kw-2">&amp;</span>a.number.unwrap()));
 <a href=#224 id=224 data-nosnippet>224</a>        <span class="kw">for </span>ep <span class="kw">in </span>eps {
@@ -228,10 +228,10 @@
 <a href=#228 id=228 data-nosnippet>228</a>    final_lines.push(<span class="string">"&lt;!-- RECENT_END --&gt;"</span>.to_string());
 <a href=#229 id=229 data-nosnippet>229</a>
 <a href=#230 id=230 data-nosnippet>230</a>    <span class="comment">// 3. Section: Deep Storage
-<a href=#231 id=231 data-nosnippet>231</a>    </span>final_lines.push(<span class="string">"\n- [Deep Storage (Archive)](archive.md)"</span>.to_string());
+<a href=#231 id=231 data-nosnippet>231</a>    </span>final_lines.push(<span class="string">"\n- [chain](archive.md)"</span>.to_string());
 <a href=#232 id=232 data-nosnippet>232</a>    <span class="kw">for </span>(id, <span class="kw-2">mut </span>eps) <span class="kw">in </span>blocks {
 <a href=#233 id=233 data-nosnippet>233</a>        <span class="kw">if </span>id == current_block_id { <span class="kw">continue</span>; }
-<a href=#234 id=234 data-nosnippet>234</a>        final_lines.push(<span class="macro">format!</span>(<span class="string">"    - [Block {}]()"</span>, id));
+<a href=#234 id=234 data-nosnippet>234</a>        final_lines.push(<span class="macro">format!</span>(<span class="string">"    - [block {}]()"</span>, id));
 <a href=#235 id=235 data-nosnippet>235</a>        eps.sort_by(|a, b| b.number.unwrap().cmp(<span class="kw-2">&amp;</span>a.number.unwrap()));
 <a href=#236 id=236 data-nosnippet>236</a>        <span class="kw">for </span>ep <span class="kw">in </span>eps {
 <a href=#237 id=237 data-nosnippet>237</a>            final_lines.push(<span class="macro">format!</span>(<span class="string">"        - [{} : {}]({}.md)"</span>, ep.number.unwrap(), ep.title, ep.filename));
