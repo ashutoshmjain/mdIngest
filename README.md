@@ -77,27 +77,24 @@ Once the research is complete, use the **Master Packaging Prompt** (see below) t
 
 ---
 
-## The Three-Pillar Taxonomy & Parking System
+## The Blockchain of Knowledge Taxonomy
 
-As a research publication scales, managing the visual taxonomy and PWA health becomes critical. `md-publish` automatically enforces a "Three-Pillar" structural taxonomy within `SUMMARY.md` while guaranteeing absolute **URL Permanence** (zero broken external links).
+As a research publication scales, managing the visual taxonomy and PWA health becomes critical. `md-publish` automatically enforces a **"Blockchain of Knowledge"** structural taxonomy within `SUMMARY.md` while guaranteeing absolute **URL Permanence**.
 
-### The Three Pillars
+### The Three Structural Layers
 
-1.  **# Recent (The Active Flow)**
-    *   Contains the **21 most recent** numbered episodes (e.g., `242.md`, `241.md`), symbolizing Bitcoin's 21M scarcity.
-    *   These are the primary active files cached by the Progressive Web App (PWA) for immediate offline reading.
-2.  **# Archive (The Heritage)**
-    *   Older numbered episodes and all unnumbered "thematic" research are removed from the sidebar to keep the navigation lean.
-    *   They are dynamically cataloged in an auto-generated `src/archive.md` directory.
-    *   **PWA Health Strategy:** To prevent the offline PWA cache from bloating to hundreds of megabytes, items in the Archive link *directly* to the raw source files on your GitHub repository. They are strictly "Online Only."
-3.  **# WIP / Parked (Call for Collaboration)**
-    *   Drafts or incomplete episodes can be "parked." They are removed from the active `Recent` list and placed in a dedicated `src/parked.md` directory.
-    *   Parked files use a leading underscore (e.g., `_243.md`).
-    *   Like the Archive, Parked files link to GitHub, acting as an open call for community participation and review.
+1.  **# mempool (The Catchment)**
+    *   The high-entropy zone for raw research and parked episodes. 
+    *   Episodes here are prefixed with an underscore (e.g., `_242.md`) and are considered volatile drafts awaiting validation.
+2.  **# block template (Active Mining)**
+    *   The active mining space for finalized research. 
+    *   Each block is strictly governed by the **Law of 21**; once the 21st episode is confirmed, the block is locked and moved to the immutable chain.
+3.  **# chain (The Ledger)**
+    *   The commitment to permanence. Each link represents a verified epoch of research (e.g., **block 1**), stacked in descending order.
+    *   **genesis:** The non-episodic discovery layer anchoring the chain through six absolute pillars.
 
 ### Immutability & "Cast in Stone"
-To protect URL integrity (e.g., existing links on YouTube or Spotify), an episode is considered **"Cast in Stone"** (locked) if an associated infographic video exists in the `src/vid/` directory.
-- Locked episodes **cannot** be parked or renumbered.
+To protect URL integrity, an episode is considered **"Cast in Stone"** if an associated infographic video exists in the `src/vid/` directory. Locked episodes cannot be parked or renumbered.
 - Only "draft" episodes (without videos) can transition into the Parked state.
 
 
