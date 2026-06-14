@@ -10,6 +10,7 @@ use glob::glob;
 use std::path::PathBuf;
 use std::process::Command;
 use serde::{Deserialize};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Deserialize)]
 struct IngestConfig {
@@ -26,6 +27,7 @@ struct IngestConfig {
 
 #[derive(Debug, Deserialize)]
 struct BookConfig {
+    wip_threshold: Option<u32>, // The episode number that ends Block 1
     preprocessor: Option<PreprocessorConfig>,
 }
 
@@ -48,7 +50,7 @@ fn main() -> Result<()> {
     if args.len() > 1 && args[1] == "doctor" { return run_doctor(); }
 
     let config_content = std::fs::read_to_string("book.toml").unwrap_or_default();
-    let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { preprocessor: None });
+    let book_config: BookConfig = toml::from_str(&config_content).unwrap_or(BookConfig { wip_threshold: Some(240), preprocessor: None });
     let ingest_config = book_config.preprocessor.and_then(|p| p.ingest).unwrap_or(IngestConfig {
         downloads_path: Some("/mnt/c/Users/ashut/Downloads".to_string()),
         text_source: None,
@@ -141,9 +143,14 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
 
 fn update_summary(config: &IngestConfig) -> Result<()> {
     let summary_path = "src/SUMMARY.md";
-    let window_size = config.recent_window_size.unwrap_or(21);
+    
+    // Pivot and Block Size logic
+    let pivot = 220;
+    let block_size = 21;
     
     let mut all_files = Vec::new();
+    let mut wip_parked = Vec::new();
+    
     let pattern = "src/*.md";
     for entry in glob(pattern)? {
         if let Ok(path) = entry {
@@ -157,56 +164,85 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
             } else { "Untitled".to_string() };
             let mtime = std::fs::metadata(&path)?.modified()?;
             let number = base.parse::<u32>().ok();
-            all_files.push(EpisodeEntry { number, filename: base.to_string(), title, mtime });
+            
+            if filename.starts_with('_') {
+                wip_parked.push(EpisodeEntry { number: base.trim_start_matches('_').parse().ok(), filename: base.to_string(), title, mtime });
+            } else {
+                all_files.push(EpisodeEntry { number, filename: base.to_string(), title, mtime });
+            }
         }
     }
 
-    let mut numbered_active: Vec<_> = all_files.iter().filter(|e| e.number.is_some() && !e.filename.starts_with("_")).cloned().collect();
-    let mut wip_parked: Vec<_> = all_files.iter().filter(|e| e.filename.starts_with("_")).cloned().collect();
-
-    numbered_active.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
+    // Sort WIP
     wip_parked.sort_by(|a, b| b.mtime.cmp(&a.mtime));
 
-    let recents: Vec<_> = numbered_active.iter().take(window_size).collect();
-    let overflow_numbered: Vec<_> = numbered_active.iter().skip(window_size).cloned().collect();
+    // Calculate Blocks
+    // Current Block = Max Block ID
+    // All others = Deep Storage
+    let mut block_map: BTreeMap<i32, Vec<EpisodeEntry>> = BTreeMap::new();
+    let mut thematic_episodes = Vec::new();
 
-    eprintln!("𓄊 Indexer: {} Recents, {} WIP", recents.len(), wip_parked.len());
-    
+    for ep in all_files {
+        if let Some(num) = ep.number {
+            let block_id = ((num as i32 - pivot) / block_size) + 1;
+            block_map.entry(block_id).or_insert_with(Vec::new).push(ep);
+        } else {
+            thematic_episodes.push(ep);
+        }
+    }
+
+    let current_block_id = block_map.keys().last().cloned().unwrap_or(2);
+    let mut blocks: Vec<_> = block_map.into_iter().collect();
+    blocks.sort_by(|a, b| b.0.cmp(&a.0));
+
+    eprintln!("𓄊 Indexer: Current Block ID: {}, Blocks found: {}", current_block_id, blocks.len());
+
     let original_content = std::fs::read_to_string(summary_path)?;
     let mut final_lines = Vec::new();
     
     for line in original_content.lines() {
-        if line.contains("# The Mempool") || line.contains("- [The Mempool") || line.contains("# Recent") || line.contains("# Current Block") || line.contains("- [Current Block") || line.contains("<!-- RECENT_START -->") { break; }
+        if line.contains("- [The Mempool") || line.contains("- [Current Block") || line.contains("- [Deep Storage") || line.contains("<!-- RECENT_START -->") { break; }
         final_lines.push(line.to_string());
     }
 
+    // 1. Section: The Mempool
     final_lines.push("\n- [The Mempool (WIP)](mempool.md)".to_string());
     if wip_parked.is_empty() {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
         for ep in wip_parked {
-            let display_num = ep.filename.trim_start_matches('_');
+            let display_num = ep.number.map(|n| n.to_string()).unwrap_or_else(|| ep.filename.clone());
             final_lines.push(format!("    - [{} : {}]({}.md)", display_num, ep.title, ep.filename));
         }
     }
 
+    // 2. Section: Current Block
+    final_lines.push("\n- [Current Block](current.md)".to_string());
     final_lines.push("<!-- RECENT_START -->".to_string());
-    final_lines.push("- [Current Block](current.md)".to_string());
-    for ep in recents { final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename)); }
+    if let Some((id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
+        eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
+        for ep in eps {
+            final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
+        }
+    }
     final_lines.push("<!-- RECENT_END -->".to_string());
 
+    // 3. Section: Deep Storage
     final_lines.push("\n- [Deep Storage (Archive)](archive.md)".to_string());
-    if !overflow_numbered.is_empty() {
-        final_lines.push("    - [Verified Blocks (Older Episodes)]()".to_string());
-        for ep in overflow_numbered {
+    for (id, mut eps) in blocks {
+        if id == current_block_id { continue; }
+        final_lines.push(format!("    - [Block {}]()", id));
+        eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
+        for ep in eps {
             final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
         }
     }
 
+    // 4. Append Thematic Heritage
     let mut in_thematic_zone = false;
     let mut thematic_buffer = Vec::new();
     let num_regex = regex::Regex::new(r"\d+\.md").unwrap();
-    let skip_strings = ["# WIP", "# Archive", "# Repository", "parked.md", "mempool.md", "Deep Storage", "The Network", "Verified Blocks", "Older Episodes", "github.md", "# Recent Blocks", "# The Mempool", "- [The Mempool", "Current Block", "current.md", "- [The Archive](archive.md)", "- [Deep Storage (Archive)](archive.md)", "- [WIP / Call for Participation](mempool.md)"];
+    let skip_strings = ["# WIP", "# Archive", "# Repository", "parked.md", "mempool.md", "Deep Storage", "The Network", "Verified Blocks", "Older Episodes", "github.md", "# Recent Blocks", "# The Mempool", "- [The Mempool", "Current Block", "current.md", "- [The Archive", "Block ", "- [Deep Storage"];
     
     for line in original_content.lines() {
         if line.contains("<!-- RECENT_END -->") { in_thematic_zone = true; continue; }
@@ -218,6 +254,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
             if skip { continue; }
             if num_regex.is_match(line) { continue; }
             
+            // Normalize indentation
             let mut mod_line = line.to_string();
             if mod_line.starts_with("  - [") && !mod_line.starts_with("    - [") {
                 mod_line = mod_line.replacen("  - [", "    - [", 1);
@@ -233,13 +270,14 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     final_lines.extend(thematic_buffer);
     std::fs::write(summary_path, final_lines.join("\n"))?;
     
+    // Create core pages
     let mempool_content = format!("# The Mempool (Unconfirmed Research)\n\nIn a blockchain, the mempool is where transactions wait to be verified. Here, the Mempool contains our raw, unconfirmed ideas. These episodes are currently being researched, debated, and refined. We invite you to act as a validating node—review the research on our GitHub and email your consensus or objections to amj@shutri.com before we mine the next block.\n\n### Offline Access & Contribution\nTo work on these episodes locally, clone the repository:\n\n```bash\ngit clone https://github.com/ashutoshmjain/deepDive.git\n```\n");
     std::fs::write("src/mempool.md", mempool_content)?;
 
-    let archive_content = format!("# Deep Storage (The Immutable Ledger)\n\nWhile our Progressive Web App seamlessly synchronizes this entire repository for full offline access, the sheer volume of our research can become overwhelming to navigate daily.\n\nTo keep your reading interface clean and focused, the main sidebar only displays the 'Current Block'—our 21 most recently mined blocks.\n\nEverything else is organized here in Deep Storage. This ledger contains our complete, immutable history. You can expand the folders in the sidebar to browse older **Verified Blocks**, or explore the unnumbered **Genesis Concepts** that built the foundation of our current research framework.\n\n### Collaboration & Offline Access\nFor full offline access to the entire history, or to collaborate on research, please clone our GitHub repository:\n\n```bash\ngit clone https://github.com/ashutoshmjain/deepDive.git\n```\n");
+    let archive_content = format!("# Deep Storage (The Immutable Ledger)\n\nEverything here is organized in Deep Storage. This ledger contains our complete, immutable history. You can expand the folders in the sidebar to browse older **Verified Blocks**, or explore the unnumbered **Genesis Concepts** that built the foundation of our current research framework.\n\n### Collaboration & Offline Access\nFor full offline access to the entire history, or to collaborate on research, please clone our GitHub repository:\n\n```bash\ngit clone https://github.com/ashutoshmjain/deepDive.git\n```\n");
     std::fs::write("src/archive.md", archive_content)?;
     
-    let current_content = format!("# Current Block (21 Episodes)\n\nThis block contains the 21 most recently mined episodes, instantly available for offline reading in the Progressive Web App.\n");
+    let current_content = format!("# Current Block\n\nThis block contains the active research episodes, instantly available for offline reading in the Progressive Web App. Once this block reaches 21 episodes, it is mined and moved to Deep Storage.\n");
     std::fs::write("src/current.md", current_content)?;
 
     std::fs::write("src/github.md", "# Join us on GitHub\n\n[Click here to visit the repository](https://github.com/ashutoshmjain/deepDive)")?;
