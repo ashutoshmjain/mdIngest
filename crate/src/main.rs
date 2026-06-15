@@ -148,7 +148,6 @@ fn update_summary(_config: &IngestConfig) -> Result<()> {
     let mut all_files = Vec::new();
     let mut wip_parked = Vec::new();
     
-    let concept_files = ["bitcoin", "intelligence", "digital credit", "capital", "physics", "culture"];
     let skip_files = ["SUMMARY.md", "cover.md", "chain.md", "parked.md", "vault.md", "mempool.md", "github.md", "template.md", "genesis.md", "block1.md", "block2.md", "block3.md", "bitcoin.md", "intelligence.md", "digital credit.md", "capital.md", "physics.md", "culture.md"];
 
     let pattern = "src/*.md";
@@ -240,55 +239,29 @@ fn update_summary(_config: &IngestConfig) -> Result<()> {
         }
     }
 
-    // 4. genesis
-    final_lines.push("    - [genesis](genesis.md)".to_string());
+    // 4. block 0 (genesis)
+    final_lines.push("    - [block 0](genesis.md)".to_string());
     
     let mut in_thematic_zone = false;
-    let mut thematic_buffer = Vec::new();
-    let num_regex = regex::Regex::new(r"\d+\.md").unwrap();
-    let skip_strings = ["wip", "archive", "repository", "parked.md", "mempool.md", "deep storage", "network", "verified blocks", "older episodes", "github.md", "recent blocks", "mempool", "current block", "block template", "current.md", "genesis", "chain", "block1.md", "block2.md", "block3.md", "bitcoin.md", "intelligence.md", "digital credit.md", "capital.md", "physics.md", "culture.md"];
-    
     for line in original_content.lines() {
-        if line.to_lowercase().contains("220 : ai made me a believer") { in_thematic_zone = true; continue; }
+        let l = line.to_lowercase();
+        // The marker for the end of episodic content is "220 : AI Made Me a Believer"
+        if l.contains("220 : ai made me a believer") { in_thematic_zone = true; continue; }
+        
         if in_thematic_zone {
-            let l = line.to_lowercase();
-            let mut skip = false;
-            for s in &skip_strings {
-                if l.contains(s) && (l.contains("[]") || l.contains("()") || l.contains(".md")) { 
-                    skip = true; 
-                    break; 
-                }
-            }
-            if skip { continue; }
-            if num_regex.is_match(line) { continue; }
+            // Stop if we hit a generated header we want to skip (just in case)
+            if l.contains("- [mempool") || l.contains("- [template") || l.contains("- [chain") { continue; }
             
-            let mut mod_line = line.to_string();
-            let trimmed = mod_line.trim();
-            if trimmed.starts_with("- [") {
-                if trimmed.contains("()") || trimmed.contains("[]") {
-                    mod_line = format!("        {}", trimmed);
-                } else {
-                    mod_line = format!("            {}", trimmed);
-                }
+            // Skip the block 0 / genesis labels to prevent duplication
+            if l.contains("- [block 0](genesis.md)") || l.contains("- [genesis](genesis.md)") { continue; }
+
+            // Only push if it's not empty and not the marker line
+            if !line.trim().is_empty() {
+                final_lines.push(line.to_string());
             }
-
-            if thematic_buffer.is_empty() && mod_line.trim().is_empty() { continue; }
-            thematic_buffer.push(mod_line);
-        }
-    }
-    
-    if thematic_buffer.is_empty() {
-        for c in &concept_files {
-            let link = if std::path::Path::new(&format!("src/{}.md", c)).exists() {
-                format!("{}.md", c)
-            } else {
-                String::new()
-            };
-            thematic_buffer.push(format!("        - [{}]({})", c, link));
         }
     }
 
-    final_lines.extend(thematic_buffer);
     std::fs::write(summary_path, final_lines.join("\n"))?;
     
     let mempool_content = "# mempool\n\nthe title \"mempool\" is a deliberate choice from the architecture of decentralized systems. it represents the space where transactions wait for verification—a high-entropy zone of pure potential. in our context, the mempool is the catchment of all active research. it is where we catch the signals of the world before they are filtered and mined into history. we inhabit this space to acknowledge that discovery is a process of refinement, not a sudden event. here, ideas are raw. they are the unconfirmed drafts that have been pulled from the digital noise, awaiting the validation of our network of experts. \n\nwhat you find here is the \"mempool of thought.\" these are the episodes currently being researched, debated, and refined. we do not work in isolation. we treat our readers and collaborators as validating nodes. this is the layer of discovery where we invite the network to challenge the signal. the mempool is where we collaborate with domain experts to ensure the fidelity of our research. it is a space of open participation. we believe that for knowledge to be sovereign, it must be hardened by scrutiny before it becomes part of the permanent ledger. \n\nwhen you explore the mempool, you are seeing the research in its most vulnerable and honest state. once these drafts are refined, they move to the template, but while they are here, they are the living breath of the project. if you are an expert, a researcher, or a seeker who has found a signal we missed, your contribution is the consensus mechanism we rely on. we act as the filter, but the network provides the proof. this is where we build the truth, one unconfirmed transaction at a time.\n\n---\n\n```text\n### instructions to ai agents for managing this sub tree\n\n- **catchment rule**: this subtree is the high-entropy zone for raw research and parked episodes.\n- **collaboration**: agents should prioritize expert input and external signals when refining drafts here.\n- **renumbering**: episodes here may be renumbered or renamed as they are not yet 'cast in stone'.\n- **participation**: always maintain the link to the call for participation and github.\n- **indentation**: mempool node is at 0 spaces; unnumbered drafts are at 4 spaces.\n```\n";
