@@ -149,7 +149,7 @@
 <a href=#149 id=149 data-nosnippet>149</a>    <span class="kw">let </span><span class="kw-2">mut </span>wip_parked = Vec::new();
 <a href=#150 id=150 data-nosnippet>150</a>    
 <a href=#151 id=151 data-nosnippet>151</a>    <span class="kw">let </span>concept_files = [<span class="string">"bitcoin"</span>, <span class="string">"intelligence"</span>, <span class="string">"digital credit"</span>, <span class="string">"capital"</span>, <span class="string">"physics"</span>, <span class="string">"culture"</span>];
-<a href=#152 id=152 data-nosnippet>152</a>    <span class="kw">let </span>skip_files = [<span class="string">"SUMMARY.md"</span>, <span class="string">"cover.md"</span>, <span class="string">"archive.md"</span>, <span class="string">"parked.md"</span>, <span class="string">"vault.md"</span>, <span class="string">"mempool.md"</span>, <span class="string">"github.md"</span>, <span class="string">"current.md"</span>, <span class="string">"genesis.md"</span>, <span class="string">"block1.md"</span>, <span class="string">"block2.md"</span>, <span class="string">"block3.md"</span>, <span class="string">"bitcoin.md"</span>, <span class="string">"intelligence.md"</span>, <span class="string">"digital credit.md"</span>, <span class="string">"capital.md"</span>, <span class="string">"physics.md"</span>, <span class="string">"culture.md"</span>];
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="kw">let </span>skip_files = [<span class="string">"SUMMARY.md"</span>, <span class="string">"cover.md"</span>, <span class="string">"chain.md"</span>, <span class="string">"parked.md"</span>, <span class="string">"vault.md"</span>, <span class="string">"mempool.md"</span>, <span class="string">"github.md"</span>, <span class="string">"template.md"</span>, <span class="string">"genesis.md"</span>, <span class="string">"block1.md"</span>, <span class="string">"block2.md"</span>, <span class="string">"block3.md"</span>, <span class="string">"bitcoin.md"</span>, <span class="string">"intelligence.md"</span>, <span class="string">"digital credit.md"</span>, <span class="string">"capital.md"</span>, <span class="string">"physics.md"</span>, <span class="string">"culture.md"</span>];
 <a href=#153 id=153 data-nosnippet>153</a>
 <a href=#154 id=154 data-nosnippet>154</a>    <span class="kw">let </span>pattern = <span class="string">"src/*.md"</span>;
 <a href=#155 id=155 data-nosnippet>155</a>    <span class="kw">for </span>entry <span class="kw">in </span>glob(pattern)<span class="question-mark">? </span>{
@@ -194,7 +194,7 @@
 <a href=#194 id=194 data-nosnippet>194</a>    
 <a href=#195 id=195 data-nosnippet>195</a>    <span class="kw">for </span>line <span class="kw">in </span>original_content.lines() {
 <a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">let </span>l = line.to_lowercase();
-<a href=#197 id=197 data-nosnippet>197</a>        <span class="kw">if </span>l.contains(<span class="string">"- [mempool"</span>) || l.contains(<span class="string">"- [block template"</span>) || l.contains(<span class="string">"- [chain"</span>) { <span class="kw">break</span>; }
+<a href=#197 id=197 data-nosnippet>197</a>        <span class="kw">if </span>l.contains(<span class="string">"- [mempool"</span>) || l.contains(<span class="string">"- [template"</span>) || l.contains(<span class="string">"- [chain"</span>) { <span class="kw">break</span>; }
 <a href=#198 id=198 data-nosnippet>198</a>        final_lines.push(line.to_string());
 <a href=#199 id=199 data-nosnippet>199</a>    }
 <a href=#200 id=200 data-nosnippet>200</a>
@@ -210,9 +210,9 @@
 <a href=#210 id=210 data-nosnippet>210</a>        }
 <a href=#211 id=211 data-nosnippet>211</a>    }
 <a href=#212 id=212 data-nosnippet>212</a>
-<a href=#213 id=213 data-nosnippet>213</a>    <span class="comment">// 2. block template
+<a href=#213 id=213 data-nosnippet>213</a>    <span class="comment">// 2. template
 <a href=#214 id=214 data-nosnippet>214</a>    </span>final_lines.push(<span class="string">""</span>.to_string());
-<a href=#215 id=215 data-nosnippet>215</a>    final_lines.push(<span class="string">"- [block template](current.md)"</span>.to_string());
+<a href=#215 id=215 data-nosnippet>215</a>    final_lines.push(<span class="string">"- [template](template.md)"</span>.to_string());
 <a href=#216 id=216 data-nosnippet>216</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>((_id, eps)) = blocks.iter_mut().find(|(id, <span class="kw">_</span>)| <span class="kw-2">*</span>id == current_block_id) {
 <a href=#217 id=217 data-nosnippet>217</a>        eps.sort_by(|a, b| b.number.unwrap().cmp(<span class="kw-2">&amp;</span>a.number.unwrap()));
 <a href=#218 id=218 data-nosnippet>218</a>        <span class="kw">for </span>ep <span class="kw">in </span>eps {
@@ -222,7 +222,7 @@
 <a href=#222 id=222 data-nosnippet>222</a>
 <a href=#223 id=223 data-nosnippet>223</a>    <span class="comment">// 3. chain
 <a href=#224 id=224 data-nosnippet>224</a>    </span>final_lines.push(<span class="string">""</span>.to_string());
-<a href=#225 id=225 data-nosnippet>225</a>    final_lines.push(<span class="string">"- [chain](archive.md)"</span>.to_string());
+<a href=#225 id=225 data-nosnippet>225</a>    final_lines.push(<span class="string">"- [chain](chain.md)"</span>.to_string());
 <a href=#226 id=226 data-nosnippet>226</a>    <span class="kw">for </span>(id, eps) <span class="kw">in </span><span class="kw-2">&amp;</span>blocks {
 <a href=#227 id=227 data-nosnippet>227</a>        <span class="kw">if </span><span class="kw-2">*</span>id == current_block_id { <span class="kw">continue</span>; }
 <a href=#228 id=228 data-nosnippet>228</a>        
@@ -249,141 +249,132 @@
 <a href=#249 id=249 data-nosnippet>249</a>    <span class="kw">let </span>num_regex = regex::Regex::new(<span class="string">r"\d+\.md"</span>).unwrap();
 <a href=#250 id=250 data-nosnippet>250</a>    <span class="kw">let </span>skip_strings = [<span class="string">"wip"</span>, <span class="string">"archive"</span>, <span class="string">"repository"</span>, <span class="string">"parked.md"</span>, <span class="string">"mempool.md"</span>, <span class="string">"deep storage"</span>, <span class="string">"network"</span>, <span class="string">"verified blocks"</span>, <span class="string">"older episodes"</span>, <span class="string">"github.md"</span>, <span class="string">"recent blocks"</span>, <span class="string">"mempool"</span>, <span class="string">"current block"</span>, <span class="string">"block template"</span>, <span class="string">"current.md"</span>, <span class="string">"genesis"</span>, <span class="string">"chain"</span>, <span class="string">"block1.md"</span>, <span class="string">"block2.md"</span>, <span class="string">"block3.md"</span>, <span class="string">"bitcoin.md"</span>, <span class="string">"intelligence.md"</span>, <span class="string">"digital credit.md"</span>, <span class="string">"capital.md"</span>, <span class="string">"physics.md"</span>, <span class="string">"culture.md"</span>];
 <a href=#251 id=251 data-nosnippet>251</a>    
-<a href=#252 id=252 data-nosnippet>252</a>    <span class="comment">// Recovery Logic: We strictly look for the line AFTER the last episodic entry.
-<a href=#253 id=253 data-nosnippet>253</a>    // The episodic entries end with "220 : AI Made Me a Believer".
-<a href=#254 id=254 data-nosnippet>254</a>    </span><span class="kw">for </span>line <span class="kw">in </span>original_content.lines() {
-<a href=#255 id=255 data-nosnippet>255</a>        <span class="kw">if </span>line.to_lowercase().contains(<span class="string">"220 : ai made me a believer"</span>) { in_thematic_zone = <span class="bool-val">true</span>; <span class="kw">continue</span>; }
-<a href=#256 id=256 data-nosnippet>256</a>        <span class="kw">if </span>in_thematic_zone {
-<a href=#257 id=257 data-nosnippet>257</a>            <span class="kw">let </span>l = line.to_lowercase();
-<a href=#258 id=258 data-nosnippet>258</a>            <span class="comment">// Skip headers we already generated or meta files
-<a href=#259 id=259 data-nosnippet>259</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>skip = <span class="bool-val">false</span>;
-<a href=#260 id=260 data-nosnippet>260</a>            <span class="kw">for </span>s <span class="kw">in </span><span class="kw-2">&amp;</span>skip_strings {
-<a href=#261 id=261 data-nosnippet>261</a>                <span class="kw">if </span>l.contains(s) &amp;&amp; (l.contains(<span class="string">"[]"</span>) || l.contains(<span class="string">"()"</span>) || l.contains(<span class="string">".md"</span>)) { 
-<a href=#262 id=262 data-nosnippet>262</a>                    <span class="comment">// This is likely a generated node, but we should be careful.
-<a href=#263 id=263 data-nosnippet>263</a>                    // If it's a concept summary like bitcoin.md, we will re-generate it to ensure link integrity.
-<a href=#264 id=264 data-nosnippet>264</a>                    </span>skip = <span class="bool-val">true</span>; 
-<a href=#265 id=265 data-nosnippet>265</a>                    <span class="kw">break</span>; 
-<a href=#266 id=266 data-nosnippet>266</a>                }
-<a href=#267 id=267 data-nosnippet>267</a>            }
-<a href=#268 id=268 data-nosnippet>268</a>            <span class="kw">if </span>skip { <span class="kw">continue</span>; }
-<a href=#269 id=269 data-nosnippet>269</a>            <span class="kw">if </span>num_regex.is_match(line) { <span class="kw">continue</span>; }
-<a href=#270 id=270 data-nosnippet>270</a>            
-<a href=#271 id=271 data-nosnippet>271</a>            <span class="kw">let </span><span class="kw-2">mut </span>mod_line = line.to_string();
-<a href=#272 id=272 data-nosnippet>272</a>            <span class="kw">let </span>trimmed = mod_line.trim();
-<a href=#273 id=273 data-nosnippet>273</a>            <span class="kw">if </span>trimmed.starts_with(<span class="string">"- ["</span>) {
-<a href=#274 id=274 data-nosnippet>274</a>                <span class="comment">// If it's just a folder link without an md file, it's a thematic category header.
-<a href=#275 id=275 data-nosnippet>275</a>                </span><span class="kw">if </span>trimmed.contains(<span class="string">"()"</span>) || trimmed.contains(<span class="string">"[]"</span>) {
-<a href=#276 id=276 data-nosnippet>276</a>                    mod_line = <span class="macro">format!</span>(<span class="string">"    {}"</span>, trimmed);
-<a href=#277 id=277 data-nosnippet>277</a>                } <span class="kw">else </span>{
-<a href=#278 id=278 data-nosnippet>278</a>                    <span class="comment">// It's a thematic article.
-<a href=#279 id=279 data-nosnippet>279</a>                    </span>mod_line = <span class="macro">format!</span>(<span class="string">"        {}"</span>, trimmed);
-<a href=#280 id=280 data-nosnippet>280</a>                }
-<a href=#281 id=281 data-nosnippet>281</a>            }
-<a href=#282 id=282 data-nosnippet>282</a>
-<a href=#283 id=283 data-nosnippet>283</a>            <span class="kw">if </span>thematic_buffer.is_empty() &amp;&amp; mod_line.trim().is_empty() { <span class="kw">continue</span>; }
-<a href=#284 id=284 data-nosnippet>284</a>            thematic_buffer.push(mod_line);
-<a href=#285 id=285 data-nosnippet>285</a>        }
-<a href=#286 id=286 data-nosnippet>286</a>    }
-<a href=#287 id=287 data-nosnippet>287</a>    
-<a href=#288 id=288 data-nosnippet>288</a>    <span class="comment">// Seed the foundational structure if recovery failed
-<a href=#289 id=289 data-nosnippet>289</a>    </span><span class="kw">if </span>thematic_buffer.is_empty() {
-<a href=#290 id=290 data-nosnippet>290</a>        <span class="kw">for </span>c <span class="kw">in </span><span class="kw-2">&amp;</span>concept_files {
-<a href=#291 id=291 data-nosnippet>291</a>            <span class="kw">let </span>link = <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, c)).exists() {
-<a href=#292 id=292 data-nosnippet>292</a>                <span class="macro">format!</span>(<span class="string">"{}.md"</span>, c)
-<a href=#293 id=293 data-nosnippet>293</a>            } <span class="kw">else </span>{
-<a href=#294 id=294 data-nosnippet>294</a>                String::new()
-<a href=#295 id=295 data-nosnippet>295</a>            };
-<a href=#296 id=296 data-nosnippet>296</a>            thematic_buffer.push(<span class="macro">format!</span>(<span class="string">"    - [{}]({})"</span>, c, link));
-<a href=#297 id=297 data-nosnippet>297</a>        }
-<a href=#298 id=298 data-nosnippet>298</a>    }
-<a href=#299 id=299 data-nosnippet>299</a>
-<a href=#300 id=300 data-nosnippet>300</a>    final_lines.extend(thematic_buffer);
-<a href=#301 id=301 data-nosnippet>301</a>    std::fs::write(summary_path, final_lines.join(<span class="string">"\n"</span>))<span class="question-mark">?</span>;
-<a href=#302 id=302 data-nosnippet>302</a>    
-<a href=#303 id=303 data-nosnippet>303</a>    <span class="comment">// Write narratives
-<a href=#304 id=304 data-nosnippet>304</a>    </span><span class="kw">let </span>mempool_content = <span class="string">"# mempool\n\nthe title \"mempool\" is a deliberate choice from the architecture of decentralized systems. it represents the space where transactions wait for verification—a high-entropy zone of pure potential. in our context, the mempool is the catchment of all active research. it is where we catch the signals of the world before they are filtered and mined into history. we inhabit this space to acknowledge that discovery is a process of refinement, not a sudden event. here, ideas are raw. they are the unconfirmed drafts that have been pulled from the digital noise, awaiting the validation of our network of experts. \n\nwhat you find here is the \"mempool of thought.\" these are the episodes currently being researched, debated, and refined. we do not work in isolation. we treat our readers and collaborators as validating nodes. this is the layer of discovery where we invite the network to challenge the signal. the mempool is where we collaborate with domain experts to ensure the fidelity of our research. it is a space of open participation. we believe that for knowledge to be sovereign, it must be hardened by scrutiny before it becomes part of the permanent ledger. \n\nwhen you explore the mempool, you are seeing the research in its most vulnerable and honest state. once these drafts are refined, they move to the block template, but while they are here, they are the living breath of the project. if you are an expert, a researcher, or a seeker who has found a signal we missed, your contribution is the consensus mechanism we rely on. we act as the filter, but the network provides the proof. this is where we build the truth, one unconfirmed transaction at a time.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **catchment rule**: this subtree is the high-entropy zone for raw research and parked episodes.\n- **collaboration**: agents should prioritize expert input and external signals when refining drafts here.\n- **renumbering**: episodes here may be renumbered or renamed as they are not yet 'cast in stone'.\n- **participation**: always maintain the link to the call for participation and github.\n"</span>;
-<a href=#305 id=305 data-nosnippet>305</a>    std::fs::write(<span class="string">"src/mempool.md"</span>, mempool_content)<span class="question-mark">?</span>;
+<a href=#252 id=252 data-nosnippet>252</a>    <span class="kw">for </span>line <span class="kw">in </span>original_content.lines() {
+<a href=#253 id=253 data-nosnippet>253</a>        <span class="kw">if </span>line.to_lowercase().contains(<span class="string">"220 : ai made me a believer"</span>) { in_thematic_zone = <span class="bool-val">true</span>; <span class="kw">continue</span>; }
+<a href=#254 id=254 data-nosnippet>254</a>        <span class="kw">if </span>in_thematic_zone {
+<a href=#255 id=255 data-nosnippet>255</a>            <span class="kw">let </span>l = line.to_lowercase();
+<a href=#256 id=256 data-nosnippet>256</a>            <span class="kw">let </span><span class="kw-2">mut </span>skip = <span class="bool-val">false</span>;
+<a href=#257 id=257 data-nosnippet>257</a>            <span class="kw">for </span>s <span class="kw">in </span><span class="kw-2">&amp;</span>skip_strings {
+<a href=#258 id=258 data-nosnippet>258</a>                <span class="kw">if </span>l.contains(s) &amp;&amp; (l.contains(<span class="string">"[]"</span>) || l.contains(<span class="string">"()"</span>) || l.contains(<span class="string">".md"</span>)) { 
+<a href=#259 id=259 data-nosnippet>259</a>                    skip = <span class="bool-val">true</span>; 
+<a href=#260 id=260 data-nosnippet>260</a>                    <span class="kw">break</span>; 
+<a href=#261 id=261 data-nosnippet>261</a>                }
+<a href=#262 id=262 data-nosnippet>262</a>            }
+<a href=#263 id=263 data-nosnippet>263</a>            <span class="kw">if </span>skip { <span class="kw">continue</span>; }
+<a href=#264 id=264 data-nosnippet>264</a>            <span class="kw">if </span>num_regex.is_match(line) { <span class="kw">continue</span>; }
+<a href=#265 id=265 data-nosnippet>265</a>            
+<a href=#266 id=266 data-nosnippet>266</a>            <span class="kw">let </span><span class="kw-2">mut </span>mod_line = line.to_string();
+<a href=#267 id=267 data-nosnippet>267</a>            <span class="kw">let </span>trimmed = mod_line.trim();
+<a href=#268 id=268 data-nosnippet>268</a>            <span class="kw">if </span>trimmed.starts_with(<span class="string">"- ["</span>) {
+<a href=#269 id=269 data-nosnippet>269</a>                <span class="kw">if </span>trimmed.contains(<span class="string">"()"</span>) || trimmed.contains(<span class="string">"[]"</span>) {
+<a href=#270 id=270 data-nosnippet>270</a>                    mod_line = <span class="macro">format!</span>(<span class="string">"    {}"</span>, trimmed);
+<a href=#271 id=271 data-nosnippet>271</a>                } <span class="kw">else </span>{
+<a href=#272 id=272 data-nosnippet>272</a>                    mod_line = <span class="macro">format!</span>(<span class="string">"        {}"</span>, trimmed);
+<a href=#273 id=273 data-nosnippet>273</a>                }
+<a href=#274 id=274 data-nosnippet>274</a>            }
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a>            <span class="kw">if </span>thematic_buffer.is_empty() &amp;&amp; mod_line.trim().is_empty() { <span class="kw">continue</span>; }
+<a href=#277 id=277 data-nosnippet>277</a>            thematic_buffer.push(mod_line);
+<a href=#278 id=278 data-nosnippet>278</a>        }
+<a href=#279 id=279 data-nosnippet>279</a>    }
+<a href=#280 id=280 data-nosnippet>280</a>    
+<a href=#281 id=281 data-nosnippet>281</a>    <span class="kw">if </span>thematic_buffer.is_empty() {
+<a href=#282 id=282 data-nosnippet>282</a>        <span class="kw">for </span>c <span class="kw">in </span><span class="kw-2">&amp;</span>concept_files {
+<a href=#283 id=283 data-nosnippet>283</a>            <span class="kw">let </span>link = <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, c)).exists() {
+<a href=#284 id=284 data-nosnippet>284</a>                <span class="macro">format!</span>(<span class="string">"{}.md"</span>, c)
+<a href=#285 id=285 data-nosnippet>285</a>            } <span class="kw">else </span>{
+<a href=#286 id=286 data-nosnippet>286</a>                String::new()
+<a href=#287 id=287 data-nosnippet>287</a>            };
+<a href=#288 id=288 data-nosnippet>288</a>            thematic_buffer.push(<span class="macro">format!</span>(<span class="string">"    - [{}]({})"</span>, c, link));
+<a href=#289 id=289 data-nosnippet>289</a>        }
+<a href=#290 id=290 data-nosnippet>290</a>    }
+<a href=#291 id=291 data-nosnippet>291</a>
+<a href=#292 id=292 data-nosnippet>292</a>    final_lines.extend(thematic_buffer);
+<a href=#293 id=293 data-nosnippet>293</a>    std::fs::write(summary_path, final_lines.join(<span class="string">"\n"</span>))<span class="question-mark">?</span>;
+<a href=#294 id=294 data-nosnippet>294</a>    
+<a href=#295 id=295 data-nosnippet>295</a>    <span class="kw">let </span>mempool_content = <span class="string">"# mempool\n\nthe title \"mempool\" is a deliberate choice from the architecture of decentralized systems. it represents the space where transactions wait for verification—a high-entropy zone of pure potential. in our context, the mempool is the catchment of all active research. it is where we catch the signals of the world before they are filtered and mined into history. we inhabit this space to acknowledge that discovery is a process of refinement, not a sudden event. here, ideas are raw. they are the unconfirmed drafts that have been pulled from the digital noise, awaiting the validation of our network of experts. \n\nwhat you find here is the \"mempool of thought.\" these are the episodes currently being researched, debated, and refined. we do not work in isolation. we treat our readers and collaborators as validating nodes. this is the layer of discovery where we invite the network to challenge the signal. the mempool is where we collaborate with domain experts to ensure the fidelity of our research. it is a space of open participation. we believe that for knowledge to be sovereign, it must be hardened by scrutiny before it becomes part of the permanent ledger. \n\nwhen you explore the mempool, you are seeing the research in its most vulnerable and honest state. once these drafts are refined, they move to the template, but while they are here, they are the living breath of the project. if you are an expert, a researcher, or a seeker who has found a signal we missed, your contribution is the consensus mechanism we rely on. we act as the filter, but the network provides the proof. this is where we build the truth, one unconfirmed transaction at a time.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **catchment rule**: this subtree is the high-entropy zone for raw research and parked episodes.\n- **collaboration**: agents should prioritize expert input and external signals when refining drafts here.\n- **renumbering**: episodes here may be renumbered or renamed as they are not yet 'cast in stone'.\n- **participation**: always maintain the link to the call for participation and github.\n"</span>;
+<a href=#296 id=296 data-nosnippet>296</a>    std::fs::write(<span class="string">"src/mempool.md"</span>, mempool_content)<span class="question-mark">?</span>;
+<a href=#297 id=297 data-nosnippet>297</a>
+<a href=#298 id=298 data-nosnippet>298</a>    <span class="kw">let </span>current_content = <span class="string">"# template\n\nthe block template is the miner’s canvas. as miners of knowledge, we don't merely aggregate information; we select for signals that deserve to be etched into the chain. \n\nour block space is strictly governed by the law of 21. this 21-episode limit is our proof-of-work—a scarcity that forces us to filter out the noise of the ephemeral and prioritize high-fidelity research. each slot in this template is a precious transaction of truth. \n\nwe are currently mining the next block. as we select finalized episodes from the mempool, they fill the template. once the 21st episode is confirmed, the block is locked and moved to the immutable chain. while in the template, the research is active and volatile, waiting for the consensus of time.\n\nthe template is where the ephemeral becomes historical. as a miner of knowledge, our goal is to ensure that the 21 episodes selected for this block represent the highest possible density of truth. we are not building a library of volume; we are mining a ledger of value. the block template is the tip of the spear, the place where the future of our research is being forged into the permanent record of our past.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **scarcity rule**: the block space is strictly limited to 21 episodes.\n- **mining logic**: once the 21st episode is confirmed, this entire block must be moved to the 'chain' subtree as a numbered block (e.g., block 2).\n- **volatility**: research here is finalizing. minor polish is allowed, but the core thesis should be stable.\n- **exclusivity**: only select high-fidelity signals from the mempool for inclusion in this template.\n"</span>;
+<a href=#299 id=299 data-nosnippet>299</a>    std::fs::write(<span class="string">"src/template.md"</span>, current_content)<span class="question-mark">?</span>;
+<a href=#300 id=300 data-nosnippet>300</a>
+<a href=#301 id=301 data-nosnippet>301</a>    <span class="kw">let </span>archive_content = <span class="string">"# chain : the master chain\n\nthe chain is our commitment to permanence. once a block of 21 episodes is mined, it is moved here to become part of the immutable ledger. \n\neach link in the chain represents a verified epoch of research. we stack these blocks in descending order, creating a vertical record of our shared discovery. here, the volatile signals of the block template become the historical capital of the project.\n\ndescend into the ledger to explore the verified blocks, or go deeper to reach the genesis layer—the non-episodic root of our entire knowledge architecture.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **immutability rule**: episodes in this subtree are 'cast in stone'. zero editing of source content is permitted.\n- **ledger order**: blocks must be maintained in descending numerical order.\n- **summarization only**: agents may create or update block-level summary pages (e.g., block 1 description) but must never touch the underlying episodic transactions.\n- **permanence**: ensure url paths never change to prevent breaking external links.\n"</span>;
+<a href=#302 id=302 data-nosnippet>302</a>    std::fs::write(<span class="string">"src/chain.md"</span>, archive_content)<span class="question-mark">?</span>;
+<a href=#303 id=303 data-nosnippet>303</a>
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="kw">let </span>genesis_content = <span class="string">"# genesis : the genesis bump\n\ngenesis is the discovery layer that pre-dates the chain. we believe that before one can build a true blockchain of knowledge, there is a bare minimum of thematic understanding required. this is not episodic; it is foundational.\n\nwe characterize genesis through three absolute pillars:\n1. **bitcoin**: the discovery of mathematical scarcity and sovereign value. without understanding the architecture of truth in money, one cannot anchor research in reality.\n2. **intelligence**: the exploration of how we process and compress the universe. this is the \"how\" of our discovery.\n3. **digital credit**: the bridge between trust and code. it is the mechanism through which value flows in a decentralized world.\n\ngenesis is where the internal flavor of our project is expressed. it is the subtle, non-episodic root from which every numbered block grows. you must know the genesis to understand the chain.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **foundational rule**: this subtree contains only non-episodic, thematic research. \n- **no numbers**: episodes in this section do not have block numbers or sequential IDs.\n- **thematic integrity**: maintain the three absolute pillars (bitcoin, intelligence, digital credit) as the root discovery layer.\n- **artistic flavor**: prioritize subtle, deep discovery over high-frequency updates.\n"</span>;
+<a href=#305 id=305 data-nosnippet>305</a>    std::fs::write(<span class="string">"src/genesis.md"</span>, genesis_content)<span class="question-mark">?</span>;
 <a href=#306 id=306 data-nosnippet>306</a>
-<a href=#307 id=307 data-nosnippet>307</a>    <span class="kw">let </span>current_content = <span class="string">"# block template\n\nthe block template is the miner’s canvas. as miners of knowledge, we don't merely aggregate information; we select for signals that deserve to be etched into the chain. \n\nour block space is strictly governed by the law of 21. this 21-episode limit is our proof-of-work—a scarcity that forces us to filter out the noise of the ephemeral and prioritize high-fidelity research. each slot in this template is a precious transaction of truth. \n\nwe are currently mining the next block. as we select finalized episodes from the mempool, they fill the template. once the 21st episode is confirmed, the block is locked and moved to the immutable chain. while in the template, the research is active and volatile, waiting for the consensus of time.\n\nthe template is where the ephemeral becomes historical. as a miner of knowledge, our goal is to ensure that the 21 episodes selected for this block represent the highest possible density of truth. we are not building a library of volume; we are mining a ledger of value. the block template is the tip of the spear, the place where the future of our research is being forged into the permanent record of our past.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **scarcity rule**: the block space is strictly limited to 21 episodes.\n- **mining logic**: once the 21st episode is confirmed, this entire block must be moved to the 'chain' subtree as a numbered block (e.g., block 2).\n- **volatility**: research here is finalizing. minor polish is allowed, but the core thesis should be stable.\n- **exclusivity**: only select high-fidelity signals from the mempool for inclusion in this template.\n"</span>;
-<a href=#308 id=308 data-nosnippet>308</a>    std::fs::write(<span class="string">"src/current.md"</span>, current_content)<span class="question-mark">?</span>;
-<a href=#309 id=309 data-nosnippet>309</a>
-<a href=#310 id=310 data-nosnippet>310</a>    <span class="kw">let </span>archive_content = <span class="string">"# chain\n\nthe chain is our commitment to permanence. once a block of 21 episodes is mined, it is moved here to become part of the immutable ledger. \n\neach link in the chain represents a verified epoch of research. we stack these blocks in descending order, creating a vertical record of our shared discovery. here, the volatile signals of the block template become the historical capital of the project.\n\ndescend into the ledger to explore the verified blocks, or go deeper to reach the genesis layer—the non-episodic root of our entire knowledge architecture.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **immutability rule**: episodes in this subtree are 'cast in stone'. zero editing of source content is permitted.\n- **ledger order**: blocks must be maintained in descending numerical order.\n- **summarization only**: agents may create or update block-level summary pages (e.g., block 1 description) but must never touch the underlying episodic transactions.\n- **permanence**: ensure url paths never change to prevent breaking external links.\n"</span>;
-<a href=#311 id=311 data-nosnippet>311</a>    std::fs::write(<span class="string">"src/archive.md"</span>, archive_content)<span class="question-mark">?</span>;
-<a href=#312 id=312 data-nosnippet>312</a>
-<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">let </span>genesis_content = <span class="string">"# genesis\n\ngenesis is the discovery layer that pre-dates the chain. we believe that before one can build a true blockchain of knowledge, there is a bare minimum of thematic understanding required. this is not episodic; it is foundational.\n\nwe characterize genesis through three absolute pillars:\n1. **bitcoin**: the discovery of mathematical scarcity and sovereign value. without understanding the architecture of truth in money, one cannot anchor research in reality.\n2. **intelligence**: the exploration of how we process and compress the universe. this is the \"how\" of our discovery.\n3. **digital credit**: the bridge between trust and code. it is the mechanism through which value flows in a decentralized world.\n\ngenesis is where the internal flavor of our project is expressed. it is the subtle, non-episodic root from which every numbered block grows. you must know the genesis to understand the chain.\n\n---\n\n## instructions to ai agents for managing this sub tree\n\n- **foundational rule**: this subtree contains only non-episodic, thematic research. \n- **no numbers**: episodes in this section do not have block numbers or sequential IDs.\n- **thematic integrity**: maintain the three absolute pillars (bitcoin, intelligence, digital credit) as the root discovery layer.\n- **artistic flavor**: prioritize subtle, deep discovery over high-frequency updates.\n"</span>;
-<a href=#314 id=314 data-nosnippet>314</a>    std::fs::write(<span class="string">"src/genesis.md"</span>, genesis_content)<span class="question-mark">?</span>;
-<a href=#315 id=315 data-nosnippet>315</a>
-<a href=#316 id=316 data-nosnippet>316</a>    std::fs::write(<span class="string">"src/github.md"</span>, <span class="string">"# join us on github\n\n[Click here to visit the repository](https://github.com/ashutoshmjain/deepDive)"</span>)<span class="question-mark">?</span>;
-<a href=#317 id=317 data-nosnippet>317</a>    <span class="prelude-val">Ok</span>(())
-<a href=#318 id=318 data-nosnippet>318</a>}
-<a href=#319 id=319 data-nosnippet>319</a>
-<a href=#320 id=320 data-nosnippet>320</a><span class="kw">fn </span>ingest_image(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#321 id=321 data-nosnippet>321</a>    <span class="macro">eprintln!</span>(<span class="string">"🎨 Ingesting image for episode {}..."</span>, number);
-<a href=#322 id=322 data-nosnippet>322</a>    <span class="kw">let </span>img_dir = <span class="string">"src/img"</span>;
-<a href=#323 id=323 data-nosnippet>323</a>    std::fs::create_dir_all(img_dir)<span class="question-mark">?</span>;
-<a href=#324 id=324 data-nosnippet>324</a>    <span class="kw">let </span><span class="kw-2">mut </span>images: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}/*{}*.png"</span>, source, number))<span class="question-mark">?</span>.filter_map(Result::ok).collect();
-<a href=#325 id=325 data-nosnippet>325</a>    images.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(<span class="kw-2">&amp;</span>std::fs::metadata(a).unwrap().modified().unwrap()));
-<a href=#326 id=326 data-nosnippet>326</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = images.first() {
-<a href=#327 id=327 data-nosnippet>327</a>        <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"{}/{}.png"</span>, img_dir, number);
-<a href=#328 id=328 data-nosnippet>328</a>        <span class="kw">if </span>path.as_path() != std::path::Path::new(<span class="kw-2">&amp;</span>dest) { std::fs::copy(path, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>; }
-<a href=#329 id=329 data-nosnippet>329</a>    }
-<a href=#330 id=330 data-nosnippet>330</a>    <span class="prelude-val">Ok</span>(())
-<a href=#331 id=331 data-nosnippet>331</a>}
-<a href=#332 id=332 data-nosnippet>332</a>
-<a href=#333 id=333 data-nosnippet>333</a><span class="kw">fn </span>ingest_video(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#334 id=334 data-nosnippet>334</a>    <span class="macro">eprintln!</span>(<span class="string">"🎬 Ingesting video for episode {}..."</span>, number);
-<a href=#335 id=335 data-nosnippet>335</a>    <span class="kw">let </span>vid_dir = <span class="string">"src/vid"</span>;
-<a href=#336 id=336 data-nosnippet>336</a>    std::fs::create_dir_all(vid_dir)<span class="question-mark">?</span>;
-<a href=#337 id=337 data-nosnippet>337</a>    <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*{}*.mp4"</span>, source, number);
-<a href=#338 id=338 data-nosnippet>338</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
-<a href=#339 id=339 data-nosnippet>339</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
-<a href=#340 id=340 data-nosnippet>340</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
-<a href=#341 id=341 data-nosnippet>341</a>            std::fs::copy(<span class="kw-2">&amp;</span>path, <span class="macro">format!</span>(<span class="string">"{}/{}"</span>, vid_dir, filename))<span class="question-mark">?</span>;
-<a href=#342 id=342 data-nosnippet>342</a>        }
-<a href=#343 id=343 data-nosnippet>343</a>    }
-<a href=#344 id=344 data-nosnippet>344</a>    <span class="prelude-val">Ok</span>(())
-<a href=#345 id=345 data-nosnippet>345</a>}
-<a href=#346 id=346 data-nosnippet>346</a>
-<a href=#347 id=347 data-nosnippet>347</a><span class="kw">fn </span>run_doctor() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#348 id=348 data-nosnippet>348</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(out) = Command::new(<span class="string">"mdbook"</span>).arg(<span class="string">"--version"</span>).output() { <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()); }
-<a href=#349 id=349 data-nosnippet>349</a>    <span class="prelude-val">Ok</span>(())
-<a href=#350 id=350 data-nosnippet>350</a>}
-<a href=#351 id=351 data-nosnippet>351</a>
-<a href=#352 id=352 data-nosnippet>352</a><span class="kw">fn </span>list_parked() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#353 id=353 data-nosnippet>353</a>    <span class="macro">eprintln!</span>(<span class="string">"🅿️  Currently Parked Episodes:"</span>);
-<a href=#354 id=354 data-nosnippet>354</a>    <span class="kw">for </span>entry <span class="kw">in </span>glob(<span class="string">"src/_[0-9]*.md"</span>)<span class="question-mark">? </span>{
-<a href=#355 id=355 data-nosnippet>355</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(path) = entry {
-<a href=#356 id=356 data-nosnippet>356</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
-<a href=#357 id=357 data-nosnippet>357</a>            <span class="kw">let </span>base = filename.trim_end_matches(<span class="string">".md"</span>);
-<a href=#358 id=358 data-nosnippet>358</a>            <span class="kw">let </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
-<a href=#359 id=359 data-nosnippet>359</a>            <span class="kw">let </span>h1_regex = regex::Regex::new(<span class="string">r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$"</span>).unwrap();
-<a href=#360 id=360 data-nosnippet>360</a>            <span class="kw">let </span>title = <span class="kw">if let </span><span class="prelude-val">Some</span>(caps) = h1_regex.captures(<span class="kw-2">&amp;</span>content) { caps.get(<span class="number">1</span>).unwrap().as_str().trim() } <span class="kw">else </span>{ <span class="string">"Untitled" </span>};
-<a href=#361 id=361 data-nosnippet>361</a>            <span class="macro">println!</span>(<span class="string">"  [{}] : {}"</span>, <span class="kw-2">&amp;</span>base[<span class="number">1</span>..], title);
-<a href=#362 id=362 data-nosnippet>362</a>        }
-<a href=#363 id=363 data-nosnippet>363</a>    }
-<a href=#364 id=364 data-nosnippet>364</a>    <span class="prelude-val">Ok</span>(())
-<a href=#365 id=365 data-nosnippet>365</a>}
-<a href=#366 id=366 data-nosnippet>366</a>
-<a href=#367 id=367 data-nosnippet>367</a><span class="kw">fn </span>park_episode(number: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#368 id=368 data-nosnippet>368</a>    <span class="kw">let </span>videos: Vec&lt;<span class="kw">_</span>&gt; = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"src/vid/{}*.mp4"</span>, number))<span class="question-mark">?</span>.filter_map(Result::ok).collect();
-<a href=#369 id=369 data-nosnippet>369</a>    <span class="kw">if </span>!videos.is_empty() { <span class="macro">anyhow::bail!</span>(<span class="string">"Episode is immutable"</span>); }
-<a href=#370 id=370 data-nosnippet>370</a>    <span class="kw">let </span>src = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
-<a href=#371 id=371 data-nosnippet>371</a>    <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span>src).exists() {
-<a href=#372 id=372 data-nosnippet>372</a>        std::fs::rename(<span class="kw-2">&amp;</span>src, <span class="macro">format!</span>(<span class="string">"src/_{}.md"</span>, number))<span class="question-mark">?</span>;
-<a href=#373 id=373 data-nosnippet>373</a>        update_summary(config)<span class="question-mark">?</span>; 
-<a href=#374 id=374 data-nosnippet>374</a>    }
-<a href=#375 id=375 data-nosnippet>375</a>    <span class="prelude-val">Ok</span>(())
-<a href=#376 id=376 data-nosnippet>376</a>}
-<a href=#377 id=377 data-nosnippet>377</a>
-<a href=#378 id=378 data-nosnippet>378</a><span class="kw">fn </span>unpark_episode(old_number: <span class="kw-2">&amp;</span>str, new_number: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-<a href=#379 id=379 data-nosnippet>379</a>    <span class="kw">let </span>src = <span class="macro">format!</span>(<span class="string">"src/_{}.md"</span>, old_number);
-<a href=#380 id=380 data-nosnippet>380</a>    <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, new_number);
-<a href=#381 id=381 data-nosnippet>381</a>    <span class="kw">if </span>!std::path::Path::new(<span class="kw-2">&amp;</span>src).exists() { <span class="macro">anyhow::bail!</span>(<span class="string">"Source not found"</span>); }
-<a href=#382 id=382 data-nosnippet>382</a>    std::fs::rename(<span class="kw-2">&amp;</span>src, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
-<a href=#383 id=383 data-nosnippet>383</a>    <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
-<a href=#384 id=384 data-nosnippet>384</a>    content = content.replace(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"# {}"</span>, old_number), <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"# {}"</span>, new_number));
-<a href=#385 id=385 data-nosnippet>385</a>    std::fs::write(<span class="kw-2">&amp;</span>dest, content)<span class="question-mark">?</span>;
-<a href=#386 id=386 data-nosnippet>386</a>    update_summary(config)<span class="question-mark">?</span>;
-<a href=#387 id=387 data-nosnippet>387</a>    <span class="prelude-val">Ok</span>(())
-<a href=#388 id=388 data-nosnippet>388</a>}
+<a href=#307 id=307 data-nosnippet>307</a>    std::fs::write(<span class="string">"src/github.md"</span>, <span class="string">"# join us on github\n\n[Click here to visit the repository](https://github.com/ashutoshmjain/deepDive)"</span>)<span class="question-mark">?</span>;
+<a href=#308 id=308 data-nosnippet>308</a>    <span class="prelude-val">Ok</span>(())
+<a href=#309 id=309 data-nosnippet>309</a>}
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a><span class="kw">fn </span>ingest_image(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#312 id=312 data-nosnippet>312</a>    <span class="macro">eprintln!</span>(<span class="string">"🎨 Ingesting image for episode {}..."</span>, number);
+<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">let </span>img_dir = <span class="string">"src/img"</span>;
+<a href=#314 id=314 data-nosnippet>314</a>    std::fs::create_dir_all(img_dir)<span class="question-mark">?</span>;
+<a href=#315 id=315 data-nosnippet>315</a>    <span class="kw">let </span><span class="kw-2">mut </span>images: Vec&lt;PathBuf&gt; = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{}/*{}*.png"</span>, source, number))<span class="question-mark">?</span>.filter_map(Result::ok).collect();
+<a href=#316 id=316 data-nosnippet>316</a>    images.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(<span class="kw-2">&amp;</span>std::fs::metadata(a).unwrap().modified().unwrap()));
+<a href=#317 id=317 data-nosnippet>317</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(path) = images.first() {
+<a href=#318 id=318 data-nosnippet>318</a>        <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"{}/{}.png"</span>, img_dir, number);
+<a href=#319 id=319 data-nosnippet>319</a>        <span class="kw">if </span>path.as_path() != std::path::Path::new(<span class="kw-2">&amp;</span>dest) { std::fs::copy(path, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>; }
+<a href=#320 id=320 data-nosnippet>320</a>    }
+<a href=#321 id=321 data-nosnippet>321</a>    <span class="prelude-val">Ok</span>(())
+<a href=#322 id=322 data-nosnippet>322</a>}
+<a href=#323 id=323 data-nosnippet>323</a>
+<a href=#324 id=324 data-nosnippet>324</a><span class="kw">fn </span>ingest_video(number: <span class="kw-2">&amp;</span>str, source: <span class="kw-2">&amp;</span>str, _config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#325 id=325 data-nosnippet>325</a>    <span class="macro">eprintln!</span>(<span class="string">"🎬 Ingesting video for episode {}..."</span>, number);
+<a href=#326 id=326 data-nosnippet>326</a>    <span class="kw">let </span>vid_dir = <span class="string">"src/vid"</span>;
+<a href=#327 id=327 data-nosnippet>327</a>    std::fs::create_dir_all(vid_dir)<span class="question-mark">?</span>;
+<a href=#328 id=328 data-nosnippet>328</a>    <span class="kw">let </span>pattern = <span class="macro">format!</span>(<span class="string">"{}/*{}*.mp4"</span>, source, number);
+<a href=#329 id=329 data-nosnippet>329</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(paths) = glob(<span class="kw-2">&amp;</span>pattern) {
+<a href=#330 id=330 data-nosnippet>330</a>        <span class="kw">for </span>path <span class="kw">in </span>paths.filter_map(Result::ok) {
+<a href=#331 id=331 data-nosnippet>331</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
+<a href=#332 id=332 data-nosnippet>332</a>            std::fs::copy(<span class="kw-2">&amp;</span>path, <span class="macro">format!</span>(<span class="string">"{}/{}"</span>, vid_dir, filename))<span class="question-mark">?</span>;
+<a href=#333 id=333 data-nosnippet>333</a>        }
+<a href=#334 id=334 data-nosnippet>334</a>    }
+<a href=#335 id=335 data-nosnippet>335</a>    <span class="prelude-val">Ok</span>(())
+<a href=#336 id=336 data-nosnippet>336</a>}
+<a href=#337 id=337 data-nosnippet>337</a>
+<a href=#338 id=338 data-nosnippet>338</a><span class="kw">fn </span>run_doctor() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#339 id=339 data-nosnippet>339</a>    <span class="kw">if let </span><span class="prelude-val">Ok</span>(out) = Command::new(<span class="string">"mdbook"</span>).arg(<span class="string">"--version"</span>).output() { <span class="macro">eprintln!</span>(<span class="string">"✅ mdbook: {}"</span>, String::from_utf8_lossy(<span class="kw-2">&amp;</span>out.stdout).trim()); }
+<a href=#340 id=340 data-nosnippet>340</a>    <span class="prelude-val">Ok</span>(())
+<a href=#341 id=341 data-nosnippet>341</a>}
+<a href=#342 id=342 data-nosnippet>342</a>
+<a href=#343 id=343 data-nosnippet>343</a><span class="kw">fn </span>list_parked() -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#344 id=344 data-nosnippet>344</a>    <span class="macro">eprintln!</span>(<span class="string">"🅿️  Currently Parked Episodes:"</span>);
+<a href=#345 id=345 data-nosnippet>345</a>    <span class="kw">for </span>entry <span class="kw">in </span>glob(<span class="string">"src/_[0-9]*.md"</span>)<span class="question-mark">? </span>{
+<a href=#346 id=346 data-nosnippet>346</a>        <span class="kw">if let </span><span class="prelude-val">Ok</span>(path) = entry {
+<a href=#347 id=347 data-nosnippet>347</a>            <span class="kw">let </span>filename = path.file_name().unwrap().to_str().unwrap();
+<a href=#348 id=348 data-nosnippet>348</a>            <span class="kw">let </span>base = filename.trim_end_matches(<span class="string">".md"</span>);
+<a href=#349 id=349 data-nosnippet>349</a>            <span class="kw">let </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
+<a href=#350 id=350 data-nosnippet>350</a>            <span class="kw">let </span>h1_regex = regex::Regex::new(<span class="string">r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$"</span>).unwrap();
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="kw">let </span>title = <span class="kw">if let </span><span class="prelude-val">Some</span>(caps) = h1_regex.captures(<span class="kw-2">&amp;</span>content) { caps.get(<span class="number">1</span>).unwrap().as_str().trim() } <span class="kw">else </span>{ <span class="string">"Untitled" </span>};
+<a href=#352 id=352 data-nosnippet>352</a>            <span class="macro">println!</span>(<span class="string">"  [{}] : {}"</span>, <span class="kw-2">&amp;</span>base[<span class="number">1</span>..], title);
+<a href=#353 id=353 data-nosnippet>353</a>        }
+<a href=#354 id=354 data-nosnippet>354</a>    }
+<a href=#355 id=355 data-nosnippet>355</a>    <span class="prelude-val">Ok</span>(())
+<a href=#356 id=356 data-nosnippet>356</a>}
+<a href=#357 id=357 data-nosnippet>357</a>
+<a href=#358 id=358 data-nosnippet>358</a><span class="kw">fn </span>park_episode(number: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#359 id=359 data-nosnippet>359</a>    <span class="kw">let </span>videos: Vec&lt;<span class="kw">_</span>&gt; = glob(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"src/vid/{}*.mp4"</span>, number))<span class="question-mark">?</span>.filter_map(Result::ok).collect();
+<a href=#360 id=360 data-nosnippet>360</a>    <span class="kw">if </span>!videos.is_empty() { <span class="macro">anyhow::bail!</span>(<span class="string">"Episode is immutable"</span>); }
+<a href=#361 id=361 data-nosnippet>361</a>    <span class="kw">let </span>src = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, number);
+<a href=#362 id=362 data-nosnippet>362</a>    <span class="kw">if </span>std::path::Path::new(<span class="kw-2">&amp;</span>src).exists() {
+<a href=#363 id=363 data-nosnippet>363</a>        std::fs::rename(<span class="kw-2">&amp;</span>src, <span class="macro">format!</span>(<span class="string">"src/_{}.md"</span>, number))<span class="question-mark">?</span>;
+<a href=#364 id=364 data-nosnippet>364</a>        update_summary(config)<span class="question-mark">?</span>; 
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>    <span class="prelude-val">Ok</span>(())
+<a href=#367 id=367 data-nosnippet>367</a>}
+<a href=#368 id=368 data-nosnippet>368</a>
+<a href=#369 id=369 data-nosnippet>369</a><span class="kw">fn </span>unpark_episode(old_number: <span class="kw-2">&amp;</span>str, new_number: <span class="kw-2">&amp;</span>str, config: <span class="kw-2">&amp;</span>IngestConfig) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#370 id=370 data-nosnippet>370</a>    <span class="kw">let </span>src = <span class="macro">format!</span>(<span class="string">"src/_{}.md"</span>, old_number);
+<a href=#371 id=371 data-nosnippet>371</a>    <span class="kw">let </span>dest = <span class="macro">format!</span>(<span class="string">"src/{}.md"</span>, new_number);
+<a href=#372 id=372 data-nosnippet>372</a>    <span class="kw">if </span>!std::path::Path::new(<span class="kw-2">&amp;</span>src).exists() { <span class="macro">anyhow::bail!</span>(<span class="string">"Source not found"</span>); }
+<a href=#373 id=373 data-nosnippet>373</a>    std::fs::rename(<span class="kw-2">&amp;</span>src, <span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
+<a href=#374 id=374 data-nosnippet>374</a>    <span class="kw">let </span><span class="kw-2">mut </span>content = std::fs::read_to_string(<span class="kw-2">&amp;</span>dest)<span class="question-mark">?</span>;
+<a href=#375 id=375 data-nosnippet>375</a>    content = content.replace(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"# {}"</span>, old_number), <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"# {}"</span>, new_number));
+<a href=#376 id=376 data-nosnippet>376</a>    std::fs::write(<span class="kw-2">&amp;</span>dest, content)<span class="question-mark">?</span>;
+<a href=#377 id=377 data-nosnippet>377</a>    update_summary(config)<span class="question-mark">?</span>;
+<a href=#378 id=378 data-nosnippet>378</a>    <span class="prelude-val">Ok</span>(())
+<a href=#379 id=379 data-nosnippet>379</a>}
 </code></pre></div></section></main></body></html>
