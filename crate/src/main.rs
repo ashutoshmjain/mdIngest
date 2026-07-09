@@ -105,6 +105,7 @@ fn main() -> Result<()> {
         if do_video { 
             let video_src = ingest_config.video_source.clone().unwrap_or(source.clone());
             ingest_video(&num, &video_src, &ingest_config)?; 
+            inject_video_carousel(&num, &ingest_config)?;
         }
         update_summary(&ingest_config)?;
     } else {
@@ -303,6 +304,110 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
             let filename = path.file_name().unwrap().to_str().unwrap();
             std::fs::copy(&path, format!("{}/{}", vid_dir, filename))?;
         }
+    }
+    Ok(())
+}
+
+fn inject_video_carousel(number: &str, config: &IngestConfig) -> Result<()> {
+    let vid_dir = "src/vid";
+    let pattern = format!("{}/{}*.mp4", vid_dir, number);
+    let mut vids: Vec<String> = Vec::new();
+    if let Ok(paths) = glob(&pattern) {
+        for path in paths.filter_map(Result::ok) {
+            let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+            // Ignore merged/composite videos if they exist
+            if !filename.contains("merged") {
+                vids.push(filename);
+            }
+        }
+    }
+    vids.sort();
+
+    if vids.is_empty() {
+        return Ok(());
+    }
+
+    let default_visual_links = r#"<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">▶ TikTok ◀</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">◈ Instagram ◈</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37q8rU8HKTLhdLPZQadcvx-K" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">⫸ YouTube ⫷</a></center>"#;
+    let visual_links = config.visual_html.as_deref().unwrap_or(default_visual_links);
+
+    let mut html = String::new();
+    html.push_str("<center><a href=\"https://github.com/ashutoshmjain/deepDive\" target=\"_blank\" style=\"text-decoration: none;\">📥 Download videos and text from GitHub repo</a></center>\n\n");
+    html.push_str("<!-- VIDEO_STRIP_START -->\n\n");
+    html.push_str("<div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\">\n");
+
+    for vid in &vids {
+        let title = vid.trim_end_matches(".mp4");
+        html.push_str("  <div style=\"flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.3);\">\n");
+        html.push_str(&format!("    <video src=\"vid/{}\" style=\"width: 100%; height: 85%; object-fit: contain;\" playsinline loop preload=\"auto\" muted autoplay></video>\n", vid));
+        html.push_str(&format!("    <div style=\"height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;\">{}</div>\n", title));
+        html.push_str("    <button class=\"vid-toggle\" onclick=\"window.oph_play_toggle(this)\" style=\"position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; font-size: 22px; z-index: 100;\">🔇</button>\n");
+        html.push_str("  </div>\n");
+    }
+
+    html.push_str("</div>\n\n");
+    html.push_str(&format!("{}\n\n", visual_links));
+    html.push_str("<script>\n");
+    html.push_str("  window.oph_play_toggle = function(btn) {\n");
+    html.push_str("    const parent = btn.parentElement;\n");
+    html.push_str("    const vid = parent.querySelector('video');\n");
+    html.push_str("    const container = btn.closest('.video-carousel-container');\n");
+    html.push_str("    if (vid.paused || vid.muted) {\n");
+    html.push_str("      container.querySelectorAll('video').forEach(v => { v.pause(); v.muted = true; v.parentElement.querySelector('.vid-toggle').innerText = '🔇'; });\n");
+    html.push_str("      vid.muted = false; vid.volume = 1.0;\n");
+    html.push_str("      vid.play().then(() => { btn.innerText = '🔊'; }).catch(e => console.error(e));\n");
+    html.push_str("    } else {\n");
+    html.push_str("      vid.pause(); vid.muted = true; btn.innerText = '🔇';\n");
+    html.push_str("    }\n");
+    html.push_str("  };\n");
+    html.push_str("  (function() {\n");
+    html.push_str("    const init = () => {\n");
+    html.push_str("      const vids = document.querySelectorAll('.video-carousel-container video');\n");
+    html.push_str("      vids.forEach(v => { \n");
+    html.push_str("        v.muted = true; \n");
+    html.push_str("        v.play().catch(() => {}); \n");
+    // Also init for non-carousel videos if any (single container)
+    html.push_str("        const singles = document.querySelectorAll('.video-single-container video');\n");
+    html.push_str("        singles.forEach(s => { s.muted = true; s.play().catch(() => {}); });\n");
+    html.push_str("      });\n");
+    html.push_str("    };\n");
+    html.push_str("    setTimeout(init, 500);\n");
+    html.push_str("  })();\n");
+    html.push_str("</script>\n\n");
+    html.push_str("<!-- VIDEO_STRIP_END -->");
+
+    let file_path = format!("src/{}.md", number);
+    if std::path::Path::new(&file_path).exists() {
+        let mut content = std::fs::read_to_string(&file_path)?;
+        let start_tag = "<!-- VIDEO_STRIP_START -->";
+        let end_tag = "<!-- VIDEO_STRIP_END -->";
+
+        if let Some(start_idx) = content.find(start_tag) {
+            if let Some(end_idx) = content.find(end_tag) {
+                let dl_link = "📥 Download videos and text from GitHub repo";
+                let replace_start = if let Some(dl_idx) = content.find(dl_link) {
+                    if let Some(c_idx) = content[..dl_idx].rfind("<center>") {
+                        c_idx
+                    } else {
+                        start_idx
+                    }
+                } else {
+                    start_idx
+                };
+                content.replace_range(replace_start..(end_idx + end_tag.len()), &html);
+            }
+        } else {
+            let lines: Vec<&str> = content.lines().collect();
+            if !lines.is_empty() && lines[0].starts_with('#') {
+                let first_line_len = lines[0].len();
+                let insert_pos = first_line_len + 1;
+                let mut real_pos = insert_pos;
+                while real_pos < content.len() && (content.as_bytes()[real_pos] == b'\n' || content.as_bytes()[real_pos] == b'\r') {
+                    real_pos += 1;
+                }
+                content.insert_str(real_pos, &format!("{}\n\n", html));
+            }
+        }
+        std::fs::write(&file_path, content)?;
     }
     Ok(())
 }
