@@ -168,10 +168,17 @@ fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestC
 
 fn truncate_words(title: &str, limit: usize) -> String {
     let clean = title.trim();
-    if let Some((main_part, _)) = clean.split_once(':') {
+    if let Some((main_part, rest)) = clean.split_once(':') {
         let main_words: Vec<&str> = main_part.split_whitespace().collect();
-        if !main_words.is_empty() && main_words.len() <= limit + 2 {
+        if main_words.len() >= 3 && main_words.len() <= limit + 2 {
             return main_words.join(" ");
+        }
+        let full_clean = format!("{}: {}", main_part.trim(), rest.trim());
+        let words: Vec<&str> = full_clean.split_whitespace().collect();
+        if words.len() > limit {
+            return words[..limit].join(" ");
+        } else {
+            return full_clean;
         }
     }
     let words: Vec<&str> = clean.split_whitespace().collect();
