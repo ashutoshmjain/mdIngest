@@ -345,11 +345,11 @@ fn fix_footnotes(content: String, social_block: &str) -> String {
         if !unique_old_nums.contains(&n) { unique_old_nums.push(n); }
     }
 
-    for old_num in unique_old_nums {
+    for old_num in &unique_old_nums {
         let mut aggregated_text = String::new();
         let mut found = false;
         // Collect all text pieces for this citation number
-        for ref_entry in ref_entries.iter_mut().filter(|r| r.old_num.as_ref() == Some(&old_num)) {
+        for ref_entry in ref_entries.iter_mut().filter(|r| r.old_num.as_ref() == Some(old_num)) {
             if found { aggregated_text.push_str(" "); }
             let entry_text_clean = ref_entry.text.replace("`", "");
             let processed_text = url_regex.replace_all(&entry_text_clean, |caps: &regex::Captures| {
@@ -370,19 +370,40 @@ fn fix_footnotes(content: String, social_block: &str) -> String {
         }
     }
 
+    // Include all remaining/standalone references from the Works Cited section
+    for ref_entry in ref_entries.iter_mut().filter(|r| !r.processed) {
+        let entry_text_clean = ref_entry.text.replace("`", "");
+        let processed_text = if entry_text_clean.contains("](") {
+            entry_text_clean
+        } else {
+            url_regex.replace_all(&entry_text_clean, |caps: &regex::Captures| {
+                let url = caps.get(1).unwrap().as_str();
+                format!("[{}]({})", url, url)
+            }).to_string()
+        };
+        new_refs.push(processed_text);
+        ref_entry.processed = true;
+    }
+
     // 4. Final Body and Footer Assembly
     let final_body = norm_marker_regex.replace_all(&body_normalized, |caps: &regex::Captures| {
         let n = caps.get(1).unwrap().as_str();
-        format!("[^{}] ", old_to_new.get(n).unwrap_or(&n.to_string())) // Added trailing space
-    }).to_string().replace(" ]", "]"); // Clean up trailing space if inside brackets (though markers are outside)
+        format!("[^{}] ", old_to_new.get(n).unwrap_or(&n.to_string()))
+    }).to_string().replace(" ]", "]");
 
     let mut result = final_body.to_string();
     result.push_str(social_block);
     result.push_str("\n\n");
     result.push_str(header);
     result.push_str("\n\n");
-    for (i, text) in new_refs.iter().enumerate() {
-        result.push_str(&format!("[^{}]: {}\n\n", i + 1, text));
+    if unique_old_nums.is_empty() {
+        for (i, text) in new_refs.iter().enumerate() {
+            result.push_str(&format!("{}. {}\n\n", i + 1, text));
+        }
+    } else {
+        for (i, text) in new_refs.iter().enumerate() {
+            result.push_str(&format!("[^{}]: {}\n\n", i + 1, text));
+        }
     }
     result
 }
