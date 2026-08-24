@@ -83,7 +83,7 @@ fn main() -> Result<()> {
             "--list-parked" => do_list_parked = true,
             "-t" | "--title" => { if i + 1 < args.len() { title_override = Some(args[i+1].as_str()); i += 1; } },
             "-s" | "--source" => { if i + 1 < args.len() { source = args[i+1].to_string(); i += 1; } },
-            num if num.chars().all(|c| c.is_digit(10)) => number = Some(num.to_string()),
+            arg if !arg.starts_with('-') => number = Some(arg.to_string()),
             _ => {}
         }
         i += 1;
@@ -118,30 +118,72 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn normalize_source_paths(source: &str) -> Vec<String> {
+    let mut candidates = Vec::new();
+    candidates.push(source.to_string());
+    if source.starts_with("/mnt/c/") {
+        candidates.push(source.replace("/mnt/c/", "C:/"));
+    }
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        candidates.push(format!("{}/Downloads", home.replace('\\', "/")));
+    }
+    candidates.push(".".to_string());
+    candidates
+}
+
 fn ingest_text(number: &str, source: &str, title: Option<&str>, config: &IngestConfig) -> Result<()> {
-    eprintln!("📖 Ingesting text for episode {}...", number);
+    eprintln!("📖 Ingesting text for episode/slug {}...", number);
     let mut files: Vec<PathBuf> = Vec::new();
-    for ext in &["json", "rs", "md"] {
-        let pattern = format!("{}/*.{}", source, ext);
-        if let Ok(paths) = glob(&pattern) {
-            for path in paths.filter_map(Result::ok) {
-                let filename = path.file_name().unwrap().to_str().unwrap();
-                if !["SUMMARY.md", "cover.md"].contains(&filename) { files.push(path); }
+    for src in normalize_source_paths(source) {
+        for ext in &["json", "rs", "md"] {
+            let pattern = format!("{}/*.{}", src, ext);
+            if let Ok(paths) = glob(&pattern) {
+                for path in paths.filter_map(Result::ok) {
+                    let filename = path.file_name().unwrap().to_str().unwrap();
+                    if !["SUMMARY.md", "cover.md", "README.md", "AGENTS.md", "GEMINI.md", "CHANGELOG.md"].contains(&filename) 
+                        && !filename.starts_with('_') 
+                        && filename != &format!("{}.md", number) {
+                        files.push(path);
+                    }
+                }
             }
         }
     }
-    files.sort_by(|a, b| std::fs::metadata(b).unwrap().modified().unwrap().cmp(&std::fs::metadata(a).unwrap().modified().unwrap()));
+    files.sort_by(|a, b| {
+        let ma = std::fs::metadata(a).and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        let mb = std::fs::metadata(b).and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        mb.cmp(&ma)
+    });
     if let Some(path) = files.first() {
         eprintln!("📄 Found source: {}", path.display());
         let content = std::fs::read_to_string(path)?;
         let hardened = sanitizer::process_content(content, number, title, config.title_word_limit.unwrap_or(5));
         std::fs::write(format!("src/{}.md", number), hardened)?;
         eprintln!("✅ Ingested text to src/{}.md", number);
+    } else {
+        anyhow::bail!("No source markdown/json found in source paths for {}", number);
     }
     Ok(())
 }
 
-fn update_summary(_config: &IngestConfig) -> Result<()> {
+fn truncate_words(title: &str, limit: usize) -> String {
+    let clean = title.trim();
+    if let Some((main_part, _)) = clean.split_once(':') {
+        let main_words: Vec<&str> = main_part.split_whitespace().collect();
+        if !main_words.is_empty() && main_words.len() <= limit + 2 {
+            return main_words.join(" ");
+        }
+    }
+    let words: Vec<&str> = clean.split_whitespace().collect();
+    if words.len() > limit {
+        words[..limit].join(" ")
+    } else {
+        clean.to_string()
+    }
+}
+
+fn update_summary(config: &IngestConfig) -> Result<()> {
+    let word_limit = config.title_word_limit.unwrap_or(6);
     let summary_path = "src/SUMMARY.md";
     let pivot = 220;
     let block_size = 21;
@@ -205,8 +247,12 @@ fn update_summary(_config: &IngestConfig) -> Result<()> {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
         for ep in wip_parked {
-            let display_num = ep.number.map(|n| n.to_string()).unwrap_or_else(|| ep.filename.clone());
-            final_lines.push(format!("    - [{} : {}]({}.md)", display_num, ep.title, ep.filename));
+            let sidebar_title = truncate_words(&ep.title, word_limit);
+            if let Some(num) = ep.number {
+                final_lines.push(format!("    - [{} : {}]({}.md)", num, sidebar_title, ep.filename));
+            } else {
+                final_lines.push(format!("    - [{}]({}.md)", sidebar_title, ep.filename));
+            }
         }
     }
 
@@ -216,7 +262,8 @@ fn update_summary(_config: &IngestConfig) -> Result<()> {
     if let Some((_id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
         eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps {
-            final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
+            let sidebar_title = truncate_words(&ep.title, word_limit);
+            final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), sidebar_title, ep.filename));
         }
     }
 
@@ -236,7 +283,8 @@ fn update_summary(_config: &IngestConfig) -> Result<()> {
         let mut eps_sorted = eps.clone();
         eps_sorted.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps_sorted {
-            final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), ep.title, ep.filename));
+            let sidebar_title = truncate_words(&ep.title, word_limit);
+            final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), sidebar_title, ep.filename));
         }
     }
 
@@ -419,7 +467,7 @@ fn run_doctor() -> Result<()> {
 
 fn list_parked() -> Result<()> {
     eprintln!("🅿️  Currently Parked Episodes:");
-    for entry in glob("src/_[0-9]*.md")? {
+    for entry in glob("src/_*.md")? {
         if let Ok(path) = entry {
             let filename = path.file_name().unwrap().to_str().unwrap();
             let base = filename.trim_end_matches(".md");
@@ -433,11 +481,14 @@ fn list_parked() -> Result<()> {
 }
 
 fn park_episode(number: &str, config: &IngestConfig) -> Result<()> {
-    let videos: Vec<_> = glob(&format!("src/vid/{}*.mp4", number))?.filter_map(Result::ok).collect();
+    let clean = number.trim_start_matches('_');
+    let videos: Vec<_> = glob(&format!("src/vid/{}*.mp4", clean))?.filter_map(Result::ok).collect();
     if !videos.is_empty() { anyhow::bail!("Episode is immutable"); }
-    let src = format!("src/{}.md", number);
+    let src = format!("src/{}.md", clean);
+    let dest = format!("src/_{}.md", clean);
     if std::path::Path::new(&src).exists() {
-        std::fs::rename(&src, format!("src/_{}.md", number))?;
+        std::fs::rename(&src, &dest)?;
+        eprintln!("🅿️ Parked {} -> {}", src, dest);
         update_summary(config)?; 
     }
     Ok(())

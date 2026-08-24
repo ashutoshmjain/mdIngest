@@ -76,7 +76,7 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
 
     // 1. Title Processing
     let h1_regex_full = Regex::new(r"(?m)^#\s(?:\d+\s*:\s*)?\s*(.*)$").unwrap();
-    let mut h1_title = if let Some(t) = json_title {
+    let h1_title = if let Some(t) = json_title {
         t
     } else if let Some(caps) = h1_regex_full.captures(&content) {
         caps.get(1).unwrap().as_str().trim().trim_matches('*').to_string()
@@ -85,11 +85,6 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
     };
 
     content = h1_regex_full.replace(&content, "").to_string().trim().to_string();
-
-    let words: Vec<&str> = h1_title.split_whitespace().collect();
-    if words.len() > word_limit {
-        h1_title = words[..word_limit].join(" ");
-    }
 
     // 2. Sanitization Pipeline
     content = content.replace('\u{0332}', "");
@@ -182,11 +177,18 @@ pub fn process_content(mut content: String, ep_num: &str, _title_override: Optio
     }
 
     // 6. Final Assembly
+    let is_numeric = !ep_num.is_empty() && ep_num.chars().all(|c| c.is_digit(10));
+    let h1_prefix = if is_numeric {
+        format!("# {} : {}", ep_num, h1_title)
+    } else {
+        format!("# {}", h1_title)
+    };
+
     if is_json_capsule {
-        format!("# {} : {}\n\n{}{}{}{}", ep_num, h1_title, temp_content.trim(), social_block, refs_section, "\n").trim().to_string()
+        format!("{}\n\n{}{}{}{}", h1_prefix, temp_content.trim(), social_block, refs_section, "\n").trim().to_string()
     } else {
         // For non-JSON (like our payload), fix_footnotes now handles the merge correctly
-        format!("# {} : {}\n\n{}", ep_num, h1_title, temp_content.trim()).trim().to_string()
+        format!("{}\n\n{}", h1_prefix, temp_content.trim()).trim().to_string()
     }
 }
 
