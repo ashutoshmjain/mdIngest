@@ -40,6 +40,7 @@ struct EpisodeEntry {
     number: Option<u32>,
     filename: String,
     title: String,
+    is_explicit_sidebar: bool,
     mtime: std::time::SystemTime,
 }
 
@@ -78,6 +79,7 @@ fn main() -> Result<()> {
             "--text" => do_text = true,
             "--image" => do_image = true,
             "--video" => do_video = true,
+            "--index" => { update_summary(&ingest_config)?; return Ok(()); },
             "--park" => { if i + 1 < args.len() { do_park = Some(args[i+1].clone()); i += 1; } },
             "--unpark" => { if i + 2 < args.len() { do_unpark = Some((args[i+1].clone(), args[i+2].clone())); i += 2; } },
             "--list-parked" => do_list_parked = true,
@@ -207,17 +209,20 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
             if skip_files.contains(&filename) { continue; }
             let base = filename.trim_end_matches(".md").trim();
             let md_content = std::fs::read_to_string(&path)?;
+            let sidebar_override_regex = regex::Regex::new(r"(?im)<!--\s*SIDEBAR_TITLE:\s*(.*?)\s*-->").unwrap();
             let h1_regex = regex::Regex::new(r"(?m)^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$").unwrap();
-            let title = if let Some(caps) = h1_regex.captures(&md_content) {
-                caps.get(1).unwrap().as_str().trim().to_string()
-            } else { "Untitled".to_string() };
+            let (title, is_explicit_sidebar) = if let Some(caps) = sidebar_override_regex.captures(&md_content) {
+                (caps.get(1).unwrap().as_str().trim().to_string(), true)
+            } else if let Some(caps) = h1_regex.captures(&md_content) {
+                (caps.get(1).unwrap().as_str().trim().to_string(), false)
+            } else { ("Untitled".to_string(), false) };
             let mtime = std::fs::metadata(&path)?.modified()?;
             let number = base.parse::<u32>().ok();
             
             if filename.starts_with('_') {
-                wip_parked.push(EpisodeEntry { number: base.trim_start_matches('_').parse().ok(), filename: base.to_string(), title, mtime });
+                wip_parked.push(EpisodeEntry { number: base.trim_start_matches('_').parse().ok(), filename: base.to_string(), title, is_explicit_sidebar, mtime });
             } else {
-                all_files.push(EpisodeEntry { number, filename: base.to_string(), title, mtime });
+                all_files.push(EpisodeEntry { number, filename: base.to_string(), title, is_explicit_sidebar, mtime });
             }
         }
     }
@@ -254,7 +259,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         final_lines.push("    - [None at this moment. Join us on GitHub!](github.md)".to_string());
     } else {
         for ep in wip_parked {
-            let sidebar_title = truncate_words(&ep.title, word_limit);
+            let sidebar_title = if ep.is_explicit_sidebar { ep.title.clone() } else { truncate_words(&ep.title, word_limit) };
             if let Some(num) = ep.number {
                 final_lines.push(format!("    - [{} : {}]({}.md)", num, sidebar_title, ep.filename));
             } else {
@@ -269,7 +274,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
     if let Some((_id, eps)) = blocks.iter_mut().find(|(id, _)| *id == current_block_id) {
         eps.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps {
-            let sidebar_title = truncate_words(&ep.title, word_limit);
+            let sidebar_title = if ep.is_explicit_sidebar { ep.title.clone() } else { truncate_words(&ep.title, word_limit) };
             final_lines.push(format!("    - [{} : {}]({}.md)", ep.number.unwrap(), sidebar_title, ep.filename));
         }
     }
@@ -290,7 +295,7 @@ fn update_summary(config: &IngestConfig) -> Result<()> {
         let mut eps_sorted = eps.clone();
         eps_sorted.sort_by(|a, b| b.number.unwrap().cmp(&a.number.unwrap()));
         for ep in eps_sorted {
-            let sidebar_title = truncate_words(&ep.title, word_limit);
+            let sidebar_title = if ep.is_explicit_sidebar { ep.title.clone() } else { truncate_words(&ep.title, word_limit) };
             final_lines.push(format!("        - [{} : {}]({}.md)", ep.number.unwrap(), sidebar_title, ep.filename));
         }
     }
