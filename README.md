@@ -52,6 +52,31 @@ In the age of LLMs, the cost of generating information has collapsed to zero, bu
 
 ---
 
+## Dependencies & System Requirements
+
+| Tool | Version Requirement | Purpose |
+| :--- | :--- | :--- |
+| **Python** | `3.10+` (e.g. `3.12`) | Powers the Cockpit backend server (`server.py`), AST payload extractor, and rolling backup engine. **Zero pip dependencies** (built with pure standard library). |
+| **Rust & Cargo** | `1.85+` (e.g. `1.97+`) | Compiles the optional headless `md-publish` preprocessor binary. |
+| **mdbook** | `v0.5.0+` (e.g. `v0.5.4`) | High-performance CLI documentation engine and local preview server. |
+| **mdbook-katex** | `v0.5.1+` (or `v0.10.0+`) | Preprocessor for high-fidelity LaTeX/KaTeX mathematical equation rendering. |
+
+---
+
+## 🤖 1-Prompt Setup for Antigravity & AI Assistants
+
+If you are setting up `mdIngest` in a new workspace using **Antigravity** or another AI coding assistant, copy and paste this prompt to configure the complete publishing stack automatically:
+
+```text
+Please set up and verify the complete md² (mdIngest) publishing environment in this workspace:
+1. Verify that Python 3.10+, Cargo/Rust, mdbook (v0.5.0+), and mdbook-katex are installed and available on PATH. If mdbook or mdbook-katex are missing, install them via `cargo install mdbook mdbook-katex`.
+2. Build the md-publish preprocessor binary in the `crate/` directory using `cargo build --release`.
+3. Verify that `book.toml` contains the required `[preprocessor.katex]` and `[preprocessor.ingest]` configuration blocks.
+4. Launch the md² Publishing Cockpit server (`python ui/server.py` or `./start_ui.bat`) on http://localhost:8088 and verify that http://localhost:3000 is accessible via `mdbook serve`.
+```
+
+---
+
 ## Quick Start: Launching the Cockpit
 
 ### Windows 1-Click Launcher
