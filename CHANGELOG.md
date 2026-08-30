@@ -4,7 +4,13 @@ All notable changes to the **mdIngest** open-source Rust ingestion and publishin
 
 The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and follows a **weekly release update strategy** toward a stable `v1.0.0` core engine.
 
----
+## [0.3.0] - 2026-08-28
+
+### 🚀 md² Publishing Cockpit Release (`v0.3.0`)
+* **3-Pane Cockpit UI (`ui/cockpit.html` & `ui/server.py`):** Standalone desktop application styled with the Shutri.com Minimalist Editorial design system (Warm Sand palette, Outfit & Fira Code typography).
+* **Lossless Python Payload Standard (`.py`):** Replaces legacy text exports with self-extracting Base64+Gzip Python scripts, guaranteeing 100% KaTeX formula and citation integrity.
+* **Mempool & Block Template Lifecycle:** Named draft intake (`src/_<name>.md`) with 1-click automatic sequential episode number allocation upon promotion to the active Block Template.
+* **1-Click Launchers (`start_ui.bat` / `start_ingest.bat`):** Zero-dependency local server with REST API for payload decoding, SUMMARY.md synchronization, local `mdbook serve`, and remote Git publishing.
 
 ## [0.1.0] - 2026-08-01
 

@@ -1,6 +1,10 @@
-# md² (The mdd Engine)
+# md² (The mdd Engine & Publishing Cockpit)
 
-> **md²** (pronounced *md-squared*) stands for **mdBook deepDive**. Much like `vim` is a recursion of `vi`, **md²** is a recursive evolution of the `mdbook` ecosystem, transformed into an opinionated platform for the **Personal Knowledge Blockchain**.
+> **md²** (pronounced *md-squared*) stands for **mdBook deepDive**. Much like `vim` is a recursion of `vi`, **md²** is a recursive evolution of the `mdbook` ecosystem, transformed into an opinionated, multi-modal publishing web application for the **Personal Knowledge Blockchain**.
+
+---
+
+![md² Ingest Publishing Cockpit UI](screenshot.png)
 
 ---
 
@@ -8,96 +12,123 @@
 
 In the age of LLMs, the cost of generating information has collapsed to zero, but the cost of maintaining **Signal** has skyrocketed. Most research dies in transient chat windows. 
 
-**md²** is the engine for those who refuse to let their inquiries evaporate. It provides a formal framework to organize research into an immutable ledger of discovery:
+**md²** provides a formal framework to organize research into an immutable ledger of discovery:
 
-### 1. The Block Structure
-*   **Block 0 (The Genesis Block):** The hardcoded rules of your universe. It contains the **Six Foundational Pillars** (e.g., Bitcoin, Intelligence, Physics) that anchor all subsequent research.
-*   **Knowledge Blocks (Block 1, 2, ...):** Chronological epochs of discovery. Each block is limited by the **Law of 21**; once the 21st episodic transaction is mined, the block is locked into the permanent chain.
-*   **The Mempool:** The high-entropy zone for unconfirmed drafts and raw signal.
-
-### 2. The Genesis Bump (Hierarchy of Synthesis)
-Research in **md²** follows a "Bottom-Up Mining, Top-Down Reading" flow. As insights are discovered within individual episodes, they are "bumped up" to the **Block 0** pillars. Over time, the Genesis Block becomes a compressed, high-fidelity synthesis of your entire knowledge chain.
+* **Block 0 (The Genesis Block):** The hardcoded rules of your universe. It contains the **Six Foundational Pillars** (e.g., Bitcoin, Intelligence, Physics) that anchor all subsequent research.
+* **Knowledge Blocks (Block 1, 2, ...):** Chronological epochs of discovery. Each block is limited by the **Law of 21**; once the 21st episodic transaction is mined, the block is sealed into the permanent chain.
+* **The Mempool:** The volatile staging zone for unmined research drafts (`src/_<slug>.md`).
+* **The Block Template:** The active mining epoch holding verified episodes awaiting block seal.
 
 ---
 
-## The Multi-Modal Standard
+## The md² Publishing Cockpit (Web Application)
 
-**md²** transforms raw LLM intelligence into a "Clean Internet" publication that spans three densities:
+`mdIngest` includes a standalone, zero-dependency desktop web application styled in the **Shutri.com Minimalist Editorial design system** (`#fbf9f5` warm sand canvas, `#e7e5e4` stone borders, `#d97706` amber accents, and `#1c1917` ink typography).
 
-1.  **The Slice (Visual):** Cinematic video infographics (short-form) used as "Visual Covers."
-2.  **The Cake (Audio):** High-level audio overviews for podcast distribution (Spotify, Apple, Fountain).
-3.  **The Dough (Text):** Deep, KaTeX-hardened mathematical research papers anchored on `mdbook`.
+### 1. 3-Pane Modular Workspace
+
+* **Left Pane (Active Ledger Scope):**
+  * **Mempool Drafts:** Visual list of active drafts (`src/_<slug>.md`) with live status indicators.
+  * **Two-Way Inline Title Editor:** Hover `✏️` or double-click to edit summary titles with real-time 5-word limit badges. Auto-saves and synchronizes `SUMMARY.md` instantly.
+  * **Draft Management:** 1-Click `🗑️` deletion for unmined drafts with automatic tree reconciliation.
+  * **Block Template & Chain Archive:** Visual inspection of active epoch episodes and historical Genesis blocks.
+  * **Collapsible & Expandable:** Toggle via edge tabs (`LEDGER` / `STUDIO`) or keyboard shortcuts (`[` and `]`).
+
+* **Central Pane (Live Editorial Preview):**
+  * **Absolute KaTeX Pipeline:** High-fidelity mathematical formula rendering ($\mathbb{R}, \mathbb{C}, \mathbb{H}, \mathbb{O}$, Dirac spinors, quaternions, and matrices) with delimiter hardening.
+  * **Clean Paper Typography:** Seamless reading experience matching physical book aesthetics.
+  * **Podcast Syndication Strip:** Live preview links for Spotify, Apple Podcasts, YouTube Music, and Fountain.fm.
+
+* **Right Pane (Studio & Ingestion):**
+  * **Lossless `.py` Payload Extractor:** AST-driven Python script unpacker with live metadata diagnostics and citation counters.
+  * **Single-Asset Store Discovery:** Automatically discovers 740×740 square video clips and cover art across both `src/vid/` and DDMA single-asset archives.
+
+* **Top Command Bar:**
+  * **`⚡ Mine & Lock`:** 1-Click atomic mining—allocates the next sequential episode number (e.g. `# 247`), updates `SUMMARY.md`, and moves the draft into the Block Template.
+  * **`🟢 mdserve:3000` (Two-Way Toggle):** Starts/stops the local `mdbook serve` process on `0.0.0.0:3000` with live port probing.
+  * **`🚀 Push (Remote)`:** Stages, commits, and pushes changes to your remote Git repository with automated semantic messages.
+  * **`📋 Prompt`:** One-click clipboard copy of the canonical Master Packaging Prompt.
+  * **`⚙️ Settings`:** Manage podcast URLs and publishing word limits.
 
 ---
 
-## The Workflow: Mining Knowledge
+## Quick Start: Launching the Cockpit
 
-### Phase 1: Lossless Packaging
-To prevent "LLM Pruning" during export, use the **Master Packaging Prompt** to force the LLM to generate a self-extracting Python payload. This ensures 100% structural integrity and zero-loss transmission of complex math and citations.
+### Windows 1-Click Launcher
+Double-click `start_ui.bat` or run:
+```cmd
+start_ui.bat
+```
 
-### Phase 2: Ingestion & Sanitization
-Run the `md-publish` binary to "mine" the payload into the chain. The engine automatically:
-*   **Hardens KaTeX:** Fixes math delimiters and escapes currency for mdbook-katex compatibility.
-*   **Re-indexes Citations:** Manages sequential footnotes and duplicate references.
-*   **Syncs Sidebar:** Enforces the 3-layered 4-space hierarchy in `SUMMARY.md`.
-*   **Injects Multi-modal UI:** Adds the GitHub download CTA, lightning widgets, and video carousels.
-
----
-
-## Technical Installation
-
-### Dependencies
-- **Rust & Cargo:** (v1.88.0+)
-- **mdbook:** (v0.5.3+)
-- **mdbook-katex:** (v0.10.0-alpha+)
-- **Python 3:** For payload extraction.
-
-### Setup
+### Universal Launch (macOS / Linux / Windows)
 ```bash
-# 1. Clone the mdd engine
-git clone https://github.com/ashutoshmjain/mdIngest.git
-cd mdIngest
+python ui/server.py
+```
+This opens `http://localhost:8088` in your browser.
 
-# 2. Build the mining tool
-cargo build --release
+---
 
-# 3. Add to Path
-cp target/release/md-publish /usr/local/bin/
+## The Master Packaging Prompt
+
+*Copy this into Google Gemini, Claude, or ChatGPT to generate a 100% lossless self-extracting payload:*
+
+```text
+Objective: Package the complete exhaustive research from this session into a self-extracting Python script without summarizing or pruning.
+
+1. Packaging Requirements:
+* Full Fidelity: Package the exhaustive research in its entirety. Do not summarize or prune.
+* Absolute KaTeX: Wrap all mathematical notation and symbols in Absolute KaTeX delimiters: $...$ for inline and $$...$$ for block displays. Never leave whitespace adjacent to '$'. Escape financial dollar amounts as \$ (e.g. \$100M).
+* Hyperlinked Bibliography: Format every entry in the "Works Cited" section as a clickable Markdown link: [^N]: [Author, Title, Year](URL).
+* Title Header: Ensure the document begins with a strict H1 title adhering to a 5-word maximum limit: # [Title].
+
+2. Python Script Format:
+Create an executable Python script where the full exhaustive research markdown is stored in raw_markdown:
+
+raw_markdown = """
+# [Title]
+
+[Insert complete exhaustive markdown research here with $inline$ and $$block$$ math and [^1] citations...]
+"""
+
+if __name__ == '__main__':
+    with open('final_research.md', 'w', encoding='utf-8') as f:
+        f.write(raw_markdown)
+    print("✅ Extracted final_research.md successfully.")
 ```
 
 ---
 
-## Configuration (`book.toml`)
+## The Underlying Rust Preprocessor (`md-publish`)
 
+For automated headless CI/CD builds, `mdIngest` includes the high-performance `md-publish` Rust binary.
+
+### Build & Installation:
+```bash
+# Build the Rust preprocessor
+cargo build --release
+
+# Add to system PATH
+cp target/release/md-publish /usr/local/bin/
+```
+
+### `book.toml` Configuration:
 ```toml
 [preprocessor.ingest]
 command = "md-publish"
-downloads_path = "/path/to/your/downloads"
-video_source = "/path/to/your/video/archive"
+downloads_path = "/path/to/downloads"
+video_source = "/path/to/video/archive"
 lightning_address = "yourname@primal.net"
 title_word_limit = 5
 ```
 
 ---
 
-## The Master Packaging Prompt
+## Safety & Integrity Mechanisms
 
-*Copy this into your LLM session to generate a lossless export:*
-
-```text
-Objective: Convert the exhaustive research conducted in this session into a self-extracting Python payload to ensure 100% structural integrity and zero-loss transmission.
-
-1. Packaging Requirements:
-* Full Fidelity: Package the exhaustive research in its entirety. Do not summarize or prune.
-* Absolute KaTeX: Wrap all mathematical notation and symbols in Absolute KaTeX delimiters: $...$ for inline and $$...$$ for block displays.
-* Hyperlinked Bibliography: Format every entry in the "Works Cited" section as a clickable Markdown link: [^N]: [Author, Title, Year](URL).
-
-2. Technical Encoding:
-Generate a Python Script that performs the following:
-1. Assign the complete Markdown text to a variable named payload_text.
-2. Gzip-compress and Base64-encode the payload_text.
-3. Output the final Python script containing this encoded string and the logic to decode and write it to a file named final_research.md.
-```
+To ensure `SUMMARY.md` is never corrupted:
+1. **Automated Pre-Write Backups:** `server.py` writes rolling timestamped snapshots to `ingest/backups/SUMMARY_<timestamp>.md.bak` before every write.
+2. **Surgical AST Section Isolation:** Reconstructs Mempool and Block Template sections while keeping Genesis Pillars and Header links 100% immutable.
+3. **Git Atomic Versioning:** Every transaction is tracked in Git with 1-click rollback.
 
 ---
 

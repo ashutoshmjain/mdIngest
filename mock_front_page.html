@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>md² Ingest &bull; Publishing Cockpit (Shutri Pillar 2)</title>
+    
+    <!-- Fonts matching Shutri.com -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- KaTeX for live mathematical rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <!-- Marked.js for client-side markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        /* ==========================================================================
+           Shutri.com Minimalist Editorial Cockpit (Anthropic Warm Sand Palette)
+           ========================================================================== */
+        :root {
+            --bg-light: #fbf9f5;
+            --card-bg: #ffffff;
+            --border-light: #e7e5e4;
+            --border-light-hover: #d6d3d1;
+            --text-dark-primary: #1c1917;
+            --text-dark-secondary: #44403c;
+            --text-dark-muted: #78716c;
+            --accent-amber: #d97706;
+            --accent-amber-dark: #b45309;
+            --accent-indigo: #4f46e5;
+            --accent-emerald: #059669;
+            --tag-bg: #f5f5f4;
+            --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-light);
+            color: var(--text-dark-primary);
+            font-family: var(--font-sans);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* --------------------------------------------------------------------------
+           1. TOP COMMAND BAR (PUBLISHING STRIP)
+           -------------------------------------------------------------------------- */
+        .top-command-bar {
+            height: 60px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.25rem;
+            flex-shrink: 0;
+            z-index: 100;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-wordmark {
+            font-family: var(--font-sans);
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: 0.3em;
+            color: var(--text-dark-primary);
+            text-transform: uppercase;
+            text-decoration: none;
+        }
+
+        .brand-badge {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            font-weight: 600;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            border: 1px solid #fde68a;
+        }
+
+        .pane-toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            margin-left: 0.5rem;
+        }
+
+        .btn-pane-toggle {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.35rem 0.65rem;
+            border-radius: 5px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-light);
+            color: var(--text-dark-secondary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            transition: all 0.15s ease;
+        }
+
+        .btn-pane-toggle:hover {
+            border-color: var(--accent-amber);
+            color: var(--accent-amber-dark);
+            background: #ffffff;
+        }
+
+        .btn-pane-toggle.active {
+            background: var(--text-dark-primary);
+            color: #ffffff;
+            border-color: var(--text-dark-primary);
+        }
+
+        .command-center {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .ep-number-control {
+            display: flex;
+            align-items: center;
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            gap: 0.4rem;
+        }
+
+        .ep-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-amber-dark);
+        }
+
+        .ep-input {
+            width: 105px;
+            border: none;
+            background: transparent;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-dark-primary);
+            outline: none;
+        }
+
+        .btn-cmd {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 0.45rem 0.85rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background: var(--card-bg);
+            color: var(--text-dark-secondary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+
+        .btn-cmd:hover {
+            border-color: var(--accent-amber);
+            color: var(--accent-amber-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-cmd.primary {
+            background: var(--text-dark-primary);
+            color: #ffffff;
+            border-color: var(--text-dark-primary);
+        }
+
+        .btn-cmd.primary:hover {
+            background: var(--accent-amber-dark);
+            border-color: var(--accent-amber-dark);
+            color: #ffffff;
+        }
+
+        .btn-cmd.emerald {
+            background: var(--accent-emerald);
+            color: #ffffff;
+            border-color: var(--accent-emerald);
+        }
+
+        /* --------------------------------------------------------------------------
+           2. 3-PANE WORKSPACE LAYOUT WITH SMOOTH COLLAPSING (DDMA STYLE)
+           -------------------------------------------------------------------------- */
+        .cockpit-workspace {
+            display: flex;
+            flex-grow: 1;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --------------------------------------------------------------------------
+           LEFT PANE: EPISODE / PROJECT EXPLORER
+           -------------------------------------------------------------------------- */
+        .left-pane {
+            width: 300px;
+            min-width: 300px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s, border-color 0.28s;
+            flex-shrink: 0;
+        }
+
+        .left-pane.collapsed {
+            width: 0px !important;
+            min-width: 0px !important;
+            border-right-color: transparent;
+        }
+
+        .pane-header {
+            padding: 0.85rem 1.1rem;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .pane-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dark-muted);
+        }
+
+        .pane-close-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: var(--text-dark-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 2px 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .pane-close-btn:hover {
+            border-color: var(--border-light);
+            color: var(--text-dark-primary);
+            background: var(--bg-light);
+        }
+
+        .btn-new-ep {
+            width: calc(100% - 1.6rem);
+            margin: 0.85rem 0.8rem 0.4rem;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 700;
+            padding: 0.6rem;
+            border-radius: 6px;
+            border: 1px dashed var(--accent-amber);
+            background: #fffdfa;
+            color: var(--accent-amber-dark);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            flex-shrink: 0;
+        }
+
+        .btn-new-ep:hover {
+            background: var(--accent-amber);
+            color: #ffffff;
+            border-style: solid;
+        }
+
+        .tree-scroll-area {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0.5rem 0.85rem 1.5rem;
+        }
+
+        .tree-section-label {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-dark-muted);
+            margin: 1rem 0 0.4rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ep-card {
+            padding: 0.65rem 0.75rem;
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            margin-bottom: 0.45rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .ep-card:hover {
+            border-color: var(--border-light-hover);
+            background: #ffffff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+        }
+
+        .ep-card.active {
+            border-color: var(--accent-amber);
+            background: #ffffff;
+            box-shadow: 0 0 0 1px var(--accent-amber);
+        }
+
+        .ep-card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.2rem;
+        }
+
+        .ep-card-num {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-amber-dark);
+        }
+
+        .ep-card-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem;
+        }
+
+        .ep-card-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-dark-primary);
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+        }
+
+        .btn-edit-title-icon {
+            opacity: 0;
+            background: transparent;
+            border: none;
+            color: var(--text-dark-muted);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: all 0.15s ease;
+        }
+
+        .ep-card:hover .btn-edit-title-icon {
+            opacity: 0.8;
+        }
+
+        .btn-edit-title-icon:hover {
+            opacity: 1;
+            color: var(--accent-amber-dark);
+            background: #fef3c7;
+        }
+
+        /* Inline Title Editor on Left Pane */
+        .inline-title-editor-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            margin: 0.2rem 0;
+        }
+
+        .inline-title-input-row {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .inline-num-prefix {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--accent-amber-dark);
+            white-space: nowrap;
+        }
+
+        .inline-title-input {
+            width: 100%;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.25rem 0.4rem;
+            border: 1px solid var(--accent-amber);
+            border-radius: 4px;
+            background: #ffffff;
+            color: var(--text-dark-primary);
+            outline: none;
+        }
+
+        .word-count-badge {
+            font-family: var(--font-mono);
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 3px;
+            align-self: flex-start;
+        }
+
+        .word-count-badge.valid {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .word-count-badge.overflow {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .ep-card-tags {
+            display: flex;
+            gap: 0.3rem;
+            margin-top: 0.3rem;
+        }
+
+        .mini-tag {
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: #e7e5e4;
+            color: #57534e;
+        }
+
+        .mini-tag.mempool {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .mini-tag.ok {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* --------------------------------------------------------------------------
+           VERTICAL COLLAPSED STRIPS (CLICKABLE TO EXPAND)
+           -------------------------------------------------------------------------- */
+        .collapsed-strip {
+            width: 32px;
+            background: var(--card-bg);
+            border-right: 1px solid var(--border-light);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s, border-color 0.2s;
+            z-index: 10;
+            gap: 0.75rem;
+            padding: 1rem 0;
+            flex-shrink: 0;
+        }
+
+        .collapsed-strip:hover {
+            background: #fffdfa;
+            border-color: var(--accent-amber);
+        }
+
+        .collapsed-strip-right {
+            border-right: none;
+            border-left: 1px solid var(--border-light);
+        }
+
+        .collapsed-strip .strip-text {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            color: var(--text-dark-muted);
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+        }
+
+        .collapsed-strip:hover .strip-text {
+            color: var(--accent-amber-dark);
+        }
+
+        .collapsed-strip .strip-icon {
+            font-size: 0.8rem;
+            color: var(--accent-amber-dark);
+        }
+
+        /* --------------------------------------------------------------------------
+           CENTRAL PANE: LIVE KATEX & MARKDOWN PREVIEW
+           -------------------------------------------------------------------------- */
+        .central-pane {
+            flex: 1;
+            background: var(--bg-light);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .preview-top-toolbar {
+            height: 48px;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .preview-status {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            color: var(--text-dark-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .preview-content-scroll {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 2.25rem 3rem 5rem;
+        }
+
+        .paper-sheet {
+            max-width: 820px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 2.75rem 3.25rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            line-height: 1.75;
+            font-size: 0.95rem;
+        }
+
+        .paper-h1 {
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: var(--text-dark-primary);
+            line-height: 1.25;
+            margin-bottom: 1rem;
+        }
+
+        .audio-syndication-strip {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1.25rem 0 2rem;
+            flex-wrap: wrap;
+        }
+
+        .audio-pill {
+            background: #2e2e2e;
+            color: #ffffff;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .audio-pill:hover {
+            opacity: 0.85;
+        }
+
+        .rendered-body {
+            color: var(--text-dark-primary);
+            line-height: 1.8;
+            font-size: 0.98rem;
+        }
+
+        .rendered-body h2 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 2rem 0 0.85rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-dark-primary);
+        }
+
+        .rendered-body h3 {
+            font-size: 1.12rem;
+            font-weight: 700;
+            margin: 1.5rem 0 0.6rem;
+            color: var(--text-dark-secondary);
+        }
+
+        .rendered-body p {
+            margin-bottom: 1.15rem;
+        }
+
+        .rendered-body ul, .rendered-body ol {
+            margin: 0.75rem 0 1.25rem 1.5rem;
+        }
+
+        .rendered-body li {
+            margin-bottom: 0.4rem;
+        }
+
+        .rendered-body hr {
+            border: none;
+            border-top: 1px solid var(--border-light);
+            margin: 2rem 0;
+        }
+
+        .rendered-body blockquote {
+            border-left: 3px solid var(--accent-amber);
+            padding: 0.5rem 1rem;
+            margin: 1.25rem 0;
+            background: #fffdfa;
+            color: var(--text-dark-secondary);
+            font-style: italic;
+        }
+
+        .rendered-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: #f5f5f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-light);
+        }
+
+        .rendered-body pre {
+            background: #1c1917;
+            color: #f5f5f4;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 1.25rem 0;
+        }
+
+        .rendered-body pre code {
+            background: transparent;
+            border: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        .katex-display-block {
+            margin: 1.5rem 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 0.85rem 0;
+            text-align: center;
+        }
+
+        .katex-inline {
+            font-size: 1.05em;
+            padding: 0 2px;
+        }
+
+        /* --------------------------------------------------------------------------
+           RIGHT PANE: .PY PAYLOAD & MULTI-MODAL STUDIO
+           -------------------------------------------------------------------------- */
+        .right-pane {
+            width: 330px;
+            min-width: 330px;
+            background: var(--card-bg);
+            border-left: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 1.15rem;
+            gap: 1.15rem;
+            transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.28s, padding 0.28s, border-color 0.28s;
+            flex-shrink: 0;
+        }
+
+        .right-pane.collapsed {
+            width: 0px !important;
+            min-width: 0px !important;
+            padding: 0 !important;
+            border-left-color: transparent;
+            overflow: hidden;
+        }
+
+        .studio-card {
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 1.1rem;
+        }
+
+        .studio-title {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-dark-secondary);
+            margin-bottom: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .btn-select-file {
+            width: 100%;
+            padding: 1.15rem 1rem;
+            border: 2px dashed var(--border-light);
+            border-radius: 6px;
+            background: #ffffff;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-select-file:hover {
+            border-color: var(--accent-amber);
+            background: #fffdfa;
+        }
+
+        .meta-stat-row {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text-dark-secondary);
+        }
+
+        .meta-stat-row:last-child {
+            border-bottom: none;
+        }
+
+        /* --------------------------------------------------------------------------
+           MODALS (NEW PROJECT / MASTER PROMPT / SETTINGS)
+           -------------------------------------------------------------------------- */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(28, 25, 23, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: #ffffff;
+            border-radius: 12px;
+            max-width: 620px;
+            width: 100%;
+            border: 1px solid var(--border-light);
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .form-group {
+            margin-bottom: 1.15rem;
+        }
+
+        .form-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-dark-secondary);
+            margin-bottom: 0.35rem;
+            display: block;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            background: #ffffff;
+            color: var(--text-dark-primary);
+            outline: none;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            border-color: var(--accent-amber);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--text-dark-primary);
+            color: #ffffff;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            padding: 0.75rem 1.25rem;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.25s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. TOP COMMAND BAR -->
+    <header class="top-command-bar">
+        <div class="brand-section">
+            <a href="https://deepdive.shutri.com" target="_blank" class="brand-wordmark">S H U T R I &nbsp;md²</a>
+        </div>
+
+        <div class="command-center">
+            <!-- Episode Number Assignment (Auto-Calculated) -->
+            <div class="ep-number-control">
+                <span class="ep-label">NEXT EP:</span>
+                <input type="text" class="ep-input" id="top-ep-num" value="# 247 (Auto)" readonly title="Auto-assigned when locked from Mempool into Template">
+            </div>
+
+            <!-- Ingest & Lock Action -->
+            <button class="btn-cmd primary" onclick="triggerMineLock()" id="btn-lock">
+                <span>⚡</span> Mine &amp; Lock
+            </button>
+
+            <!-- Local mdbook serve -->
+            <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve">
+                <span>📖</span> mdserve (Local)
+            </button>
+
+            <!-- Remote Git Push -->
+            <button class="btn-cmd emerald" onclick="triggerPush()">
+                <span>🚀</span> Push (Remote)
+            </button>
+
+            <!-- Master Prompt Drawer -->
+            <button class="btn-cmd" onclick="openModal('prompt-modal')">
+                <span>📋</span> Prompt
+            </button>
+
+            <!-- Settings -->
+            <button class="btn-cmd" onclick="openModal('settings-modal')">
+                <span>⚙️</span> Settings
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. 3-PANE COCKPIT WORKSPACE WITH COLLAPSIBLE PANELS -->
+    <div class="cockpit-workspace">
+        
+        <!-- LEFT PANE: EPISODE / PROJECT EXPLORER -->
+        <aside class="left-pane" id="left-pane">
+            <div class="pane-header">
+                <span class="pane-title">Active Ledger Scope</span>
+                <button class="pane-close-btn" onclick="toggleLeftPane()" title="Collapse Ledger Sidebar (Click to close)">◀</button>
+            </div>
+
+            <!-- New Episode Button (Opens Project Name & .py Selector Modal) -->
+            <button class="btn-new-ep" onclick="openModal('new-ep-modal')">
+                <span>+</span> New Episode (&lt;name&gt;.py)
+            </button>
+
+            <div class="tree-scroll-area" id="tree-scroll-area">
+                <!-- Dynamically populated with active Mempool drafts & Block Template episodes only -->
+            </div>
+        </aside>
+
+        <!-- LEFT COLLAPSED STRIP (CLICK TO EXPAND) -->
+        <div class="collapsed-strip" id="left-collapsed-strip" onclick="toggleLeftPane()" title="Click to Expand Ledger Sidebar">
+            <span class="strip-icon">▶</span>
+            <span class="strip-text">LEDGER</span>
+        </div>
+
+        <!-- CENTRAL PANE: LIVE KATEX & MARKDOWN PREVIEW -->
+        <main class="central-pane" id="central-pane">
+            <div class="preview-top-toolbar">
+                <div class="preview-status">
+                    <span>📄 <strong id="current-preview-file">Select an episode</strong></span>
+                    <span>&bull;</span>
+                    <span id="current-stage-tag" style="background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 4px; font-weight: 700;">READY</span>
+                    <span>&bull;</span>
+                    <span>Words: <strong id="preview-words">0</strong></span>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
+                    <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="refreshCurrentEpisode()">Refresh</button>
+                </div>
+            </div>
+
+            <div class="preview-content-scroll">
+                <div class="paper-sheet" id="paper-sheet">
+                    <h1 class="paper-h1" id="preview-h1">md² Ingestion Cockpit</h1>
+                    <p style="color: var(--text-dark-secondary);">Select an active episode from the ledger on the left or create a new episode draft from a Python payload script.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT COLLAPSED STRIP (CLICK TO EXPAND) -->
+        <div class="collapsed-strip collapsed-strip-right" id="right-collapsed-strip" onclick="toggleRightPane()" title="Click to Expand Studio Sidebar">
+            <span class="strip-icon">◀</span>
+            <span class="strip-text">STUDIO</span>
+        </div>
+
+        <!-- RIGHT PANE: .PY PAYLOAD & MULTI-MODAL STUDIO -->
+        <aside class="right-pane" id="right-pane">
+            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem;">
+                <span class="pane-title">Studio &amp; Ingestion</span>
+                <button class="pane-close-btn" onclick="toggleRightPane()" title="Collapse Studio Sidebar (Click to close)">▶</button>
+            </div>
+            
+            <!-- Python Payload Section -->
+            <div class="studio-card">
+                <div class="studio-title">
+                    <span>🐍 Python Payload Script</span>
+                    <span style="color: var(--accent-emerald);" id="payload-status-tag">Ready</span>
+                </div>
+
+                <div class="btn-select-file" onclick="document.getElementById('file-picker-input').click()">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">📄</div>
+                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dark-primary);" id="file-picker-label">Select .py Script</div>
+                    <div style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dark-muted);">extract.py or custom .py</div>
+                    <input type="file" id="file-picker-input" accept=".py" style="display: none;" onchange="handleDirectFileLoaded(event)">
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <div class="meta-stat-row">
+                        <span>Active Item:</span>
+                        <strong id="meta-slug">None</strong>
+                    </div>
+                    <div class="meta-stat-row">
+                        <span>Next Ep Alloc:</span>
+                        <strong style="color: var(--accent-amber-dark);" id="meta-alloc"># 247</strong>
+                    </div>
+                    <div class="meta-stat-row">
+                        <span>Extracted MD:</span>
+                        <strong id="meta-size">-</strong>
+                    </div>
+                    <div class="meta-stat-row">
+                        <span>Citations:</span>
+                        <strong id="meta-citations">-</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cover Art Ingestion -->
+            <div class="studio-card">
+                <div class="studio-title">
+                    <span>🖼️ Cover Art Image</span>
+                    <span style="font-size: 0.7rem; color: var(--text-dark-muted);" id="img-path-tag">src/img/</span>
+                </div>
+
+                <div class="btn-select-file" style="padding: 0.85rem;" onclick="showToast('Cover Art Dropzone Ready')">
+                    <div style="font-size: 1.2rem;">🎨</div>
+                    <div style="font-size: 0.75rem; font-weight: 600;">Drop PNG/JPG Cover</div>
+                </div>
+            </div>
+
+            <!-- Video Carousels Ingestion -->
+            <div class="studio-card">
+                <div class="studio-title">
+                    <span>🎬 740&times;740 Square Videos</span>
+                    <span style="color: var(--accent-emerald); font-size: 0.7rem;" id="vid-status-tag">0 Found</span>
+                </div>
+
+                <div class="btn-select-file" style="padding: 0.85rem;" onclick="showToast('Video Clips Staged')">
+                    <div style="font-size: 1.2rem;">🎞️</div>
+                    <div style="font-size: 0.75rem; font-weight: 600;">Drop Square MP4 Clips</div>
+                </div>
+            </div>
+
+        </aside>
+
+    </div>
+
+    <!-- MODAL 1: NEW PROJECT / EPISODE CREATION (NAME + .PY SCRIPT) -->
+    <div class="modal-overlay" id="new-ep-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 style="font-size: 1.15rem; font-weight: 700;">+ Create New Episode Draft</h2>
+                <button onclick="closeModals()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1.25rem;">
+                Upload a Python payload script (<code style="font-family: var(--font-mono);">.py</code>). It will enter the <strong>Mempool</strong> under its initial <code style="font-family: var(--font-mono);">&lt;name&gt;</code> in <code style="font-family: var(--font-mono);">SUMMARY.md</code>, and auto-assign the next episode number when locked into the Template.
+            </p>
+
+            <div class="form-group">
+                <label class="form-label">1. Episode Draft Name / Slug &lt;name&gt;</label>
+                <input type="text" class="form-input" id="new-draft-slug" placeholder="e.g. qualia_gauge or universal_compression" value="universal_compression">
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dark-muted);">Used in SUMMARY.md Mempool as: <code id="slug-preview-tag">- [universal_compression](_universal_compression.md)</code></span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">2. Select Python Payload File (.py)</label>
+                <div class="btn-select-file" onclick="document.getElementById('modal-py-file').click()">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">🐍</div>
+                    <div style="font-weight: 700; font-size: 0.85rem;" id="modal-file-label">Browse for .py File...</div>
+                    <div style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dark-muted);">e.g. extract.py in Downloads</div>
+                    <input type="file" id="modal-py-file" accept=".py" style="display: none;" onchange="handleModalFileLoaded(event)">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">3. Optional Title Override (Max 5 Words)</label>
+                <input type="text" class="form-input" id="new-draft-title" placeholder="Leave blank to auto-detect from payload">
+            </div>
+
+            <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="submitNewEpisode()">
+                ⚡ Ingest to Mempool as Draft
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 2: MASTER LLM PACKAGING PROMPT -->
+    <div class="modal-overlay" id="prompt-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 style="font-size: 1.15rem; font-weight: 700;">📋 Master LLM Packaging Prompt</h2>
+                <button onclick="closeModals()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
+                Copy and paste this prompt into Google Gemini, Claude, or ChatGPT to generate the self-extracting Python (<code style="font-family: var(--font-mono);">.py</code>) payload.
+            </p>
+
+            <div style="background: #1c1917; color: #f5f5f4; padding: 1rem; border-radius: 6px; font-family: var(--font-mono); font-size: 0.78rem; max-height: 260px; overflow-y: auto; line-height: 1.5; margin-bottom: 1.25rem;">
+                <pre id="master-prompt-code">Objective: Package the complete exhaustive research from this session into a self-extracting Python script without summarizing or pruning.
+
+1. Packaging Requirements:
+* Full Fidelity: Package the exhaustive research in its entirety. Do not summarize or prune.
+* Absolute KaTeX: Wrap all mathematical notation and symbols in Absolute KaTeX delimiters: $...$ for inline and $$...$$ for block displays. Never leave whitespace adjacent to '$'. Escape financial dollar amounts as \$ (e.g. \$100M).
+* Hyperlinked Bibliography: Format every citation entry in Works Cited as a clickable Markdown link: [^N]: [Author, Title, Year](URL).
+* Title Header: Ensure the document begins with a strict H1 title adhering to a 5-word maximum limit: # [Title].
+
+2. Python Script Format:
+Create an executable Python script where the full exhaustive research markdown is stored in raw_markdown:
+
+raw_markdown = """
+# [Title]
+
+[Insert complete exhaustive markdown research here with $inline$ and $$block$$ math and [^1] citations...]
+"""
+
+if __name__ == '__main__':
+    with open('final_research.md', 'w', encoding='utf-8') as f:
+        f.write(raw_markdown)
+    print("✅ Extracted final_research.md successfully.")</pre>
+            </div>
+
+            <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="copyPrompt()">
+                📋 Copy Master Prompt to Clipboard
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 3: SETTINGS (MATCHING DDMA PATTERN) -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 style="font-size: 1.15rem; font-weight: 700;">⚙️ Publishing &amp; Platform Settings</h2>
+                <button onclick="closeModals()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Spotify Show URL</label>
+                <input type="text" class="form-input" id="setting-spotify">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Apple Podcasts URL</label>
+                <input type="text" class="form-input" id="setting-apple">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">YouTube Music Playlist URL</label>
+                <input type="text" class="form-input" id="setting-yt-music">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Fountain.fm Show URL</label>
+                <input type="text" class="form-input" id="setting-fountain">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Lightning Tips Address</label>
+                <input type="text" class="form-input" id="setting-lightning">
+            </div>
+
+            <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="saveSettings()">
+                💾 Save Configuration
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">Action Executed</div>
+
+    <script>
+        let currentStatus = null;
+        let selectedEpisode = null;
+        let stagedPayloadText = "";
+        let currentlyEditingFilename = null;
+
+        let leftPaneOpen = true;
+        let rightPaneOpen = true;
+
+        // Toggle Left Pane
+        function toggleLeftPane() {
+            leftPaneOpen = !leftPaneOpen;
+            const pane = document.getElementById('left-pane');
+            const strip = document.getElementById('left-collapsed-strip');
+
+            if (leftPaneOpen) {
+                pane.classList.remove('collapsed');
+                strip.style.display = 'none';
+            } else {
+                pane.classList.add('collapsed');
+                strip.style.display = 'flex';
+            }
+        }
+
+        // Toggle Right Pane
+        function toggleRightPane() {
+            rightPaneOpen = !rightPaneOpen;
+            const pane = document.getElementById('right-pane');
+            const strip = document.getElementById('right-collapsed-strip');
+
+            if (rightPaneOpen) {
+                pane.classList.remove('collapsed');
+                strip.style.display = 'none';
+            } else {
+                pane.classList.add('collapsed');
+                strip.style.display = 'flex';
+            }
+        }
+
+        // On page load: fetch system status
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchStatus();
+        });
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                currentStatus = data;
+                renderLedgerTree(data);
+
+                document.getElementById('top-ep-num').value = `# ${data.next_episode_number} (Auto)`;
+                document.getElementById('meta-alloc').innerText = `# ${data.next_episode_number}`;
+
+                // Update mdserve live button status
+                const serveBtn = document.getElementById('btn-serve');
+                if (data.is_serving) {
+                    serveBtn.style.background = '#dcfce7';
+                    serveBtn.style.color = '#166534';
+                    serveBtn.style.borderColor = '#86efac';
+                    serveBtn.innerHTML = '<span>🟢</span> mdserve:3000';
+                    serveBtn.title = 'mdBook is Running (Click to Stop)';
+                } else {
+                    serveBtn.style.background = '';
+                    serveBtn.style.color = '';
+                    serveBtn.style.borderColor = '';
+                    serveBtn.innerHTML = '<span>📖</span> mdserve (Local)';
+                    serveBtn.title = 'Start mdBook Preview Server on Port 3000';
+                }
+
+                // Auto-select first mempool or template episode if none selected
+                if (!selectedEpisode) {
+                    if (data.mempool && data.mempool.length > 0) {
+                        loadEpisode(data.mempool[0].filename);
+                    } else if (data.template && data.template.length > 0) {
+                        loadEpisode(data.template[0].filename);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch status:", err);
+            }
+        }
+
+        function renderLedgerTree(data) {
+            const container = document.getElementById('tree-scroll-area');
+            let html = '';
+
+            // 1. Mempool Section (Active Unconfirmed Drafts)
+            html += `
+            <div class="tree-section-label">
+                <span>Mempool (Active Drafts)</span>
+                <span style="color: var(--accent-amber); font-weight: 700;">${data.mempool ? data.mempool.length : 0}</span>
+            </div>`;
+
+            if (data.mempool && data.mempool.length > 0) {
+                data.mempool.forEach(item => {
+                    const activeClass = selectedEpisode && selectedEpisode.filename === item.filename ? 'active' : '';
+                    const isEditing = currentlyEditingFilename === item.filename;
+
+                    html += `
+                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" ondblclick="startInlineEdit('${item.filename}', false)" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
+                        <div class="ep-card-meta">
+                            <span class="ep-card-num" style="color: #92400e;">_${item.slug}</span>
+                            <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                <button class="btn-edit-title-icon" onclick="event.stopPropagation(); startInlineEdit('${item.filename}', false)" title="Edit Summary Title">✏️</button>
+                                <button class="btn-edit-title-icon" onclick="event.stopPropagation(); deleteMempoolDraft('${item.filename}')" title="Delete Draft">🗑️</button>
+                            </div>
+                        </div>
+                        
+                        ${isEditing ? renderInlineEditorHtml(item.filename, '', item.title) : `
+                        <div class="ep-card-title-row">
+                            <div class="ep-card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+                        </div>`}
+                        
+                        <div class="ep-card-tags">
+                            <span class="mini-tag mempool">Mempool Draft</span>
+                            ${item.has_image ? '<span class="mini-tag ok">Cover</span>' : ''}
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html += `<div style="font-size: 0.72rem; color: var(--text-dark-muted); font-family: var(--font-mono); padding: 0.4rem 0.2rem;">No drafts in Mempool.</div>`;
+            }
+
+            // 2. Block Template Section (Current Mining Epoch)
+            html += `
+            <div class="tree-section-label">
+                <span>Block Template (Active Epoch)</span>
+                <span style="color: var(--accent-indigo); font-weight: 700;">${data.template ? data.template.length : 0} / 21</span>
+            </div>`;
+
+            if (data.template && data.template.length > 0) {
+                data.template.forEach(item => {
+                    const activeClass = selectedEpisode && selectedEpisode.filename === item.filename ? 'active' : '';
+                    const isEditing = currentlyEditingFilename === item.filename;
+                    const cleanTitleOnly = item.title.replace(/^\d+\s*:\s*/, '');
+                    const prefix = item.number ? `${item.number} : ` : '';
+
+                    html += `
+                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" ondblclick="startInlineEdit('${item.filename}', true)" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
+                        <div class="ep-card-meta">
+                            <span class="ep-card-num"># ${item.number || item.slug}</span>
+                            <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                ${item.is_locked ? '<span style="font-size: 0.62rem; color: var(--accent-emerald); font-family: var(--font-mono);">Locked</span>' : ''}
+                                <button class="btn-edit-title-icon" onclick="event.stopPropagation(); startInlineEdit('${item.filename}', true)" title="Edit Summary Title">✏️</button>
+                            </div>
+                        </div>
+                        
+                        ${isEditing ? renderInlineEditorHtml(item.filename, prefix, cleanTitleOnly) : `
+                        <div class="ep-card-title-row">
+                            <div class="ep-card-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</div>
+                        </div>`}
+                        
+                        <div class="ep-card-tags">
+                            ${item.has_image ? '<span class="mini-tag ok">Cover</span>' : '<span class="mini-tag">No Cover</span>'}
+                            ${item.vid_count > 0 ? `<span class="mini-tag ok">${item.vid_count} Vids</span>` : '<span class="mini-tag">No Vid</span>'}
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html += `<div style="font-size: 0.72rem; color: var(--text-dark-muted); font-family: var(--font-mono); padding: 0.4rem 0.2rem;">No active template episodes.</div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderInlineEditorHtml(filename, prefix, titleText) {
+            const words = titleText.trim().split(/\s+/).filter(Boolean).length;
+            const validClass = words <= 5 ? 'valid' : 'overflow';
+            return `
+            <div class="inline-title-editor-wrap" onclick="event.stopPropagation()">
+                <div class="inline-title-input-row">
+                    ${prefix ? `<span class="inline-num-prefix">${prefix}</span>` : ''}
+                    <input type="text" class="inline-title-input" id="inline-input-${escapeId(filename)}" 
+                           value="${escapeHtml(titleText)}" 
+                           oninput="updateInlineWordCounter('${escapeId(filename)}', this.value)"
+                           onkeydown="handleInlineKey(event, '${filename}')"
+                           onblur="saveInlineEdit('${filename}', this.value)"
+                           autofocus>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="word-count-badge ${validClass}" id="badge-${escapeId(filename)}">${words}/5 words</span>
+                    <span style="font-size: 0.6rem; color: var(--text-dark-muted); font-family: var(--font-mono);">Enter ⏎ to save</span>
+                </div>
+            </div>`;
+        }
+
+        function startInlineEdit(filename, isTemplate) {
+            currentlyEditingFilename = filename;
+            renderLedgerTree(currentStatus);
+            setTimeout(() => {
+                const inp = document.getElementById(`inline-input-${escapeId(filename)}`);
+                if (inp) {
+                    inp.focus();
+                    inp.select();
+                }
+            }, 50);
+        }
+
+        function updateInlineWordCounter(escapedFn, val) {
+            const words = val.trim().split(/\s+/).filter(Boolean).length;
+            const badge = document.getElementById(`badge-${escapedFn}`);
+            if (badge) {
+                badge.innerText = `${words}/5 words`;
+                badge.className = `word-count-badge ${words <= 5 ? 'valid' : 'overflow'}`;
+            }
+        }
+
+        function handleInlineKey(e, filename) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveInlineEdit(filename, e.target.value);
+            } else if (e.key === 'Escape') {
+                currentlyEditingFilename = null;
+                renderLedgerTree(currentStatus);
+            }
+        }
+
+        async function saveInlineEdit(filename, newTitle) {
+            if (!currentlyEditingFilename) return;
+            currentlyEditingFilename = null;
+
+            const cleanText = newTitle.trim();
+            if (!cleanText) {
+                renderLedgerTree(currentStatus);
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/episode/update_title', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        filename: filename,
+                        title: cleanText
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ Updated Summary Title: ${data.formatted_title}`);
+                    await fetchStatus();
+                    if (selectedEpisode && selectedEpisode.filename === filename) {
+                        loadEpisode(filename);
+                    }
+                } else {
+                    renderLedgerTree(currentStatus);
+                }
+            } catch (err) {
+                console.error("Failed to update title:", err);
+                renderLedgerTree(currentStatus);
+            }
+        }
+
+        async function deleteMempoolDraft(filename) {
+            if (!confirm(`Are you sure you want to delete draft "${filename}"?`)) return;
+            try {
+                const res = await fetch('/api/mempool/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ filename: filename })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`🗑️ Deleted draft: ${filename}`);
+                    selectedEpisode = null;
+                    await fetchStatus();
+                }
+            } catch(err) {
+                console.error("Failed to delete draft:", err);
+            }
+        }
+
+        function promptEditSelectedTitle() {
+            if (!selectedEpisode) return;
+            startInlineEdit(selectedEpisode.filename, !selectedEpisode.is_draft);
+        }
+
+        async function loadEpisode(filename) {
+            try {
+                const res = await fetch(`/api/episode?filename=${encodeURIComponent(filename)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                selectedEpisode = data;
+
+                document.getElementById('current-preview-file').innerText = `src/${data.filename}`;
+                document.getElementById('preview-words').innerText = data.word_count;
+                document.getElementById('meta-slug').innerText = data.filename.replace('.md', '');
+                document.getElementById('img-path-tag').innerText = `src/img/${data.filename.replace('.md', '.png')}`;
+                document.getElementById('vid-status-tag').innerText = `${data.videos ? data.videos.length : 0} Found`;
+
+                const stageTag = document.getElementById('current-stage-tag');
+                if (data.is_draft) {
+                    stageTag.innerText = 'MEMPOOL DRAFT';
+                    stageTag.style.background = '#fef3c7';
+                    stageTag.style.color = '#92400e';
+                    document.getElementById('btn-lock').style.display = 'inline-flex';
+                } else {
+                    stageTag.innerText = `TEMPLATE (${data.filename.replace('.md', '')})`;
+                    stageTag.style.background = '#dbeafe';
+                    stageTag.style.color = '#1e40af';
+                }
+
+                renderMarkdownInPreview(data.content);
+                renderLedgerTree(currentStatus);
+            } catch (err) {
+                console.error("Failed to load episode:", err);
+            }
+        }
+
+        function renderMarkdownInPreview(mdContent) {
+            const sheet = document.getElementById('paper-sheet');
+            const h1Match = mdContent.match(/^#\s+(.*)$/m);
+            const title = h1Match ? h1Match[1] : "Untitled Episode";
+            const bodyContent = mdContent.replace(/^#\s+.*$/m, '').trim();
+
+            // 1. Math extraction & protection to prevent Markdown parser corruption
+            const blockMaths = [];
+            const inlineMaths = [];
+
+            // Protect block math $$...$$
+            let protectedMd = bodyContent.replace(/\$\$([\s\S]*?)\$\$/g, (m, code) => {
+                const idx = blockMaths.length;
+                blockMaths.push(code.trim());
+                return `%%%KATEX_BLOCK_${idx}%%%`;
+            });
+
+            // Protect inline math $...$
+            protectedMd = protectedMd.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g, (m, code) => {
+                const idx = inlineMaths.length;
+                inlineMaths.push(code.trim());
+                return `%%%KATEX_INLINE_${idx}%%%`;
+            });
+
+            // 2. Parse Markdown with marked.js
+            let parsedHtml = marked.parse(protectedMd);
+
+            // 3. Re-inject KaTeX rendered math strings
+            parsedHtml = parsedHtml.replace(/%%%KATEX_BLOCK_(\d+)%%%/g, (m, idx) => {
+                const formula = blockMaths[parseInt(idx, 10)];
+                if (!formula) return "";
+                try {
+                    if (window.katex) {
+                        return `<div class="katex-display-block">${katex.renderToString(formula, { displayMode: true, throwOnError: false })}</div>`;
+                    }
+                    return `<div class="katex-display-block">$$${formula}$$</div>`;
+                } catch(e) {
+                    return `<div class="katex-error">$$${formula}$$</div>`;
+                }
+            });
+
+            parsedHtml = parsedHtml.replace(/%%%KATEX_INLINE_(\d+)%%%/g, (m, idx) => {
+                const formula = inlineMaths[parseInt(idx, 10)];
+                if (!formula) return "";
+                try {
+                    if (window.katex) {
+                        return `<span class="katex-inline">${katex.renderToString(formula, { displayMode: false, throwOnError: false })}</span>`;
+                    }
+                    return `$${formula}$`;
+                } catch(e) {
+                    return `<span>$${formula}$</span>`;
+                }
+            });
+
+            sheet.innerHTML = `
+                <h1 class="paper-h1">${title}</h1>
+                <div class="audio-syndication-strip">
+                    <a href="${currentStatus?.settings?.spotify_url || '#'}" target="_blank" class="audio-pill">▶ Spotify</a>
+                    <a href="${currentStatus?.settings?.apple_podcasts_url || '#'}" target="_blank" class="audio-pill">◈ Apple Podcasts</a>
+                    <a href="${currentStatus?.settings?.youtube_music_url || '#'}" target="_blank" class="audio-pill">⫸ YouTube Music</a>
+                    <a href="${currentStatus?.settings?.fountain_url || '#'}" target="_blank" class="audio-pill">⚡ Fountain.fm</a>
+                </div>
+                <div class="rendered-body">${parsedHtml}</div>
+            `;
+        }
+
+        async function handleModalFileLoaded(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('modal-file-label').innerText = file.name;
+            const text = await file.text();
+            stagedPayloadText = text;
+
+            const res = await fetch('/api/payload/extract', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ code: text })
+            });
+            const data = await res.json();
+            if (data.success && data.title) {
+                document.getElementById('new-draft-title').value = data.title;
+                const autoSlug = data.title.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 30);
+                document.getElementById('new-draft-slug').value = autoSlug;
+                document.getElementById('slug-preview-tag').innerText = `- [${autoSlug}](_${autoSlug}.md)`;
+            }
+        }
+
+        async function submitNewEpisode() {
+            const slug = document.getElementById('new-draft-slug').value.trim() || 'new_draft';
+            const title = document.getElementById('new-draft-title').value.trim();
+
+            if (!stagedPayloadText) {
+                showToast('Please select a .py payload script first!');
+                return;
+            }
+
+            const res = await fetch('/api/mempool/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    slug: slug,
+                    title: title,
+                    content: stagedPayloadText
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                closeModals();
+                showToast(`✅ Created Mempool draft: src/${data.filename}`);
+                await fetchStatus();
+                loadEpisode(data.filename);
+            }
+        }
+
+        async function triggerMineLock() {
+            if (!selectedEpisode || !selectedEpisode.is_draft) {
+                showToast('Please select a Mempool draft to mine and lock!');
+                return;
+            }
+
+            const targetNum = currentStatus.next_episode_number;
+            const res = await fetch('/api/template/lock', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    filename: selectedEpisode.filename,
+                    number: targetNum
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                showToast(`⚡ Locked into Template as #${data.episode_number}!`);
+                await fetchStatus();
+                loadEpisode(data.filename);
+            }
+        }
+
+        async function toggleMdServe() {
+            const btn = document.getElementById('btn-serve');
+            btn.innerHTML = '<span>⏳</span> ...';
+            try {
+                const res = await fetch('/api/mdserve', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'toggle' })
+                });
+                const data = await res.json();
+                if (data.is_serving) {
+                    btn.style.background = '#dcfce7';
+                    btn.style.color = '#166534';
+                    btn.style.borderColor = '#86efac';
+                    btn.innerHTML = '<span>🟢</span> mdserve:3000';
+                    btn.title = 'mdBook is Running (Click to Stop)';
+                    showToast('🟢 mdBook serve running on http://localhost:3000');
+                } else {
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                    btn.innerHTML = '<span>📖</span> mdserve (Local)';
+                    btn.title = 'Start mdBook Preview Server on Port 3000';
+                    showToast('🛑 mdBook serve stopped');
+                }
+            } catch(err) {
+                console.error("Failed to toggle mdserve:", err);
+                await fetchStatus();
+            }
+        }
+
+        async function triggerPush() {
+            const epNum = selectedEpisode ? selectedEpisode.filename.replace('.md', '') : 'update';
+            showToast('🚀 Pushing changes to remote repository...');
+            const res = await fetch('/api/git/push', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ number: epNum })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message);
+            } else {
+                showToast('Git error: ' + (data.error || 'Check terminal'));
+            }
+        }
+
+        function copyPrompt() {
+            const text = document.getElementById('master-prompt-code').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('📋 Master Prompt copied to clipboard!');
+                closeModals();
+            });
+        }
+
+        function copyCurrentMarkdown() {
+            if (selectedEpisode && selectedEpisode.content) {
+                navigator.clipboard.writeText(selectedEpisode.content).then(() => {
+                    showToast('Markdown source copied!');
+                });
+            }
+        }
+
+        function refreshCurrentEpisode() {
+            if (selectedEpisode) {
+                loadEpisode(selectedEpisode.filename);
+                showToast('Refreshed episode view');
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+            if (id === 'settings-modal' && currentStatus?.settings) {
+                document.getElementById('setting-spotify').value = currentStatus.settings.spotify_url || '';
+                document.getElementById('setting-apple').value = currentStatus.settings.apple_podcasts_url || '';
+                document.getElementById('setting-yt-music').value = currentStatus.settings.youtube_music_url || '';
+                document.getElementById('setting-fountain').value = currentStatus.settings.fountain_url || '';
+                document.getElementById('setting-lightning').value = currentStatus.settings.lightning_address || '';
+            }
+        }
+
+        function closeModals() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        }
+
+        async function saveSettings() {
+            const payload = {
+                ...currentStatus.settings,
+                spotify_url: document.getElementById('setting-spotify').value,
+                apple_podcasts_url: document.getElementById('setting-apple').value,
+                youtube_music_url: document.getElementById('setting-yt-music').value,
+                fountain_url: document.getElementById('setting-fountain').value,
+                lightning_address: document.getElementById('setting-lightning').value,
+            };
+            await fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            closeModals();
+            showToast('💾 Settings saved!');
+            fetchStatus();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        function escapeHtml(text) {
+            return (text || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function escapeId(str) {
+            return (str || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        }
+
+        document.getElementById('new-draft-slug').addEventListener('input', (e) => {
+            const val = e.target.value || '<name>';
+            document.getElementById('slug-preview-tag').innerText = `- [${val}](_${val}.md)`;
+        });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModals();
+                if (currentlyEditingFilename) {
+                    currentlyEditingFilename = null;
+                    renderLedgerTree(currentStatus);
+                }
+            }
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                if (e.key === '[') toggleLeftPane();
+                if (e.key === ']') toggleRightPane();
+            }
+        });
+    </script>
+</body>
+</html>

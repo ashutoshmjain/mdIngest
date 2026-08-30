@@ -1,0 +1,13 @@
+{
+  "spotify_url": "https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE",
+  "apple_podcasts_url": "https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251",
+  "youtube_music_url": "https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe",
+  "fountain_url": "https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF",
+  "tiktok_handle": "@shutoshabot",
+  "instagram_handle": "@shutoshabot",
+  "lightning_address": "shutosha@primal.net",
+  "downloads_path": "C:/Users/ashut/Downloads",
+  "title_word_limit": 5,
+  "recent_window_size": 21,
+  "port": 8088
+}
