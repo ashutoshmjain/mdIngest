@@ -369,19 +369,44 @@ fn ingest_video(number: &str, source: &str, _config: &IngestConfig) -> Result<()
 }
 
 fn inject_video_carousel(number: &str, config: &IngestConfig) -> Result<()> {
-    let vid_dir = "src/vid";
-    let pattern = format!("{}/{}*.mp4", vid_dir, number);
-    let mut vids: Vec<String> = Vec::new();
-    if let Ok(paths) = glob(&pattern) {
+    let mut vids: Vec<(String, String)> = Vec::new();
+
+    // 1. Check Canonical DDMA directory (src/ddma/docs/episodes/<number>/clips/*.mp4)
+    let ddma_pattern = format!("src/ddma/docs/episodes/{}/clips/*.mp4", number);
+    if let Ok(paths) = glob(&ddma_pattern) {
         for path in paths.filter_map(Result::ok) {
             let filename = path.file_name().unwrap().to_str().unwrap().to_string();
-            // Ignore merged/composite videos if they exist
-            if !filename.contains("merged") {
-                vids.push(filename);
+            if !filename.contains("merged") && !filename.contains("-original") {
+                let title = filename.trim_end_matches(".mp4").to_string();
+                let url = format!("ddma/docs/episodes/{}/clips/{}", number, filename);
+                vids.push((title, url));
             }
         }
     }
-    vids.sort();
+
+    // 2. Fallback to legacy src/vid/<number>*.mp4
+    if vids.is_empty() {
+        let vid_pattern = format!("src/vid/{}*.mp4", number);
+        if let Ok(paths) = glob(&vid_pattern) {
+            for path in paths.filter_map(Result::ok) {
+                let filename = path.file_name().unwrap().to_str().unwrap().to_string();
+                if !filename.contains("merged") {
+                    let title = filename.trim_end_matches(".mp4").to_string();
+                    let url = format!("vid/{}", filename);
+                    vids.push((title, url));
+                }
+            }
+        }
+    }
+
+    vids.sort_by(|a, b| {
+        let num_a: Option<u32> = a.0.split('-').last().and_then(|s| s.parse().ok());
+        let num_b: Option<u32> = b.0.split('-').last().and_then(|s| s.parse().ok());
+        match (num_a, num_b) {
+            (Some(na), Some(nb)) => na.cmp(&nb),
+            _ => a.0.cmp(&b.0)
+        }
+    });
 
     if vids.is_empty() {
         return Ok(());
@@ -395,10 +420,9 @@ fn inject_video_carousel(number: &str, config: &IngestConfig) -> Result<()> {
     html.push_str("<!-- VIDEO_STRIP_START -->\n\n");
     html.push_str("<div class=\"video-carousel-container\" style=\"display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;\">\n");
 
-    for vid in &vids {
-        let title = vid.trim_end_matches(".mp4");
+    for (title, vid_url) in &vids {
         html.push_str("  <div style=\"flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.3);\">\n");
-        html.push_str(&format!("    <video src=\"vid/{}\" style=\"width: 100%; height: 85%; object-fit: contain;\" playsinline loop preload=\"auto\" muted autoplay></video>\n", vid));
+        html.push_str(&format!("    <video src=\"{}\" style=\"width: 100%; height: 85%; object-fit: contain;\" playsinline loop preload=\"auto\" muted autoplay></video>\n", vid_url));
         html.push_str(&format!("    <div style=\"height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;\">{}</div>\n", title));
         html.push_str("    <button class=\"vid-toggle\" onclick=\"window.oph_play_toggle(this)\" style=\"position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; font-size: 22px; z-index: 100;\">🔇</button>\n");
         html.push_str("  </div>\n");

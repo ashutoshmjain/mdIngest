@@ -1609,7 +1609,9 @@ if __name__ == '__main__':
             const sheet = document.getElementById('paper-sheet');
             const h1Match = mdContent.match(/^#\s+(.*)$/m);
             const title = h1Match ? h1Match[1] : "Untitled Episode";
-            const bodyContent = mdContent.replace(/^#\s+.*$/m, '').trim();
+            let bodyContent = mdContent.replace(/^#\s+.*$/m, '').trim();
+            // Clean out raw VIDEO_STRIP blocks so it doesn't duplicate with dynamic carousel
+            bodyContent = bodyContent.replace(/<!-- VIDEO_STRIP_START -->[\s\S]*?<!-- VIDEO_STRIP_END -->/gi, '').trim();
 
             // 1. Math extraction & protection to prevent Markdown parser corruption
             const blockMaths = [];
@@ -1689,6 +1691,11 @@ if __name__ == '__main__':
                         </div>
                         <div class="infographic-carousel-track">
                             ${vidCards}
+                        </div>
+                        <div style="display: flex; gap: 0.6rem; justify-content: center; margin-top: 0.85rem;">
+                            <a href="https://www.tiktok.com/@shutoshabot" target="_blank" class="audio-pill" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;">▶ TikTok</a>
+                            <a href="https://www.instagram.com/shutoshabot/" target="_blank" class="audio-pill" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;">◈ Instagram</a>
+                            <a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37q8rU8HKTLhdLPZQadcvx-K" target="_blank" class="audio-pill" style="font-size: 0.72rem; padding: 0.25rem 0.6rem;">⫸ YouTube</a>
                         </div>
                     </div>
                 `;
