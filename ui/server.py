@@ -254,28 +254,34 @@ def extract_python_payload(payload_code: str) -> tuple[str, str, int, int]:
 
     raise ValueError("Could not extract markdown content from the uploaded payload.")
 
-def find_episode_videos(slug_or_num: str) -> list[str]:
+def find_episode_videos(slug_or_num: str) -> list[dict]:
     """
-    Discovers video clips across both src/vid/ and the DDMA single-asset store.
+    Discovers video clips across canonical DDMA episodes store (src/ddma/docs/episodes/)
+    and legacy fallback directories per agent.md.
     """
     clean_id = str(slug_or_num).replace('.md', '').lstrip('_')
     candidates = []
 
-    # 1. src/vid/<clean_id>-*.mp4
-    candidates.extend(VID_DIR.glob(f"{clean_id}-*.mp4"))
-    candidates.extend(VID_DIR.glob(f"_{clean_id}-*.mp4"))
+    # 1. Modern Canonical DDMA Standard (src/ddma/docs/episodes/<ep>/clips/)
+    canonical_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "clips"
+    if canonical_ep_dir.exists():
+        candidates.extend(canonical_ep_dir.glob("*.mp4"))
 
-    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4
+    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4 (Root fallback)
     ep_clips_dir = PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id / "clips"
     if ep_clips_dir.exists():
         candidates.extend(ep_clips_dir.glob("*.mp4"))
 
-    # 3. ddma/docs/assets/clips/<clean_id>-*.mp4
+    # 3. Legacy episodes store (src/vid/<clean_id>-*.mp4)
+    candidates.extend(VID_DIR.glob(f"{clean_id}-*.mp4"))
+    candidates.extend(VID_DIR.glob(f"_{clean_id}-*.mp4"))
+
+    # 4. ddma/docs/assets/clips/<clean_id>-*.mp4
     assets_clips_dir = PROJECT_ROOT / "ddma" / "docs" / "assets" / "clips"
     if assets_clips_dir.exists():
         candidates.extend(assets_clips_dir.glob(f"{clean_id}-*.mp4"))
 
-    # 4. ddma/clips/<clean_id>-*.mp4
+    # 5. ddma/clips/<clean_id>-*.mp4
     ddma_clips_dir = PROJECT_ROOT / "ddma" / "clips"
     if ddma_clips_dir.exists():
         candidates.extend(ddma_clips_dir.glob(f"{clean_id}-*.mp4"))
@@ -287,11 +293,16 @@ def find_episode_videos(slug_or_num: str) -> list[str]:
         if name in seen or "-original.mp4" in name or "-mosaic-" in name:
             continue
         seen.add(name)
-        final_clips.append(name)
+        clip_label = name.replace('.mp4', '').replace('_', ' ')
+        final_clips.append({
+            "name": name,
+            "url": f"/media/ddma/docs/episodes/{clean_id}/clips/{name}" if "ddma" in str(path) else f"/vid/{name}",
+            "label": clip_label
+        })
 
-    def sort_key(s):
-        nums = re.findall(r'\d+', s)
-        return [int(n) for n in nums] if nums else [s]
+    def sort_key(clip):
+        nums = re.findall(r'\d+', clip["name"])
+        return [int(n) for n in nums] if nums else [clip["name"]]
 
     final_clips.sort(key=sort_key)
     return final_clips
@@ -539,8 +550,93 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(load_settings())
             return
 
+        # Media Streaming routes for video clips and cover images
+        if path.startswith("/media/") or path.startswith("/vid/") or path.startswith("/img/") or path.startswith("/src/"):
+            clean_path = path.lstrip("/")
+            if clean_path.startswith("media/"):
+                clean_path = clean_path[len("media/"):]
+
+            target_file = None
+            possible_paths = [
+                SRC_DIR / clean_path,
+                PROJECT_ROOT / clean_path,
+                SRC_DIR / "ddma" / "docs" / "episodes" / clean_path,
+                PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_path,
+                SRC_DIR / "vid" / Path(clean_path).name,
+                SRC_DIR / "img" / Path(clean_path).name,
+            ]
+            for p in possible_paths:
+                if p.exists() and p.is_file():
+                    target_file = p
+                    break
+
+            if not target_file:
+                fname = Path(clean_path).name
+                ep_match = re.search(r'(\d+)', fname)
+                ep_num = ep_match.group(1) if ep_match else ""
+                if ep_num:
+                    p1 = SRC_DIR / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
+                    p2 = PROJECT_ROOT / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
+                    if p1.exists(): target_file = p1
+                    elif p2.exists(): target_file = p2
+
+            if target_file and target_file.exists():
+                self.serve_media_file(target_file)
+                return
+            else:
+                self.send_error(404, "Media file not found")
+                return
+
         # Serve static files from ingest/
         return super().do_GET()
+
+    def serve_media_file(self, file_path: Path):
+        """Streams media files (videos, images) with HTTP Range support."""
+        try:
+            file_size = file_path.stat().st_size
+            ext = file_path.suffix.lower()
+            mime_type = "video/mp4" if ext == ".mp4" else "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "application/octet-stream"
+
+            range_header = self.headers.get('Range')
+            if range_header and range_header.startswith('bytes='):
+                bytes_range = range_header[6:].split('-')
+                start = int(bytes_range[0]) if bytes_range[0] else 0
+                end = int(bytes_range[1]) if len(bytes_range) > 1 and bytes_range[1] else file_size - 1
+                end = min(end, file_size - 1)
+                length = end - start + 1
+
+                self.send_response(206)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                self.send_header('Content-Length', str(length))
+                self.send_header('Accept-Ranges', 'bytes')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                with open(file_path, 'rb') as f:
+                    f.seek(start)
+                    bytes_remaining = length
+                    while bytes_remaining > 0:
+                        chunk_size = min(64 * 1024, bytes_remaining)
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        bytes_remaining -= len(chunk)
+            else:
+                self.send_response(200)
+                self.send_header('Content-Type', mime_type)
+                self.send_header('Content-Length', str(file_size))
+                self.send_header('Accept-Ranges', 'bytes')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                with open(file_path, 'rb') as f:
+                    shutil.copyfileobj(f, self.wfile)
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception:
+            pass
 
     def do_POST(self):
         url = urlparse(self.path)
