@@ -10,3 +10,17 @@ book/
 # Added by cargo
 
 /target
+
+# Big raw audio files & local scratch transcripts
+*.mp3
+*.wav
+*.m4a
+*.ogg
+*.aac
+*.flac
+**/audio/
+**/transcripts/
+**/audio.*
+**/transcript.txt
+*.bak
+*.py.bak

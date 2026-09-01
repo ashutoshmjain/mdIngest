@@ -322,6 +322,36 @@ def find_episode_cover(slug_or_num: str) -> bool:
         return True
     return False
 
+# Active transcription jobs: { clean_id: { "status": "idle"|"processing"|"done"|"error", "progress": str, "error": str } }
+transcription_jobs = {}
+
+def get_episode_audio_path(clean_id: str) -> Path | None:
+    """Discovers local NotebookLM audio file for an episode."""
+    possible_dirs = [
+        SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
+        PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,
+        SRC_DIR / "audio",
+        PROJECT_ROOT / "ddma" / "audio",
+    ]
+    for d in possible_dirs:
+        for ext in [".mp3", ".wav", ".m4a", ".ogg", ".aac"]:
+            f = d / f"audio{ext}"
+            if f.exists():
+                return f
+            f_named = d / f"{clean_id}{ext}"
+            if f_named.exists():
+                return f_named
+            f_nb = d / f"notebooklm{ext}"
+            if f_nb.exists():
+                return f_nb
+    return None
+
+def get_episode_transcript_path(clean_id: str) -> Path:
+    """Returns canonical path to episode transcript.txt (ensuring directory exists)."""
+    target_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    return target_dir / "transcript.txt"
+
 def parse_summary_structure():
     """
     Parses SUMMARY.md and discovers Mempool drafts, Template episodes, and Master Chain blocks.
@@ -543,6 +573,44 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "has_cover": has_cover,
                 "videos": vids,
                 "is_draft": fn.startswith("_")
+            })
+            return
+
+        if path == "/api/audio/status":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            audio_path = get_episode_audio_path(clean_id)
+            transcript_path = get_episode_transcript_path(clean_id)
+
+            transcript_text = ""
+            if transcript_path.exists():
+                try:
+                    with open(transcript_path, "r", encoding="utf-8") as f:
+                        transcript_text = f.read()
+                except Exception:
+                    pass
+
+            job = transcription_jobs.get(clean_id, {"status": "idle", "progress": ""})
+
+            audio_rel_url = None
+            if audio_path:
+                try:
+                    rel = audio_path.relative_to(SRC_DIR)
+                    audio_rel_url = f"/src/{rel.as_posix()}"
+                except ValueError:
+                    audio_rel_url = f"/media/{audio_path.name}"
+
+            self.send_json({
+                "clean_id": clean_id,
+                "has_audio": audio_path is not None,
+                "audio_filename": audio_path.name if audio_path else None,
+                "audio_url": audio_rel_url,
+                "has_transcript": len(transcript_text.strip()) > 0,
+                "transcript": transcript_text,
+                "job_status": job.get("status", "idle"),
+                "job_progress": job.get("progress", ""),
+                "job_error": job.get("error", "")
             })
             return
 
@@ -880,6 +948,105 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_json({"success": True, "is_serving": True, "url": "http://localhost:3000"})
                 except Exception as e:
                     self.send_json({"success": False, "error": str(e)})
+            return
+
+        if path == "/api/audio/upload":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            b64_data = data.get("audio_base64", "")
+            ext = data.get("ext", "mp3").lstrip(".").lower()
+
+            if not clean_id or not b64_data:
+                self.send_error(400, "Missing filename or audio_base64")
+                return
+
+            try:
+                raw_bytes = base64.b64decode(b64_data)
+                target_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_file = target_dir / f"audio.{ext}"
+
+                with open(target_file, "wb") as f:
+                    f.write(raw_bytes)
+
+                self.send_json({
+                    "success": True,
+                    "clean_id": clean_id,
+                    "audio_filename": f"audio.{ext}",
+                    "audio_url": f"/src/ddma/docs/episodes/{clean_id}/audio.{ext}",
+                    "size_bytes": len(raw_bytes)
+                })
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)})
+            return
+
+        if path == "/api/audio/transcribe":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            model_name = data.get("model", "base")
+
+            audio_path = get_episode_audio_path(clean_id)
+            if not audio_path or not audio_path.exists():
+                self.send_json({"success": False, "error": "No audio file found for this episode."})
+                return
+
+            def transcribe_worker(cid, apath, mname):
+                transcription_jobs[cid] = {"status": "processing", "progress": f"Loading Whisper ({mname})..."}
+                try:
+                    import whisper
+                    transcription_jobs[cid]["progress"] = f"Transcribing audio with {mname} model..."
+                    model = whisper.load_model(mname)
+                    result = model.transcribe(str(apath), fp16=False)
+                    text = result.get("text", "").strip()
+
+                    t_path = get_episode_transcript_path(cid)
+                    with open(t_path, "w", encoding="utf-8") as f:
+                        f.write(text)
+
+                    transcription_jobs[cid] = {"status": "done", "progress": "Transcription complete!", "text": text}
+                except Exception as e:
+                    transcription_jobs[cid] = {"status": "error", "progress": "Transcription failed", "error": str(e)}
+
+            threading.Thread(target=transcribe_worker, args=(clean_id, audio_path, model_name), daemon=True).start()
+            self.send_json({"success": True, "message": f"Transcription started with Whisper ({model_name})."})
+            return
+
+        if path == "/api/transcript/save":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            transcript_text = data.get("transcript", "")
+
+            t_path = get_episode_transcript_path(clean_id)
+            with open(t_path, "w", encoding="utf-8") as f:
+                f.write(transcript_text)
+
+            self.send_json({"success": True, "clean_id": clean_id, "length": len(transcript_text)})
+            return
+
+        if path == "/api/transcript/open_external":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            t_path = get_episode_transcript_path(clean_id)
+            if not t_path.exists():
+                with open(t_path, "w", encoding="utf-8") as f:
+                    f.write("# NotebookLM Transcript\n\n")
+
+            editor_opened = False
+            for ed in ["nvim", "gvim", "vim", "code", "notepad"]:
+                try:
+                    if shutil.which(ed):
+                        subprocess.Popen([ed, str(t_path)])
+                        editor_opened = True
+                        break
+                except Exception:
+                    pass
+
+            if not editor_opened:
+                if sys.platform == "win32":
+                    os.startfile(str(t_path))
+                    editor_opened = True
+
+            self.send_json({"success": editor_opened, "path": str(t_path)})
             return
 
         if path == "/api/git/push":

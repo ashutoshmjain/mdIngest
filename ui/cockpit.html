@@ -833,11 +833,11 @@
         }
 
         /* --------------------------------------------------------------------------
-           RIGHT PANE: .PY PAYLOAD & MULTI-MODAL STUDIO
+           RIGHT PANE: AUDIO STUDIO & NARRATIVE DECK
            -------------------------------------------------------------------------- */
         .right-pane {
-            width: 330px;
-            min-width: 330px;
+            width: 410px;
+            min-width: 410px;
             background: var(--card-bg);
             border-left: 1px solid var(--border-light);
             display: flex;
@@ -857,11 +857,84 @@
             overflow: hidden;
         }
 
-        .studio-card {
+        .audio-card {
             background: var(--bg-light);
             border: 1px solid var(--border-light);
             border-radius: 8px;
-            padding: 1.1rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .audio-player-wrapper {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .transcript-container {
+            position: relative;
+            background: #1c1917;
+            border-radius: 6px;
+            border: 1px solid #292524;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .transcript-toolbar {
+            background: #292524;
+            color: #d6d3d1;
+            padding: 0.4rem 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            border-bottom: 1px solid #3f3f46;
+        }
+
+        .transcript-textarea {
+            width: 100%;
+            height: 230px;
+            background: #18181b;
+            color: #f4f4f5;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.5;
+            padding: 0.75rem;
+            border: none;
+            outline: none;
+            resize: vertical;
+            white-space: pre-wrap;
+        }
+
+        .transcript-textarea:focus {
+            background: #141417;
+        }
+
+        .vim-mode-badge {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #d97706;
+            color: #ffffff;
+            letter-spacing: 0.05em;
+        }
+
+        .vim-mode-badge.insert {
+            background: #10b981;
+        }
+
+        .vim-mode-badge.off {
+            background: #71717a;
         }
 
         .studio-title {
@@ -1103,71 +1176,95 @@
             <span class="strip-text">STUDIO</span>
         </div>
 
-        <!-- RIGHT PANE: .PY PAYLOAD & MULTI-MODAL STUDIO -->
+        <!-- RIGHT PANE: AUDIO STUDIO & NARRATIVE DECK -->
         <aside class="right-pane" id="right-pane">
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem;">
-                <span class="pane-title">Studio &amp; Ingestion</span>
-                <button class="pane-close-btn" onclick="toggleRightPane()" title="Collapse Studio Sidebar (Click to close)">▶</button>
+                <span class="pane-title">🎙️ Audio Studio &amp; Narrative</span>
+                <button class="pane-close-btn" onclick="toggleRightPane()" title="Collapse Audio Sidebar (Click to close)">▶</button>
             </div>
             
-            <!-- Python Payload Section -->
-            <div class="studio-card">
-                <div class="studio-title">
-                    <span>🐍 Python Payload Script</span>
-                    <span style="color: var(--accent-emerald);" id="payload-status-tag">Ready</span>
+            <!-- 1. NotebookLM Audio Deep Dive Section -->
+            <div class="audio-card">
+                <div class="studio-title" style="margin-bottom: 0.5rem;">
+                    <span>🎙️ NotebookLM Audio</span>
+                    <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
                 </div>
 
-                <div class="btn-select-file" onclick="document.getElementById('file-picker-input').click()">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">📄</div>
-                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dark-primary);" id="file-picker-label">Select .py Script</div>
-                    <div style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dark-muted);">extract.py or custom .py</div>
-                    <input type="file" id="file-picker-input" accept=".py" style="display: none;" onchange="handleDirectFileLoaded(event)">
+                <!-- Dropzone / Audio Selector -->
+                <div class="btn-select-file" id="audio-dropzone" onclick="document.getElementById('audio-file-input').click()">
+                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎵</div>
+                    <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop NotebookLM Audio</div>
+                    <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted);">.mp3, .wav, .m4a (Gitignored)</div>
+                    <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a,.ogg,.aac" style="display: none;" onchange="handleAudioFileSelected(event)">
                 </div>
 
-                <div style="margin-top: 1rem;">
-                    <div class="meta-stat-row">
-                        <span>Active Item:</span>
-                        <strong id="meta-slug">None</strong>
-                    </div>
-                    <div class="meta-stat-row">
-                        <span>Next Ep Alloc:</span>
-                        <strong style="color: var(--accent-amber-dark);" id="meta-alloc"># 247</strong>
-                    </div>
-                    <div class="meta-stat-row">
-                        <span>Extracted MD:</span>
-                        <strong id="meta-size">-</strong>
-                    </div>
-                    <div class="meta-stat-row">
-                        <span>Citations:</span>
-                        <strong id="meta-citations">-</strong>
+                <!-- Embedded Audio Player -->
+                <div class="audio-player-wrapper" id="audio-player-container" style="display: none;">
+                    <audio id="native-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-dark-muted);">
+                        <span id="audio-filename-display">audio.mp3</span>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.0)">1x</button>
+                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.5)">1.5x</button>
+                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(2.0)">2x</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Cover Art Ingestion -->
-            <div class="studio-card">
-                <div class="studio-title">
-                    <span>🖼️ Cover Art Image</span>
-                    <span style="font-size: 0.7rem; color: var(--text-dark-muted);" id="img-path-tag">src/img/</span>
+            <!-- 2. Local Whisper Speech-to-Text Engine -->
+            <div class="audio-card">
+                <div class="studio-title" style="margin-bottom: 0.5rem;">
+                    <span>⚡ Local Whisper STT</span>
+                    <select id="whisper-model-select" style="font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); background: #ffffff;">
+                        <option value="base" selected>base (Fast)</option>
+                        <option value="tiny">tiny (Ultra-Fast)</option>
+                        <option value="small">small (Accurate)</option>
+                    </select>
                 </div>
 
-                <div class="btn-select-file" style="padding: 0.85rem;" onclick="showToast('Cover Art Dropzone Ready')">
-                    <div style="font-size: 1.2rem;">🎨</div>
-                    <div style="font-size: 0.75rem; font-weight: 600;">Drop PNG/JPG Cover</div>
+                <button class="btn-cmd primary" id="btn-transcribe" style="width: 100%; justify-content: center; padding: 0.55rem;" onclick="triggerWhisperTranscribe()">
+                    <span>⚡</span> Transcribe Audio
+                </button>
+                <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
+            </div>
+
+            <!-- 3. Vim-Enabled Transcript & Narrative Editor -->
+            <div class="audio-card" style="padding-bottom: 0.5rem;">
+                <div class="studio-title" style="margin-bottom: 0.4rem;">
+                    <span>📝 Transcript &amp; Narrative</span>
+                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <span class="vim-mode-badge" id="vim-mode-indicator">VIM: NORMAL</span>
+                        <button class="btn-cmd" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;" onclick="toggleVimMode()" title="Toggle Vim Keybindings">Vim Toggle</button>
+                    </div>
+                </div>
+
+                <div class="transcript-container">
+                    <div class="transcript-toolbar">
+                        <span id="transcript-word-count">0 words</span>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button class="btn-cmd" style="padding: 0.15rem 0.45rem; font-size: 0.65rem; background: #3f3f46; color: #fff;" onclick="openExternalVim()" title="Open file in system Vim/Neovim">📟 External Vim</button>
+                            <button class="btn-cmd emerald" style="padding: 0.15rem 0.45rem; font-size: 0.65rem;" onclick="saveTranscript()" title="Save transcript.txt">💾 Save</button>
+                        </div>
+                    </div>
+                    <textarea class="transcript-textarea" id="transcript-editor" placeholder="Audio transcript will appear here after Whisper transcription, or type / paste directly..." oninput="handleTranscriptInput()"></textarea>
                 </div>
             </div>
 
-            <!-- Video Carousels Ingestion -->
-            <div class="studio-card">
-                <div class="studio-title">
-                    <span>🎬 740&times;740 Square Videos</span>
-                    <span style="color: var(--accent-emerald); font-size: 0.7rem;" id="vid-status-tag">0 Found</span>
+            <!-- 4. Longform Social Syndication & DDMA Link -->
+            <div class="audio-card">
+                <div class="studio-title" style="margin-bottom: 0.4rem;">
+                    <span>📋 Social Syndication</span>
+                    <span style="color: var(--accent-amber-dark); font-size: 0.7rem;" id="ddma-status-badge">DDMA Ready</span>
                 </div>
 
-                <div class="btn-select-file" style="padding: 0.85rem;" onclick="showToast('Video Clips Staged')">
-                    <div style="font-size: 1.2rem;">🎞️</div>
-                    <div style="font-size: 0.75rem; font-weight: 600;">Drop Square MP4 Clips</div>
-                </div>
+                <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0 0 0.5rem 0; line-height: 1.4;">
+                    Formatted conversational narrative ready for 1-click manual copy-pasting to Nostr, LinkedIn, and Substack.
+                </p>
+
+                <button class="btn-cmd" style="width: 100%; justify-content: center; padding: 0.5rem; font-weight: 700;" onclick="copySocialNarrative()">
+                    📋 Copy Social Narrative (with Backlink)
+                </button>
             </div>
 
         </aside>
@@ -1582,9 +1679,7 @@ if __name__ == '__main__':
 
                 document.getElementById('current-preview-file').innerText = `src/${data.filename}`;
                 document.getElementById('preview-words').innerText = data.word_count;
-                document.getElementById('meta-slug').innerText = data.filename.replace('.md', '');
-                document.getElementById('img-path-tag').innerText = `src/img/${data.filename.replace('.md', '.png')}`;
-                document.getElementById('vid-status-tag').innerText = `${data.videos ? data.videos.length : 0} Found`;
+                loadAudioStatus(data.filename);
 
                 const stageTag = document.getElementById('current-stage-tag');
                 if (data.is_draft) {
@@ -1935,6 +2030,295 @@ if __name__ == '__main__':
             const val = e.target.value || '<name>';
             document.getElementById('slug-preview-tag').innerText = `- [${val}](_${val}.md)`;
         });
+
+        // --------------------------------------------------------------------------
+        // AUDIO STUDIO & VIM NARRATIVE ENGINE
+        // --------------------------------------------------------------------------
+        let audioPollTimer = null;
+        let isVimModeActive = true;
+        let vimCurrentState = 'NORMAL'; // 'NORMAL' | 'INSERT'
+
+        async function loadAudioStatus(filename) {
+            if (!filename) return;
+            try {
+                const res = await fetch(`/api/audio/status?filename=${encodeURIComponent(filename)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                const audioTag = document.getElementById('audio-status-tag');
+                const playerContainer = document.getElementById('audio-player-container');
+                const nativePlayer = document.getElementById('native-audio-player');
+                const filenameDisplay = document.getElementById('audio-filename-display');
+                const transcriptEditor = document.getElementById('transcript-editor');
+                const statusText = document.getElementById('transcribe-status-text');
+
+                if (data.has_audio && data.audio_url) {
+                    audioTag.innerText = 'Ready';
+                    audioTag.style.color = 'var(--accent-emerald)';
+                    playerContainer.style.display = 'flex';
+                    filenameDisplay.innerText = data.audio_filename || 'audio.mp3';
+                    const targetAudioSrc = data.audio_url.startsWith('http') ? data.audio_url : window.location.origin + data.audio_url;
+                    if (nativePlayer.src !== targetAudioSrc) {
+                        nativePlayer.src = data.audio_url;
+                    }
+                } else {
+                    audioTag.innerText = 'No Audio';
+                    audioTag.style.color = 'var(--text-dark-muted)';
+                    playerContainer.style.display = 'none';
+                    nativePlayer.removeAttribute('src');
+                }
+
+                // Populate transcript
+                if (data.transcript && (!transcriptEditor.value || transcriptEditor.getAttribute('data-loaded-file') !== filename)) {
+                    transcriptEditor.value = data.transcript;
+                    transcriptEditor.setAttribute('data-loaded-file', filename);
+                    updateTranscriptWordCount();
+                } else if (!data.transcript && transcriptEditor.getAttribute('data-loaded-file') !== filename) {
+                    transcriptEditor.value = '';
+                    transcriptEditor.setAttribute('data-loaded-file', filename);
+                    updateTranscriptWordCount();
+                }
+
+                // Handle transcription background status
+                if (data.job_status === 'processing') {
+                    statusText.innerText = `⏳ ${data.job_progress || 'Transcribing...'}`;
+                    document.getElementById('btn-transcribe').disabled = true;
+                    if (!audioPollTimer) {
+                        audioPollTimer = setTimeout(() => {
+                            audioPollTimer = null;
+                            loadAudioStatus(filename);
+                        }, 2500);
+                    }
+                } else if (data.job_status === 'done') {
+                    statusText.innerText = '✅ Transcription complete!';
+                    document.getElementById('btn-transcribe').disabled = false;
+                } else if (data.job_status === 'error') {
+                    statusText.innerText = `❌ Error: ${data.job_error || 'Failed'}`;
+                    document.getElementById('btn-transcribe').disabled = false;
+                } else {
+                    statusText.innerText = '';
+                    document.getElementById('btn-transcribe').disabled = false;
+                }
+            } catch (err) {
+                console.error("Failed to load audio status:", err);
+            }
+        }
+
+        async function handleAudioFileSelected(event) {
+            const file = event.target.files[0];
+            if (!file || !selectedEpisode) return;
+
+            showToast(`Uploading ${file.name}...`);
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Data = e.target.result.split(',')[1];
+                const ext = file.name.split('.').pop() || 'mp3';
+
+                try {
+                    const res = await fetch('/api/audio/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: selectedEpisode.filename,
+                            audio_base64: base64Data,
+                            ext: ext
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`🎙️ Audio uploaded to episode folder!`);
+                        loadAudioStatus(selectedEpisode.filename);
+                    } else {
+                        showToast(`Upload failed: ${data.error}`);
+                    }
+                } catch (err) {
+                    console.error("Upload error:", err);
+                    showToast('Failed to upload audio');
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function setAudioSpeed(speed) {
+            const player = document.getElementById('native-audio-player');
+            if (player) {
+                player.playbackRate = speed;
+                showToast(`Speed: ${speed}x`);
+            }
+        }
+
+        async function triggerWhisperTranscribe() {
+            if (!selectedEpisode) {
+                showToast('Please select an episode first');
+                return;
+            }
+            const model = document.getElementById('whisper-model-select').value;
+            const btn = document.getElementById('btn-transcribe');
+            btn.disabled = true;
+            document.getElementById('transcribe-status-text').innerText = `⏳ Initializing Whisper (${model})...`;
+
+            try {
+                const res = await fetch('/api/audio/transcribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: selectedEpisode.filename,
+                        model: model
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`⚡ Whisper transcription started in background!`);
+                    loadAudioStatus(selectedEpisode.filename);
+                } else {
+                    showToast(`Transcription error: ${data.error}`);
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error("Transcribe request failed:", err);
+                btn.disabled = false;
+            }
+        }
+
+        async function saveTranscript() {
+            if (!selectedEpisode) return;
+            const text = document.getElementById('transcript-editor').value;
+            try {
+                const res = await fetch('/api/transcript/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: selectedEpisode.filename,
+                        transcript: text
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`💾 Transcript saved (${data.length} chars)`);
+                }
+            } catch (err) {
+                console.error("Save transcript failed:", err);
+            }
+        }
+
+        async function openExternalVim() {
+            if (!selectedEpisode) return;
+            try {
+                const res = await fetch('/api/transcript/open_external', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: selectedEpisode.filename
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`📟 Opened transcript in system editor!`);
+                } else {
+                    showToast(`Could not open external editor`);
+                }
+            } catch (err) {
+                console.error("External editor launch error:", err);
+            }
+        }
+
+        function updateTranscriptWordCount() {
+            const val = document.getElementById('transcript-editor').value.trim();
+            const words = val ? val.split(/\s+/).length : 0;
+            document.getElementById('transcript-word-count').innerText = `${words} words`;
+        }
+
+        function handleTranscriptInput() {
+            updateTranscriptWordCount();
+        }
+
+        function toggleVimMode() {
+            isVimModeActive = !isVimModeActive;
+            const badge = document.getElementById('vim-mode-indicator');
+            if (isVimModeActive) {
+                vimCurrentState = 'NORMAL';
+                badge.innerText = 'VIM: NORMAL';
+                badge.className = 'vim-mode-badge';
+                showToast('Vim mode enabled (hjkl, i, Esc, :w)');
+            } else {
+                badge.innerText = 'VIM: OFF';
+                badge.className = 'vim-mode-badge off';
+                showToast('Standard editor mode');
+            }
+        }
+
+        // Lightweight Vim keybinding listener for transcript editor
+        const editorEl = document.getElementById('transcript-editor');
+        editorEl.addEventListener('keydown', (e) => {
+            if (!isVimModeActive) return;
+
+            const badge = document.getElementById('vim-mode-indicator');
+
+            if (e.key === 'Escape') {
+                vimCurrentState = 'NORMAL';
+                badge.innerText = 'VIM: NORMAL';
+                badge.className = 'vim-mode-badge';
+                return;
+            }
+
+            if (vimCurrentState === 'NORMAL') {
+                if (e.key === 'i' || e.key === 'a' || e.key === 'o') {
+                    e.preventDefault();
+                    vimCurrentState = 'INSERT';
+                    badge.innerText = 'VIM: INSERT';
+                    badge.className = 'vim-mode-badge insert';
+                    if (e.key === 'a') {
+                        editorEl.selectionStart = Math.min(editorEl.textLength, editorEl.selectionStart + 1);
+                        editorEl.selectionEnd = editorEl.selectionStart;
+                    } else if (e.key === 'o') {
+                        const pos = editorEl.selectionStart;
+                        const nextNewline = editorEl.value.indexOf('\n', pos);
+                        const insertPos = nextNewline === -1 ? editorEl.textLength : nextNewline;
+                        editorEl.value = editorEl.value.slice(0, insertPos) + '\n' + editorEl.value.slice(insertPos);
+                        editorEl.selectionStart = editorEl.selectionEnd = insertPos + 1;
+                    }
+                    return;
+                }
+
+                // Normal mode navigation
+                if (e.key === 'h') { e.preventDefault(); editorEl.selectionStart = editorEl.selectionEnd = Math.max(0, editorEl.selectionStart - 1); }
+                else if (e.key === 'l') { e.preventDefault(); editorEl.selectionStart = editorEl.selectionEnd = Math.min(editorEl.textLength, editorEl.selectionStart + 1); }
+                else if (e.key === '0') { e.preventDefault(); const lineStart = editorEl.value.lastIndexOf('\n', editorEl.selectionStart - 1) + 1; editorEl.selectionStart = editorEl.selectionEnd = lineStart; }
+                else if (e.key === '$') { e.preventDefault(); const lineEnd = editorEl.value.indexOf('\n', editorEl.selectionStart); editorEl.selectionStart = editorEl.selectionEnd = lineEnd === -1 ? editorEl.textLength : lineEnd; }
+                else if (e.key === 'x') {
+                    e.preventDefault();
+                    const pos = editorEl.selectionStart;
+                    editorEl.value = editorEl.value.slice(0, pos) + editorEl.value.slice(pos + 1);
+                    editorEl.selectionStart = editorEl.selectionEnd = pos;
+                    updateTranscriptWordCount();
+                } else if (e.key === 'w' && e.ctrlKey) {
+                    e.preventDefault();
+                    saveTranscript();
+                }
+            }
+        });
+
+        function copySocialNarrative() {
+            if (!selectedEpisode) {
+                showToast('Please select an episode first');
+                return;
+            }
+            const transcript = document.getElementById('transcript-editor').value.trim();
+            if (!transcript) {
+                showToast('Transcript is empty. Transcribe audio or paste text first!');
+                return;
+            }
+
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const epTitle = selectedEpisode.title || 'Knowledge Deep Dive';
+            const canonicalUrl = `https://deepdive.shutri.com/${cleanId}.html`;
+
+            const narrativeText = `🎙️ Deep Dive: ${epTitle}\n\n${transcript}\n\n---\n🔬 Explore the full peer-reviewed research paper with mathematical proofs & interactive models on:\n${canonicalUrl}`;
+
+            navigator.clipboard.writeText(narrativeText).then(() => {
+                showToast('📋 Social narrative copied to clipboard with backlink!');
+            });
+        }
 
         // Keyboard shortcuts
         window.addEventListener('keydown', (e) => {
