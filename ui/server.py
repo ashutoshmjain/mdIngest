@@ -177,6 +177,59 @@ def sanitize_katex_markdown(text: str, title_override: str = None, word_limit: i
 
     return content, clean_title, citation_count
 
+def ensure_syndication_and_wallet_blocks(content: str, settings: dict = None) -> str:
+    """
+    Guarantees that the article contains the Twentyuno Sats Lightning Widget
+    and Audio platform links (Spotify, Apple Podcasts, Fountain.fm) situated
+    directly above the Works Cited / Citations section.
+    """
+    settings = settings or load_settings()
+    lightning_addr = settings.get("lightning_address", "shutosha@primal.net")
+    spotify_url = settings.get("spotify_url", "https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE")
+    apple_url = settings.get("apple_podcasts_url", "https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251")
+    fountain_url = settings.get("fountain_url", "https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF")
+
+    social_block = f"""---
+
+### Tips and Donations
+
+If you enjoyed this research, consider supporting the project with a tip in **Sats**. It's a simple, global way to support independent research.
+
+<!-- SOCIALS_START -->
+
+<center>
+<lightning-widget
+  name="Thanks for supporting the publication"
+  accent="#f9ce00"
+  to="{lightning_addr}"
+  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+/>
+</center>
+<script src="https://embed.twentyuno.net/js/app.js"></script>
+
+<center><a href="{spotify_url}" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Spotify</a><a href="{apple_url}" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">Apple Podcasts</a><a href="{fountain_url}" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">Fountain.fm</a></center>
+
+<!-- SOCIALS_END -->
+
+To send Sats, you'll need a [lightning wallet](https://lightningaddress.com/).
+
+---"""
+
+    # If the widget and donation section are already present, do not duplicate
+    if "lightning-widget" in content and "Tips and Donations" in content:
+        return content
+
+    # Clean out orphan SOCIALS tags
+    cleaned = re.sub(r'<!-- SOCIALS_START -->[\s\S]*?<!-- SOCIALS_END -->', '', content).strip()
+
+    # Locate Works Cited / Citations header
+    cited_match = re.search(r'(?mi)^(?:\#\#+|\*{2}|_{2})?\s*(?:Works Cited|References|Sources|Bibliography)', cleaned)
+    if cited_match:
+        idx = cited_match.start()
+        return cleaned[:idx].rstrip() + "\n\n" + social_block.strip() + "\n\n" + cleaned[idx:].lstrip()
+    else:
+        return cleaned.rstrip() + "\n\n" + social_block.strip() + "\n"
+
 def extract_python_payload(payload_code: str) -> tuple[str, str, int, int]:
     """
     Extracts research markdown from a self-extracting Python script or raw markdown.
@@ -751,6 +804,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 raw_md, _, _ = extract_python_payload(content)
                 sanitized_md, clean_title, _ = sanitize_katex_markdown(raw_md, title, word_limit)
+                sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
 
                 if not slug:
                     slug = re.sub(r'[^a-zA-Z0-9_-]', '_', clean_title.lower()).strip('_') or "draft"
@@ -758,7 +812,8 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 slug = slug.lstrip('_')
                 filename = f"_{slug}.md"
                 file_path = SRC_DIR / filename
-                full_content = f"# {clean_title}\n\n{sanitized_md}\n"
+                sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
+                full_content = f"# {clean_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n"
 
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(full_content)
@@ -827,8 +882,18 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 existing_text = f.read()
 
             sanitized_md, clean_title, _ = sanitize_katex_markdown(existing_text, title_override, word_limit)
+            
+            # Guarantee Tips and Donations (Twentyuno Sats Widget) and Audio Platform Links
+            sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
+
             formatted_title = f"{target_number} : {clean_title}"
-            full_content = f"# {formatted_title}\n\n{sanitized_md}\n"
+            
+            # Ensure sidebar title tag
+            sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
+            if "<!-- SIDEBAR_TITLE:" not in sanitized_md:
+                full_content = f"# {formatted_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n"
+            else:
+                full_content = f"# {formatted_title}\n\n{sanitized_md}\n"
 
             # Write to new episode file
             with open(dest_path, "w", encoding="utf-8") as f:
@@ -838,8 +903,24 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             if src_path != dest_path:
                 src_path.unlink()
 
-            # Migrate cover images if exist
+            # Migrate DDMA asset folders (audio, transcript, clips, plan)
             old_slug = src_filename.replace(".md", "").lstrip("_")
+            old_ddma_dir = SRC_DIR / "ddma" / "docs" / "episodes" / old_slug
+            new_ddma_dir = SRC_DIR / "ddma" / "docs" / "episodes" / str(target_number)
+            new_ddma_dir.mkdir(parents=True, exist_ok=True)
+
+            if old_ddma_dir.exists() and old_ddma_dir != new_ddma_dir:
+                for item in old_ddma_dir.iterdir():
+                    dest_item = new_ddma_dir / item.name
+                    if item.is_dir():
+                        if dest_item.exists():
+                            shutil.rmtree(str(dest_item))
+                        shutil.copytree(str(item), str(dest_item))
+                    else:
+                        shutil.copy2(str(item), str(dest_item))
+                shutil.rmtree(str(old_ddma_dir), ignore_errors=True)
+
+            # Migrate cover images if exist
             for ext in [".png", ".jpg"]:
                 old_img = IMG_DIR / f"_{old_slug}{ext}"
                 if not old_img.exists():
@@ -852,6 +933,14 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             template.insert(0, {"title": formatted_title, "filename": target_filename, "number": target_number})
 
             sync_summary_file(mempool, template)
+
+            # Trigger background mdbook build to ensure compiled HTML is instantly fresh
+            def bg_build():
+                try:
+                    subprocess.run(["mdbook", "build"], cwd=str(PROJECT_ROOT), capture_output=True)
+                except Exception:
+                    pass
+            threading.Thread(target=bg_build, daemon=True).start()
 
             self.send_json({
                 "success": True,
