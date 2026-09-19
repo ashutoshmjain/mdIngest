@@ -18,6 +18,9 @@
     <!-- Marked.js for client-side markdown parsing -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
+    <!-- Twentyuno Lightning Widget for Sats Donations -->
+    <script src="https://embed.twentyuno.net/js/app.js"></script>
+
     <style>
         /* ==========================================================================
            Shutri.com Minimalist Editorial Cockpit (Anthropic Warm Sand Palette)
@@ -1796,16 +1799,48 @@ if __name__ == '__main__':
                 `;
             }
 
+            // Build bottom wallet + audio syndication block (placed above citations)
+            const walletAndAudioHtml = `
+                <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; font-family: var(--font-sans);">Tips and Donations</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
+                        If you enjoyed this research, consider supporting the project with a tip in <strong>Sats</strong>. It's a simple, global way to support independent research.
+                    </p>
+                    <div style="display: flex; justify-content: center; margin: 1rem 0;">
+                        <lightning-widget
+                          name="Thanks for supporting the publication"
+                          accent="#f9ce00"
+                          to="${currentStatus?.settings?.lightning_address || 'shutosha@primal.net'}"
+                          image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+                        ></lightning-widget>
+                    </div>
+                    <div style="display: flex; gap: 0.6rem; justify-content: center; margin: 1.25rem 0; flex-wrap: wrap;">
+                        <a href="${currentStatus?.settings?.spotify_url || 'https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE'}" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">▶ Spotify</a>
+                        <a href="${currentStatus?.settings?.apple_podcasts_url || 'https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251'}" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">◈ Apple Podcasts</a>
+                        <a href="${currentStatus?.settings?.youtube_music_url || 'https://music.youtube.com'}" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⫸ YouTube Music</a>
+                        <a href="${currentStatus?.settings?.fountain_url || 'https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF'}" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⚡ Fountain.fm</a>
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-dark-muted); margin-top: 0.5rem;">
+                        To send Sats, you'll need a <a href="https://lightningaddress.com/" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline;">lightning wallet</a>.
+                    </p>
+                </div>
+            `;
+
+            let finalBodyHtml = parsedHtml;
+            const hasExistingSocials = finalBodyHtml.includes('lightning-widget') || finalBodyHtml.includes('<!-- SOCIALS_START -->');
+            if (!hasExistingSocials) {
+                const citedMatch = finalBodyHtml.search(/<h[2-4][^>]*>\s*(<strong>)?\s*(Works Cited|References|Sources)/i);
+                if (citedMatch !== -1) {
+                    finalBodyHtml = finalBodyHtml.slice(0, citedMatch) + walletAndAudioHtml + finalBodyHtml.slice(citedMatch);
+                } else {
+                    finalBodyHtml += walletAndAudioHtml;
+                }
+            }
+
             sheet.innerHTML = `
                 <h1 class="paper-h1">${title}</h1>
-                <div class="audio-syndication-strip">
-                    <a href="${currentStatus?.settings?.spotify_url || '#'}" target="_blank" class="audio-pill">▶ Spotify</a>
-                    <a href="${currentStatus?.settings?.apple_podcasts_url || '#'}" target="_blank" class="audio-pill">◈ Apple Podcasts</a>
-                    <a href="${currentStatus?.settings?.youtube_music_url || '#'}" target="_blank" class="audio-pill">⫸ YouTube Music</a>
-                    <a href="${currentStatus?.settings?.fountain_url || '#'}" target="_blank" class="audio-pill">⚡ Fountain.fm</a>
-                </div>
                 ${carouselHtml}
-                <div class="rendered-body">${parsedHtml}</div>
+                <div class="rendered-body">${finalBodyHtml}</div>
             `;
         }
 
