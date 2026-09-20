@@ -22,5 +22,9 @@ book/
 **/transcripts/
 **/audio.*
 **/transcript.txt
+**/narrative.md
 *.bak
 *.py.bak
+node_modules/
+package-lock.json
+

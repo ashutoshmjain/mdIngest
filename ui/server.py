@@ -38,6 +38,19 @@ VID_DIR.mkdir(parents=True, exist_ok=True)
 
 # Global tracker for mdbook serve background process
 mdserve_process = None
+ddma_curator_process = None
+
+def is_ddma_curator_running() -> bool:
+    """Checks if DDMA Curator server is running on port 8000."""
+    global ddma_curator_process
+    if ddma_curator_process and ddma_curator_process.poll() is None:
+        return True
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.2)
+            return s.connect_ex(('127.0.0.1', 8000)) == 0
+    except Exception:
+        return False
 
 def is_mdserve_running() -> bool:
     """Checks if mdbook serve is running either via sub-process or port 3000."""
@@ -405,6 +418,365 @@ def get_episode_transcript_path(clean_id: str) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
     return target_dir / "transcript.txt"
 
+def get_episode_narrative_path(clean_id: str) -> Path:
+    """Returns canonical path to episode narrative.md (ensuring directory exists)."""
+    target_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    return target_dir / "narrative.md"
+
+def smart_streamline_narrative(raw_text: str) -> tuple[str, int]:
+    """
+    Intelligently structures continuous audio transcripts into:
+    1. Clean, well-spaced editorial paragraphs.
+    2. Speaker/dialogue headers (**Host**, **Guest**).
+    3. Isolated promotional / sponsor / channel notes in callout quote blocks (> 📢 **Promotional Note**: ...).
+    Returns (streamlined_markdown, promo_blocks_count).
+    """
+    if not raw_text or not raw_text.strip():
+        return "", 0
+
+    text = raw_text.strip()
+
+    # Normalize whitespace & punctuation
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\s+([,.:;?!])', r'\1', text)
+    text = re.sub(r'([,.:;?!])(?=[^\s\d])', r'\1 ', text)
+    text = re.sub(r'\bi\b', 'I', text)
+    text = re.sub(r'\bi\'m\b', "I'm", text, flags=re.IGNORECASE)
+    text = re.sub(r'\bi\'ve\b', "I've", text, flags=re.IGNORECASE)
+    text = re.sub(r'\bi\'ll\b', "I'll", text, flags=re.IGNORECASE)
+    text = re.sub(r'\bi\'d\b', "I'd", text, flags=re.IGNORECASE)
+
+    # Capitalize after sentence terminators
+    text = re.sub(r'([.!?]\s+)([a-z])', lambda m: m.group(1) + m.group(2).upper(), text)
+    if text:
+        text = text[0].upper() + text[1:]
+
+    # Promotional detection regex pattern
+    promo_patterns = [
+        r'\b(?:sponsor(?:ed|s)?|patreon|subscribe|follow us on|discount code|promo code|rate and review|check out the link|link in the description|leave a five star|support (?:us|the show|the podcast))\b',
+        r'\b(?:supported by|brought to you by|special offer|advertis(?:er|ement)|our partners? at)\b'
+    ]
+    promo_regex = re.compile('|'.join(promo_patterns), re.IGNORECASE)
+
+    # Split into sentences
+    sentence_regex = re.compile(r'[^.!?]+[.!?]+(?:\s+|$)')
+    sentences = sentence_regex.findall(text)
+    if not sentences:
+        sentences = [text]
+
+    paragraphs = []
+    current_para = []
+    promo_count = 0
+
+    for idx, s in enumerate(sentences):
+        s_clean = s.strip()
+        if not s_clean:
+            continue
+
+        # Check if this sentence is a promotional note
+        is_promo = bool(promo_regex.search(s_clean))
+
+        if is_promo:
+            if current_para:
+                paragraphs.append(' '.join(current_para))
+                current_para = []
+            paragraphs.append(f"> 📢 **Promotional / Channel Note**\n> {s_clean}")
+            promo_count += 1
+            continue
+
+        current_para.append(s_clean)
+
+        # Natural paragraph boundary transitions
+        is_transition = bool(re.match(r'^(However|Moreover|Furthermore|In addition|Therefore|Clinically|When|So|Now|And|In fact|Specifically|That said|Interestingly|If |By the time|This is |On the other hand|What is fascinating|To understand this|Here is why|Let us look|Consider|Notice how)', s_clean, re.IGNORECASE))
+        
+        # Speaker prefix detection
+        speaker_match = re.match(r'^(Host|Guest|Speaker \d+|Interviewer|Narrator)\s*:\s*(.*)', s_clean, re.IGNORECASE)
+        if speaker_match:
+            speaker_name = speaker_match.group(1).title()
+            rest = speaker_match.group(2)
+            current_para[-1] = f"**{speaker_name}**: {rest}"
+
+        if len(current_para) >= 4 or (len(current_para) >= 2 and is_transition and idx > 0) or idx == len(sentences) - 1:
+            paragraphs.append(' '.join(current_para))
+            current_para = []
+
+    if current_para:
+        paragraphs.append(' '.join(current_para))
+
+    return '\n\n'.join(paragraphs), promo_count
+
+
+def seed_ddma_project_if_missing(clean_id: str) -> str:
+    """
+    Seeds DDMA project folder ddma/projects/episode_<clean_id> if it doesn't already exist.
+    Copies audio from src/ddma/docs/episodes/<clean_id>/ or src/
+    Copies transcript and generates transcription.json and plan.json with max_duration <= 165s.
+    Returns the project_id (e.g. 'episode_247').
+    """
+    project_id = f"episode_{clean_id}"
+    clean_id_digits = re.sub(r'\D', '', clean_id)
+    
+    # Locate all potential DDMA roots
+    ddma_roots = []
+    parent_ddma = PROJECT_ROOT.parent / "ddma"
+    if parent_ddma.exists():
+        ddma_roots.append(parent_ddma)
+    local_ddma = PROJECT_ROOT / "ddma"
+    if local_ddma.exists() and local_ddma not in ddma_roots:
+        ddma_roots.append(local_ddma)
+    if not ddma_roots:
+        ddma_roots.append(parent_ddma)
+
+    # Locate audio source
+    audio_path = get_episode_audio_path(clean_id)
+    if not audio_path and clean_id_digits:
+        audio_path = get_episode_audio_path(clean_id_digits)
+    
+    # Locate transcript source
+    transcript_path = get_episode_transcript_path(clean_id)
+    if not transcript_path.exists() and clean_id_digits:
+        transcript_path = get_episode_transcript_path(clean_id_digits)
+
+    # Read transcript text if available
+    transcript_text = ""
+    if transcript_path.exists():
+        try:
+            with open(transcript_path, "r", encoding="utf-8") as f:
+                transcript_text = f.read()
+        except Exception:
+            pass
+
+    # Determine episode title
+    episode_title = f"Episode {clean_id}"
+    for candidate_fn in [f"{clean_id}.md", f"_{clean_id}.md", f"{clean_id_digits}.md"]:
+        md_p = SRC_DIR / candidate_fn
+        if md_p.exists():
+            try:
+                with open(md_p, "r", encoding="utf-8") as mf:
+                    h1_match = re.search(r'(?m)^#\s+(.*)$', mf.read())
+                    if h1_match:
+                        episode_title = h1_match.group(1).strip()
+                        break
+            except Exception:
+                pass
+
+    # Determine audio duration via ffprobe
+    audio_duration = 0.0
+    if audio_path and audio_path.exists():
+        try:
+            cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode == 0 and res.stdout.strip():
+                audio_duration = float(res.stdout.strip())
+        except Exception:
+            pass
+
+    # Build or extract Whisper segments for transcription.json
+    segments = []
+    src_trans_json = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "transcription.json"
+    if src_trans_json.exists():
+        try:
+            with open(src_trans_json, "r", encoding="utf-8") as tj:
+                t_obj = json.load(tj)
+                segments = t_obj.get("segments", [])
+                if not transcript_text:
+                    transcript_text = t_obj.get("text", "")
+        except Exception:
+            pass
+
+    # If true acoustic segments with words are missing, transcribe with Whisper (word_timestamps=True)
+    has_valid_words = bool(segments and any(s.get("words") for s in segments))
+    if not has_valid_words and audio_path and audio_path.exists():
+        try:
+            import whisper
+            settings = load_settings()
+            mname = settings.get("whisper_model", "small.en")
+            try:
+                model = whisper.load_model(mname)
+            except Exception:
+                model = whisper.load_model("base")
+            res_obj = model.transcribe(str(audio_path), fp16=False, word_timestamps=True)
+            segments = res_obj.get("segments", [])
+            transcript_text = res_obj.get("text", "").strip() or transcript_text
+            
+            # Save acoustic transcription.json in src
+            src_trans_json.parent.mkdir(parents=True, exist_ok=True)
+            with open(src_trans_json, "w", encoding="utf-8") as tj:
+                json.dump(res_obj, tj, indent=4)
+        except Exception as we:
+            print(f"[DDMA SEED] Whisper acoustic alignment fallback: {we}")
+
+    if not segments and transcript_text:
+        # Emergency fallback: Synthesize segments from transcript sentences distributed over audio_duration
+        sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+', transcript_text) if s.strip()]
+        if not sentences:
+            sentences = [transcript_text]
+        
+        total_dur = audio_duration if audio_duration > 10.0 else max(len(sentences) * 5.0, 180.0)
+        total_chars = sum(len(s) for s in sentences) or 1
+        curr_t = 0.0
+        for i, s in enumerate(sentences):
+            dur = (len(s) / total_chars) * total_dur
+            dur = max(1.5, dur)
+            end_t = min(curr_t + dur, total_dur) if i < len(sentences) - 1 else total_dur
+            
+            words = s.split()
+            word_list = []
+            if words:
+                w_dur = (end_t - curr_t) / len(words)
+                w_curr = curr_t
+                for w in words:
+                    w_end = min(w_curr + w_dur, end_t)
+                    word_list.append({"word": w, "start": round(w_curr, 2), "end": round(w_end, 2)})
+                    w_curr = w_end
+
+            segments.append({
+                "id": i,
+                "start": round(curr_t, 2),
+                "end": round(end_t, 2),
+                "text": s,
+                "words": word_list
+            })
+            curr_t = end_t
+
+    transcription_payload = {
+        "text": transcript_text,
+        "segments": segments
+    }
+
+    # Iterate over DDMA roots and create/update project folder
+    for root_dir in ddma_roots:
+        proj_dir = root_dir / "projects" / project_id
+        proj_dir.mkdir(parents=True, exist_ok=True)
+
+        audio_ext = audio_path.suffix if audio_path else ".m4a"
+        dest_audio_name = f"{clean_id}{audio_ext}"
+        dest_audio_path = proj_dir / dest_audio_name
+
+        # Copy audio if missing
+        if audio_path and audio_path.exists() and not dest_audio_path.exists():
+            try:
+                shutil.copy2(str(audio_path), str(dest_audio_path))
+            except Exception as ce:
+                print(f"[DDMA SEED] Error copying audio: {ce}")
+
+        # Write project_info.json
+        info_path = proj_dir / "project_info.json"
+        project_info = {
+            "id": project_id,
+            "name": f"Episode {clean_id}",
+            "title": episode_title,
+            "audio_filename": dest_audio_name,
+            "audio_file": dest_audio_name,
+            "status": "ready"
+        }
+        with open(info_path, "w", encoding="utf-8") as inf:
+            json.dump(project_info, inf, indent=4)
+
+        # Write transcript.txt
+        if transcript_text:
+            with open(proj_dir / "transcript.txt", "w", encoding="utf-8") as tf:
+                tf.write(transcript_text)
+
+        # Write transcription.json if missing
+        trans_json_dest = proj_dir / "transcription.json"
+        if not trans_json_dest.exists() or trans_json_dest.stat().st_size == 0:
+            with open(trans_json_dest, "w", encoding="utf-8") as tj:
+                json.dump(transcription_payload, tj, indent=4)
+
+        # Generate plan.json if missing
+        plan_json_dest = proj_dir / "plan.json"
+        if not plan_json_dest.exists() or plan_json_dest.stat().st_size == 0:
+            # Try running ddma.py plan CLI first
+            cli_script = root_dir / "ddma.py"
+            plan_generated = False
+            if cli_script.exists() and dest_audio_path.exists() and trans_json_dest.exists():
+                try:
+                    cmd = [
+                        sys.executable, str(cli_script), "plan",
+                        "--audio", str(dest_audio_path),
+                        "--transcription", str(trans_json_dest),
+                        "--max-duration", "165.0",
+                        "--min-duration", "90.0",
+                        "--out", str(plan_json_dest)
+                    ]
+                    res = subprocess.run(cmd, cwd=str(root_dir), capture_output=True, text=True, timeout=30)
+                    if res.returncode == 0 and plan_json_dest.exists() and plan_json_dest.stat().st_size > 10:
+                        plan_generated = True
+                except Exception as pe:
+                    print(f"[DDMA SEED] CLI plan failed: {pe}")
+
+            # Fallback Python generator for plan.json under strict <= 165s
+            if not plan_generated and segments:
+                stings = [
+                    "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
+                    "Howling (Sting) - Gunnar Olsen.mp3",
+                    "Demilitarized Zone (Sting) - Ethan Meixsell.mp3",
+                    "Double Helix (Sting) - Ethan Meixsell.mp3"
+                ]
+                total_duration = audio_duration or (segments[-1]["end"] if segments else 180.0)
+                clips_plan = []
+                t_curr = 0.0
+                clip_num = 1
+                max_dur = 165.0
+                min_dur = 90.0
+
+                while t_curr < total_duration:
+                    target_b = min(t_curr + max_dur, total_duration)
+                    # Find candidate boundary
+                    candidates = [s["end"] for s in segments if s["end"] > t_curr]
+                    valid = [c for c in candidates if min_dur <= (c - t_curr) <= max_dur]
+                    if valid:
+                        target_b = max(valid)
+                    elif candidates:
+                        if (total_duration - t_curr) <= max_dur:
+                            target_b = total_duration
+                        else:
+                            target_b = min(candidates, key=lambda c: abs((c - t_curr) - max_dur))
+                    
+                    if total_duration - target_b < 15.0:
+                        target_b = total_duration
+
+                    clip_dur = round(target_b - t_curr, 2)
+                    in_win = [s for s in segments if s["start"] >= t_curr and s["end"] <= target_b + 0.5]
+                    win_text = " ".join(s["text"] for s in in_win).strip()
+                    
+                    # 5-part structure
+                    intro_music = stings[(clip_num - 1) % len(stings)]
+                    hook_end = min(t_curr + 22.0, target_b)
+                    hook_win = [s for s in in_win if s["start"] >= t_curr and s["end"] <= hook_end + 1.0]
+                    hook_text = " ".join(s["text"] for s in hook_win).strip() or win_text[:120]
+                    
+                    c_obj = {
+                        "num": clip_num,
+                        "title": f"Clip {clip_num}",
+                        "start": round(t_curr, 2),
+                        "end": round(target_b, 2),
+                        "duration": clip_dur,
+                        "bridge_text": [f"What is the deeper secret behind Part {clip_num}?"],
+                        "segments": [
+                            {"type": "music", "music_file": intro_music, "duration": 5.5, "crossfade": 1.3, "volume": 1.0},
+                            {"type": "audio", "start": round(t_curr, 2), "end": round(hook_end, 2), "duration": round(hook_end - t_curr, 2), "text": hook_text},
+                            {"type": "music", "music_file": "deepDive-strong.mp3" if clip_num == 1 else "deepDive-soft-ok.mp3", "duration": 7.5, "crossfade": 0.0, "volume": 1.0},
+                            {"type": "audio", "start": round(hook_end, 2), "end": round(target_b, 2), "duration": round(target_b - hook_end, 2), "text": win_text},
+                            {"type": "music", "music_file": "Howling (Sting) - Gunnar Olsen.mp3", "duration": 4.5, "crossfade": 0.3, "volume": 1.0}
+                        ],
+                        "locked": False
+                    }
+                    clips_plan.append(c_obj)
+
+                    if target_b >= total_duration:
+                        break
+                    t_curr = target_b
+                    clip_num += 1
+
+                with open(plan_json_dest, "w", encoding="utf-8") as pf:
+                    json.dump(clips_plan, pf, indent=4)
+
+    return project_id
+
+
 def parse_summary_structure():
     """
     Parses SUMMARY.md and discovers Mempool drafts, Template episodes, and Master Chain blocks.
@@ -635,6 +1007,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             clean_id = fn.replace(".md", "").lstrip("_")
             audio_path = get_episode_audio_path(clean_id)
             transcript_path = get_episode_transcript_path(clean_id)
+            narrative_path = get_episode_narrative_path(clean_id)
 
             transcript_text = ""
             if transcript_path.exists():
@@ -643,6 +1016,16 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                         transcript_text = f.read()
                 except Exception:
                     pass
+
+            narrative_text = ""
+            if narrative_path.exists():
+                try:
+                    with open(narrative_path, "r", encoding="utf-8") as f:
+                        narrative_text = f.read()
+                except Exception:
+                    pass
+            elif transcript_text:
+                narrative_text, _ = smart_streamline_narrative(transcript_text)
 
             job = transcription_jobs.get(clean_id, {"status": "idle", "progress": ""})
 
@@ -661,9 +1044,60 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "audio_url": audio_rel_url,
                 "has_transcript": len(transcript_text.strip()) > 0,
                 "transcript": transcript_text,
+                "narrative_md": narrative_text,
                 "job_status": job.get("status", "idle"),
                 "job_progress": job.get("progress", ""),
                 "job_error": job.get("error", "")
+            })
+            return
+
+        if path == "/api/ddma/status":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            
+            ddma_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+            clips_dir = ddma_ep_dir / "clips"
+            clips = []
+            
+            # 1. Discover clips in src/ddma/docs/episodes/<id>/clips
+            if clips_dir.exists():
+                for ext in [".mp4", ".mov", ".webm"]:
+                    for cf in sorted(clips_dir.glob(f"*{ext}")):
+                        clips.append({
+                            "name": cf.name,
+                            "label": cf.name.replace(".mp4", "").replace("_", " "),
+                            "url": f"/media/ddma/docs/episodes/{clean_id}/clips/{cf.name}",
+                            "size_bytes": cf.stat().st_size
+                        })
+            
+            # 2. Discover clips in ddma/projects/episode_<id>/clips
+            for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                proj_clips = ddma_root / "projects" / f"episode_{clean_id}" / "clips"
+                if proj_clips.exists():
+                    for ext in [".mp4", ".mov", ".webm"]:
+                        for cf in sorted(proj_clips.glob(f"*{ext}")):
+                            if not any(c["name"] == cf.name for c in clips):
+                                clips.append({
+                                    "name": cf.name,
+                                    "label": cf.name.replace(".mp4", "").replace("_", " "),
+                                    "url": f"/media/ddma/projects/episode_{clean_id}/clips/{cf.name}",
+                                    "size_bytes": cf.stat().st_size
+                                })
+
+            audio_path = get_episode_audio_path(clean_id)
+            transcript_path = get_episode_transcript_path(clean_id)
+            
+            self.send_json({
+                "clean_id": clean_id,
+                "ep_dir_exists": ddma_ep_dir.exists(),
+                "ep_dir_path": str(ddma_ep_dir),
+                "clips_count": len(clips),
+                "clips": clips,
+                "has_audio": audio_path is not None,
+                "has_transcript": transcript_path.exists() and transcript_path.stat().st_size > 0,
+                "curator_running": is_ddma_curator_running(),
+                "curator_url": f"http://localhost:8000/curator.html?project=episode_{clean_id}"
             })
             return
 
@@ -681,8 +1115,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             possible_paths = [
                 SRC_DIR / clean_path,
                 PROJECT_ROOT / clean_path,
+                PROJECT_ROOT.parent / clean_path,
                 SRC_DIR / "ddma" / "docs" / "episodes" / clean_path,
                 PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_path,
+                PROJECT_ROOT.parent / "ddma" / clean_path,
                 SRC_DIR / "vid" / Path(clean_path).name,
                 SRC_DIR / "img" / Path(clean_path).name,
             ]
@@ -698,8 +1134,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if ep_num:
                     p1 = SRC_DIR / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
                     p2 = PROJECT_ROOT / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
+                    p3 = PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname
                     if p1.exists(): target_file = p1
                     elif p2.exists(): target_file = p2
+                    elif p3.exists(): target_file = p3
 
             if target_file and target_file.exists():
                 self.serve_media_file(target_file)
@@ -1072,7 +1510,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path == "/api/audio/transcribe":
             fn = data.get("filename", "")
             clean_id = fn.replace(".md", "").lstrip("_")
-            model_name = data.get("model", "base")
+            settings = load_settings()
+            default_model = settings.get("whisper_model", "small.en")
+            model_name = data.get("model", default_model)
 
             audio_path = get_episode_audio_path(clean_id)
             if not audio_path or not audio_path.exists():
@@ -1083,21 +1523,75 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 transcription_jobs[cid] = {"status": "processing", "progress": f"Loading Whisper ({mname})..."}
                 try:
                     import whisper
-                    transcription_jobs[cid]["progress"] = f"Transcribing audio with {mname} model..."
+                    transcription_jobs[cid]["progress"] = f"Transcribing audio with {mname} (word_timestamps=True)..."
                     model = whisper.load_model(mname)
-                    result = model.transcribe(str(apath), fp16=False)
+                    result = model.transcribe(str(apath), fp16=False, word_timestamps=True)
                     text = result.get("text", "").strip()
 
+                    # 1. Save plain transcript.txt
                     t_path = get_episode_transcript_path(cid)
                     with open(t_path, "w", encoding="utf-8") as f:
                         f.write(text)
 
-                    transcription_jobs[cid] = {"status": "done", "progress": "Transcription complete!", "text": text}
+                    # 2. Save streamlined narrative.md
+                    streamlined_text, _ = smart_streamline_narrative(text)
+                    n_path = get_episode_narrative_path(cid)
+                    with open(n_path, "w", encoding="utf-8") as nf:
+                        nf.write(streamlined_text)
+
+                    # 3. Save full acoustic transcription.json in src/ddma/docs/episodes/<cid>/
+                    src_trans_json = SRC_DIR / "ddma" / "docs" / "episodes" / cid / "transcription.json"
+                    src_trans_json.parent.mkdir(parents=True, exist_ok=True)
+                    with open(src_trans_json, "w", encoding="utf-8") as jf:
+                        json.dump(result, jf, indent=4)
+
+                    # 4. Sync directly into DDMA projects folder if project exists
+                    for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                        proj_dir = ddma_root / "projects" / f"episode_{cid}"
+                        if proj_dir.exists():
+                            with open(proj_dir / "transcription.json", "w", encoding="utf-8") as pjf:
+                                json.dump(result, pjf, indent=4)
+                            with open(proj_dir / "transcript.txt", "w", encoding="utf-8") as ptf:
+                                ptf.write(text)
+
+                    transcription_jobs[cid] = {"status": "done", "progress": "Transcription complete with word timestamps!", "text": text}
                 except Exception as e:
                     transcription_jobs[cid] = {"status": "error", "progress": "Transcription failed", "error": str(e)}
 
             threading.Thread(target=transcribe_worker, args=(clean_id, audio_path, model_name), daemon=True).start()
-            self.send_json({"success": True, "message": f"Transcription started with Whisper ({model_name})."})
+            self.send_json({"success": True, "message": f"Transcription started with Whisper ({model_name}) with word-level timestamps."})
+            return
+
+        if path == "/api/transcript/streamline":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            custom_text = data.get("text", "")
+
+            if not custom_text:
+                t_path = get_episode_transcript_path(clean_id)
+                if t_path.exists():
+                    try:
+                        with open(t_path, "r", encoding="utf-8") as f:
+                            custom_text = f.read()
+                    except Exception:
+                        pass
+
+            streamlined, promo_count = smart_streamline_narrative(custom_text)
+
+            n_path = get_episode_narrative_path(clean_id)
+            with open(n_path, "w", encoding="utf-8") as f:
+                f.write(streamlined)
+
+            t_path = get_episode_transcript_path(clean_id)
+            with open(t_path, "w", encoding="utf-8") as f:
+                f.write(streamlined)
+
+            self.send_json({
+                "success": True,
+                "clean_id": clean_id,
+                "streamlined": streamlined,
+                "promo_count": promo_count
+            })
             return
 
         if path == "/api/transcript/save":
@@ -1109,22 +1603,29 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(t_path, "w", encoding="utf-8") as f:
                 f.write(transcript_text)
 
+            n_path = get_episode_narrative_path(clean_id)
+            with open(n_path, "w", encoding="utf-8") as f:
+                f.write(transcript_text)
+
             self.send_json({"success": True, "clean_id": clean_id, "length": len(transcript_text)})
             return
 
-        if path == "/api/transcript/open_external":
+        if path == "/api/transcript/open_external" or path == "/api/transcript/open_vim":
             fn = data.get("filename", "")
             clean_id = fn.replace(".md", "").lstrip("_")
+            n_path = get_episode_narrative_path(clean_id)
             t_path = get_episode_transcript_path(clean_id)
-            if not t_path.exists():
-                with open(t_path, "w", encoding="utf-8") as f:
-                    f.write("# NotebookLM Transcript\n\n")
+            
+            target_path = n_path if n_path.exists() else t_path
+            if not target_path.exists():
+                with open(target_path, "w", encoding="utf-8") as f:
+                    f.write("# NotebookLM Narrative\n\n")
 
             editor_opened = False
             for ed in ["nvim", "gvim", "vim", "code", "notepad"]:
                 try:
                     if shutil.which(ed):
-                        subprocess.Popen([ed, str(t_path)])
+                        subprocess.Popen([ed, str(target_path)])
                         editor_opened = True
                         break
                 except Exception:
@@ -1132,10 +1633,52 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             if not editor_opened:
                 if sys.platform == "win32":
-                    os.startfile(str(t_path))
+                    os.startfile(str(target_path))
                     editor_opened = True
 
-            self.send_json({"success": editor_opened, "path": str(t_path)})
+            self.send_json({"success": editor_opened, "path": str(target_path)})
+            return
+
+        if path == "/api/ddma/launch":
+            global ddma_curator_process
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_") if fn else ""
+            
+            if not clean_id:
+                # Pick latest episode from parse_summary_structure
+                _, template, _, next_num = parse_summary_structure()
+                if template:
+                    clean_id = str(template[0].get("number") or template[0]["filename"].replace(".md", "").lstrip("_"))
+                else:
+                    clean_id = str(next_num - 1)
+
+            # Auto-seed project in DDMA (zero re-transcription, strict <= 165s clips)
+            project_id = seed_ddma_project_if_missing(clean_id)
+            curator_target_url = f"http://localhost:8000/curator.html?project={project_id}"
+
+            ddma_dir = PROJECT_ROOT.parent / "ddma"
+            if not ddma_dir.exists():
+                ddma_dir = PROJECT_ROOT / "ddma"
+            curator_script = ddma_dir / "scratch" / "run_curator.py"
+            
+            if not is_ddma_curator_running() and curator_script.exists():
+                try:
+                    ddma_curator_process = subprocess.Popen(
+                        [sys.executable, str(curator_script)],
+                        cwd=str(ddma_dir),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                except Exception as e:
+                    self.send_json({"success": False, "error": str(e)})
+                    return
+
+            self.send_json({
+                "success": True,
+                "project_id": project_id,
+                "curator_url": curator_target_url,
+                "message": f"DDMA Project {project_id} ready and launched on {curator_target_url}"
+            })
             return
 
         if path == "/api/git/push":

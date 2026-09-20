@@ -535,7 +535,7 @@
         }
 
         /* --------------------------------------------------------------------------
-           CENTRAL PANE: LIVE KATEX & MARKDOWN PREVIEW
+           CENTRAL PANE: 3-TAB MIDDLE PANE (RESEARCH, NARRATIVE, MEDIA)
            -------------------------------------------------------------------------- */
         .central-pane {
             flex: 1;
@@ -547,14 +547,15 @@
         }
 
         .preview-top-toolbar {
-            height: 48px;
+            height: 52px;
             background: var(--card-bg);
             border-bottom: 1px solid var(--border-light);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 1.5rem;
+            padding: 0 1.25rem;
             flex-shrink: 0;
+            gap: 0.75rem;
         }
 
         .preview-status {
@@ -569,10 +570,157 @@
             text-overflow: ellipsis;
         }
 
+        /* 3-Tab Segmented Switcher */
+        .middle-tab-switcher {
+            display: flex;
+            align-items: center;
+            background: #f5f5f4;
+            padding: 3px;
+            border-radius: 7px;
+            gap: 3px;
+            border: 1px solid var(--border-light);
+        }
+
+        .btn-middle-tab {
+            font-family: var(--font-sans);
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 0.32rem 0.85rem;
+            border-radius: 5px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-dark-secondary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .btn-middle-tab:hover {
+            background: #ffffff;
+            color: var(--text-dark-primary);
+        }
+
+        .btn-middle-tab.active {
+            background: #ffffff;
+            color: var(--text-dark-primary);
+            font-weight: 700;
+            border-color: var(--border-light);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+
+        /* Generic Tab View Container */
+        .tab-view {
+            display: none;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow-y: auto;
+            min-height: 0;
+            height: calc(100vh - 112px);
+        }
+
+        .tab-view.active {
+            display: flex;
+        }
+
         .preview-content-scroll {
             flex-grow: 1;
             overflow-y: auto;
             padding: 2.25rem 3rem 5rem;
+        }
+
+        /* Narrative Tab Full View */
+        .narrative-full-view {
+            padding: 2rem 2.5rem 4rem;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .narrative-card-main {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 1.75rem 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .narrative-editor-box {
+            position: relative;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .narrative-editor-textarea {
+            width: 100%;
+            min-height: 380px;
+            max-height: 550px;
+            background: #18181b;
+            color: #f4f4f5;
+            font-family: var(--font-mono);
+            font-size: 0.84rem;
+            line-height: 1.6;
+            padding: 1rem;
+            border: none;
+            outline: none;
+            resize: vertical;
+            white-space: pre-wrap;
+        }
+
+        .narrative-editor-textarea:focus {
+            background: #141417;
+        }
+
+        /* Media Tab Full View */
+        .media-full-view {
+            padding: 2rem 2.5rem 4rem;
+            max-width: 960px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .media-hero-banner {
+            background: linear-gradient(135deg, #1c1917 0%, #292524 100%);
+            color: #ffffff;
+            border-radius: 10px;
+            padding: 1.75rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            gap: 1rem;
+        }
+
+        .media-grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 1.25rem;
+        }
+
+        /* Context-Aware Right Studio Deck Sections */
+        .right-deck-section {
+            display: none;
+            flex-direction: column;
+            gap: 1.15rem;
+        }
+
+        .right-deck-section.active {
+            display: flex;
         }
 
         .paper-sheet {
@@ -1149,7 +1297,7 @@
             <span class="strip-text">LEDGER</span>
         </div>
 
-        <!-- CENTRAL PANE: LIVE KATEX & MARKDOWN PREVIEW -->
+        <!-- CENTRAL PANE: 3-TAB VIEW (RESEARCH, NARRATIVE, MEDIA) -->
         <main class="central-pane" id="central-pane">
             <div class="preview-top-toolbar">
                 <div class="preview-status">
@@ -1159,16 +1307,84 @@
                     <span>&bull;</span>
                     <span>Words: <strong id="preview-words">0</strong></span>
                 </div>
+
+                <!-- 3-TAB SEGMENTED SWITCHER -->
+                <div class="middle-tab-switcher">
+                    <button class="btn-middle-tab active" id="tab-btn-research" onclick="switchMiddleTab('research')">🔬 Research</button>
+                    <button class="btn-middle-tab" id="tab-btn-narrative" onclick="switchMiddleTab('narrative')">🎙️ Narrative</button>
+                    <button class="btn-middle-tab" id="tab-btn-media" onclick="switchMiddleTab('media')">🎬 Media</button>
+                </div>
+
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
                     <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
             </div>
 
-            <div class="preview-content-scroll">
+            <!-- TAB 1: 🔬 RESEARCH (KATEX + 740x740 VIDEO CAROUSEL + SATS WALLET + CITATIONS) -->
+            <div class="tab-view active preview-content-scroll" id="tab-view-research">
                 <div class="paper-sheet" id="paper-sheet">
                     <h1 class="paper-h1" id="preview-h1">md² Ingestion Cockpit</h1>
                     <p style="color: var(--text-dark-secondary);">Select an active episode from the ledger on the left or create a new episode draft from a Python payload script.</p>
+                </div>
+            </div>
+
+            <!-- TAB 2: 🎙️ NARRATIVE (FULL-WIDTH VIM TRANSCRIPT & SOCIAL BACKLINK COPIER) -->
+            <div class="tab-view" id="tab-view-narrative">
+                <div class="narrative-full-view">
+                    <div class="narrative-card-main">
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.75rem;">
+                            <div>
+                                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-dark-primary);" id="narrative-tab-title">Episode Narrative &amp; Social Transcript</h2>
+                                <p style="font-size: 0.78rem; color: var(--text-dark-muted); margin-top: 0.2rem;">Distraction-free conversational transcript editor for longform socials (Nostr, Substack, LinkedIn, X).</p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span class="vim-mode-badge" id="vim-mode-indicator-main">VIM: NORMAL</span>
+                                <button class="btn-cmd" style="padding: 0.25rem 0.55rem; font-size: 0.72rem;" onclick="toggleVimMode()" title="Toggle Vim Keybindings">Vim Toggle</button>
+                            </div>
+                        </div>
+
+                        <div class="narrative-editor-box">
+                            <div class="transcript-toolbar">
+                                <span id="narrative-word-count-main">0 words</span>
+                                <div style="display: flex; gap: 0.4rem;">
+                                    <button class="btn-cmd" style="padding: 0.18rem 0.5rem; font-size: 0.68rem; background: #3f3f46; color: #fff;" onclick="openExternalVim()" title="Open in system Vim/Neovim">📟 External Vim</button>
+                                    <button class="btn-cmd emerald" style="padding: 0.18rem 0.5rem; font-size: 0.68rem;" onclick="saveTranscript()" title="Save transcript.txt">💾 Save Transcript</button>
+                                </div>
+                            </div>
+                            <textarea class="narrative-editor-textarea" id="narrative-editor-main" placeholder="Transcribed audio or pasted conversational transcript will appear here. Press 'i' for insert mode or edit directly..." oninput="handleMainNarrativeInput()"></textarea>
+                        </div>
+
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dark-primary);">📋 1-Click Social Syndication</div>
+                                <div style="font-size: 0.72rem; color: var(--text-dark-muted);">Includes conversational transcript + canonical backlink to <code id="narrative-canonical-preview">https://deepdive.shutri.com/</code></div>
+                            </div>
+                            <button class="btn-cmd primary" style="padding: 0.55rem 1.15rem; font-size: 0.82rem; font-weight: 700;" onclick="copySocialNarrative()">
+                                📋 Copy Social Narrative (with Backlink)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: 🎬 MEDIA (DDMA INFOGRAPHIC CLIPS & STORYBOARD MANAGER) -->
+            <div class="tab-view" id="tab-view-media">
+                <div class="media-full-view">
+                    <div class="media-hero-banner">
+                        <div>
+                            <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #fde68a; text-transform: uppercase; font-weight: 700;">DeepDive Media Automator (DDMA)</span>
+                            <h2 style="font-size: 1.35rem; font-weight: 800; margin-top: 0.25rem;" id="media-tab-title">740×740 Infographic Video Deck</h2>
+                            <p style="font-size: 0.8rem; color: #d6d3d1; margin-top: 0.35rem;" id="media-tab-desc">Inspect, preview, and sound-check 740×740 square video clips generated for this episode.</p>
+                        </div>
+                        <button class="btn-cmd primary" style="background: var(--accent-amber); color: #ffffff; padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.3);" onclick="launchDdmaStudio()">
+                            🚀 Open DDMA Studio
+                        </button>
+                    </div>
+
+                    <div id="media-clips-grid-deck" class="media-grid-container">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
             </div>
         </main>
@@ -1179,95 +1395,172 @@
             <span class="strip-text">STUDIO</span>
         </div>
 
-        <!-- RIGHT PANE: AUDIO STUDIO & NARRATIVE DECK -->
+        <!-- RIGHT PANE: CONTEXT-AWARE STUDIO DECK -->
         <aside class="right-pane" id="right-pane">
             <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.5rem;">
-                <span class="pane-title">🎙️ Audio Studio &amp; Narrative</span>
-                <button class="pane-close-btn" onclick="toggleRightPane()" title="Collapse Audio Sidebar (Click to close)">▶</button>
+                <span class="pane-title" id="right-pane-dynamic-title">🔬 Research &amp; AST Inspector</span>
+                <button class="pane-close-btn" onclick="toggleRightPane()" title="Collapse Studio Deck (Click to close)">▶</button>
             </div>
-            
-            <!-- 1. NotebookLM Audio Deep Dive Section -->
-            <div class="audio-card">
-                <div class="studio-title" style="margin-bottom: 0.5rem;">
-                    <span>🎙️ NotebookLM Audio</span>
-                    <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
+
+            <!-- SECTION 1: RESEARCH DECK (AST, PAYLOAD EXTRACTOR, KATEX VALIDATION) -->
+            <div class="right-deck-section active" id="right-deck-research">
+                <!-- Python Payload Dropzone -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>🐍 Python Payload Script</span>
+                        <span style="color: var(--accent-indigo);" id="ast-status-badge">Lossless AST</span>
+                    </div>
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
+                        Upload raw Gemini / Python payload scripts (<code style="font-family: var(--font-mono);">.py</code>) to extract markdown with math delimiters intact.
+                    </p>
+                    <div class="btn-select-file" onclick="openModal('new-ep-modal')">
+                        <div style="font-size: 1.4rem; margin-bottom: 0.2rem;">⚡</div>
+                        <div style="font-weight: 700; font-size: 0.8rem; color: var(--text-dark-primary);">+ Create Draft from .py</div>
+                        <div style="font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-dark-muted);">Auto-extracts H1 and sanitizes KaTeX</div>
+                    </div>
                 </div>
 
-                <!-- Dropzone / Audio Selector -->
-                <div class="btn-select-file" id="audio-dropzone" onclick="document.getElementById('audio-file-input').click()">
-                    <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎵</div>
-                    <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop NotebookLM Audio</div>
-                    <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted);">.mp3, .wav, .m4a (Gitignored)</div>
-                    <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a,.ogg,.aac" style="display: none;" onchange="handleAudioFileSelected(event)">
-                </div>
-
-                <!-- Embedded Audio Player -->
-                <div class="audio-player-wrapper" id="audio-player-container" style="display: none;">
-                    <audio id="native-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
-                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-dark-muted);">
-                        <span id="audio-filename-display">audio.mp3</span>
-                        <div style="display: flex; gap: 0.25rem;">
-                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.0)">1x</button>
-                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.5)">1.5x</button>
-                            <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(2.0)">2x</button>
+                <!-- AST & KaTeX Validation Inspector -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>📐 KaTeX &amp; AST Metrics</span>
+                        <span style="color: var(--accent-emerald);">Verified</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.72rem;">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span style="color: var(--text-dark-muted);">Equations ($$, $):</span>
+                            <strong id="ast-eq-count" style="color: var(--text-dark-primary);">0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span style="color: var(--text-dark-muted);">Citations / Works Cited:</span>
+                            <strong id="ast-cite-count" style="color: var(--text-dark-primary);">0</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span style="color: var(--text-dark-muted);">H1 Title Words:</span>
+                            <strong id="ast-title-words" style="color: var(--accent-emerald);">0 / 5 words</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-dark-muted);">Sidebar Tag:</span>
+                            <strong id="ast-sidebar-tag" style="color: var(--accent-amber-dark); font-size: 0.65rem;">Auto</strong>
                         </div>
                     </div>
                 </div>
+
+                <!-- Quick Action -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>⚡ Publishing Actions</span>
+                    </div>
+                    <button class="btn-cmd" style="width: 100%; justify-content: center; padding: 0.45rem; font-size: 0.75rem;" onclick="promptEditSelectedTitle()">
+                        ✏️ Edit 5-Word Title
+                    </button>
+                    <button class="btn-cmd" style="width: 100%; justify-content: center; padding: 0.45rem; font-size: 0.75rem;" onclick="copyCurrentMarkdown()">
+                        📋 Copy Raw Markdown
+                    </button>
+                </div>
             </div>
 
-            <!-- 2. Local Whisper Speech-to-Text Engine -->
-            <div class="audio-card">
-                <div class="studio-title" style="margin-bottom: 0.5rem;">
-                    <span>⚡ Local Whisper STT</span>
-                    <select id="whisper-model-select" style="font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); background: #ffffff;">
-                        <option value="base" selected>base (Fast)</option>
-                        <option value="tiny">tiny (Ultra-Fast)</option>
-                        <option value="small">small (Accurate)</option>
-                    </select>
+            <!-- SECTION 2: NARRATIVE DECK (AUDIO DROPZONE, PLAYER, WHISPER STT) -->
+            <div class="right-deck-section" id="right-deck-narrative">
+                <!-- 1. NotebookLM Audio Deep Dive Section -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.5rem;">
+                        <span>🎙️ NotebookLM Audio</span>
+                        <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
+                    </div>
+
+                    <!-- Dropzone / Audio Selector -->
+                    <div class="btn-select-file" id="audio-dropzone" onclick="document.getElementById('audio-file-input').click()">
+                        <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎵</div>
+                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop NotebookLM Audio</div>
+                        <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted);">.mp3, .wav, .m4a (Gitignored)</div>
+                        <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a,.ogg,.aac" style="display: none;" onchange="handleAudioFileSelected(event)">
+                    </div>
+
+                    <!-- Embedded Audio Player -->
+                    <div class="audio-player-wrapper" id="audio-player-container" style="display: none;">
+                        <audio id="native-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-dark-muted);">
+                            <span id="audio-filename-display">audio.mp3</span>
+                            <div style="display: flex; gap: 0.25rem;">
+                                <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.0)">1x</button>
+                                <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.5)">1.5x</button>
+                                <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(2.0)">2x</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <button class="btn-cmd primary" id="btn-transcribe" style="width: 100%; justify-content: center; padding: 0.55rem;" onclick="triggerWhisperTranscribe()">
-                    <span>⚡</span> Transcribe Audio
-                </button>
-                <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
-            </div>
+                <!-- 2. Local Whisper Speech-to-Text Engine -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.5rem;">
+                        <span>⚡ Local Whisper STT</span>
+                        <select id="whisper-model-select" style="font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); background: #ffffff;">
+                            <option value="base" selected>base (Fast)</option>
+                            <option value="tiny">tiny (Ultra-Fast)</option>
+                            <option value="small">small (Accurate)</option>
+                        </select>
+                    </div>
 
-            <!-- 3. Vim-Enabled Transcript & Narrative Editor -->
-            <div class="audio-card" style="padding-bottom: 0.5rem;">
-                <div class="studio-title" style="margin-bottom: 0.4rem;">
-                    <span>📝 Transcript &amp; Narrative</span>
-                    <div style="display: flex; gap: 0.4rem; align-items: center;">
+                    <button class="btn-cmd primary" id="btn-transcribe" style="width: 100%; justify-content: center; padding: 0.55rem;" onclick="triggerWhisperTranscribe()">
+                        <span>⚡</span> Transcribe Audio
+                    </button>
+                    <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
+                </div>
+
+                <!-- 3. Sidebar Transcript Mini-Editor & Tools -->
+                <div class="audio-card" style="padding-bottom: 0.5rem;">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>📝 Quick Transcript Deck</span>
                         <span class="vim-mode-badge" id="vim-mode-indicator">VIM: NORMAL</span>
-                        <button class="btn-cmd" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;" onclick="toggleVimMode()" title="Toggle Vim Keybindings">Vim Toggle</button>
                     </div>
-                </div>
 
-                <div class="transcript-container">
-                    <div class="transcript-toolbar">
-                        <span id="transcript-word-count">0 words</span>
-                        <div style="display: flex; gap: 0.4rem;">
-                            <button class="btn-cmd" style="padding: 0.15rem 0.45rem; font-size: 0.65rem; background: #3f3f46; color: #fff;" onclick="openExternalVim()" title="Open file in system Vim/Neovim">📟 External Vim</button>
-                            <button class="btn-cmd emerald" style="padding: 0.15rem 0.45rem; font-size: 0.65rem;" onclick="saveTranscript()" title="Save transcript.txt">💾 Save</button>
+                    <div class="transcript-container">
+                        <div class="transcript-toolbar">
+                            <span id="transcript-word-count">0 words</span>
+                            <div style="display: flex; gap: 0.4rem;">
+                                <button class="btn-cmd emerald" style="padding: 0.15rem 0.45rem; font-size: 0.65rem;" onclick="saveTranscript()" title="Save transcript.txt">💾 Save</button>
+                            </div>
                         </div>
+                        <textarea class="transcript-textarea" id="transcript-editor" placeholder="Audio transcript..." oninput="handleSidebarTranscriptInput()"></textarea>
                     </div>
-                    <textarea class="transcript-textarea" id="transcript-editor" placeholder="Audio transcript will appear here after Whisper transcription, or type / paste directly..." oninput="handleTranscriptInput()"></textarea>
                 </div>
             </div>
 
-            <!-- 4. Longform Social Syndication & DDMA Link -->
-            <div class="audio-card">
-                <div class="studio-title" style="margin-bottom: 0.4rem;">
-                    <span>📋 Social Syndication</span>
-                    <span style="color: var(--accent-amber-dark); font-size: 0.7rem;" id="ddma-status-badge">DDMA Ready</span>
+            <!-- SECTION 3: MEDIA DECK (DDMA BRIDGE, CLIPS STATUS, LAUNCHER) -->
+            <div class="right-deck-section" id="right-deck-media">
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>🎬 DDMA Episode Bridge</span>
+                        <span style="color: var(--accent-emerald);" id="ddma-deck-status-badge">Ready</span>
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-dark-secondary); display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono);">
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span>740×740 Clips:</span>
+                            <strong id="ddma-deck-clips-count" style="color: var(--text-dark-primary);">0 Loaded</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span>Audio Master:</span>
+                            <strong id="ddma-deck-audio-status" style="color: var(--accent-emerald);">Ready</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border-light); padding-bottom: 0.3rem;">
+                            <span>Transcript:</span>
+                            <strong id="ddma-deck-transcript-status" style="color: var(--accent-emerald);">Ready</strong>
+                        </div>
+                    </div>
                 </div>
 
-                <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0 0 0.5rem 0; line-height: 1.4;">
-                    Formatted conversational narrative ready for 1-click manual copy-pasting to Nostr, LinkedIn, and Substack.
-                </p>
-
-                <button class="btn-cmd" style="width: 100%; justify-content: center; padding: 0.5rem; font-weight: 700;" onclick="copySocialNarrative()">
-                    📋 Copy Social Narrative (with Backlink)
-                </button>
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>🚀 Launch DDMA Studio</span>
+                    </div>
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
+                        Opens the DeepDive Media Automator in a new tab to curate infographic video clips.
+                    </p>
+                    <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.6rem; font-weight: 700; margin-top: 0.4rem;" onclick="launchDdmaStudio()">
+                        🎬 Launch DDMA (Port 8000)
+                    </button>
+                </div>
             </div>
 
         </aside>
@@ -1673,6 +1966,50 @@ if __name__ == '__main__':
             startInlineEdit(selectedEpisode.filename, !selectedEpisode.is_draft);
         }
 
+        let activeMiddleTab = 'research';
+
+        function switchMiddleTab(tabName) {
+            activeMiddleTab = tabName;
+
+            // Update Tab Switcher Buttons
+            ['research', 'narrative', 'media'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (btn) {
+                    if (t === tabName) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
+
+                const view = document.getElementById(`tab-view-${t}`);
+                if (view) {
+                    if (t === tabName) view.classList.add('active');
+                    else view.classList.remove('active');
+                }
+
+                const deck = document.getElementById(`right-deck-${t}`);
+                if (deck) {
+                    if (t === tabName) deck.classList.add('active');
+                    else deck.classList.remove('active');
+                }
+            });
+
+            // Update Right Pane Dynamic Header Title
+            const titleEl = document.getElementById('right-pane-dynamic-title');
+            if (titleEl) {
+                if (tabName === 'research') titleEl.innerHTML = '🔬 Research &amp; AST Inspector';
+                else if (tabName === 'narrative') titleEl.innerHTML = '🎙️ Audio Studio &amp; Whisper';
+                else if (tabName === 'media') titleEl.innerHTML = '🎬 DDMA Media Controller';
+            }
+
+            // Sync View states
+            if (tabName === 'research') {
+                updateResearchAstMetrics();
+            } else if (tabName === 'narrative') {
+                syncNarrativeEditorViews();
+            } else if (tabName === 'media') {
+                loadDdmaStatus(selectedEpisode ? selectedEpisode.filename : '');
+            }
+        }
+
         async function loadEpisode(filename) {
             try {
                 const res = await fetch(`/api/episode?filename=${encodeURIComponent(filename)}`);
@@ -1682,7 +2019,22 @@ if __name__ == '__main__':
 
                 document.getElementById('current-preview-file').innerText = `src/${data.filename}`;
                 document.getElementById('preview-words').innerText = data.word_count;
+
+                const cleanId = data.filename.replace('.md', '').replace(/^_/, '');
+                const titleOnly = (data.title || 'Knowledge Deep Dive').replace(/^\d+\s*:\s*/, '');
+
+                const narrativeTitle = document.getElementById('narrative-tab-title');
+                if (narrativeTitle) narrativeTitle.innerText = `${data.title || 'Episode Narrative'}`;
+
+                const canonicalPreview = document.getElementById('narrative-canonical-preview');
+                if (canonicalPreview) canonicalPreview.innerText = `https://deepdive.shutri.com/${cleanId}.html`;
+
+                const mediaTitle = document.getElementById('media-tab-title');
+                if (mediaTitle) mediaTitle.innerText = `# ${cleanId} : ${titleOnly}`;
+
                 loadAudioStatus(data.filename);
+                updateResearchAstMetrics();
+                loadDdmaStatus(data.filename);
 
                 const stageTag = document.getElementById('current-stage-tag');
                 if (data.is_draft) {
@@ -1698,6 +2050,10 @@ if __name__ == '__main__':
 
                 renderMarkdownInPreview(data.content);
                 renderLedgerTree(currentStatus);
+
+                if (activeMiddleTab === 'narrative') {
+                    syncNarrativeEditorViews();
+                }
             } catch (err) {
                 console.error("Failed to load episode:", err);
             }
@@ -2257,88 +2613,226 @@ if __name__ == '__main__':
             }
         }
 
-        function updateTranscriptWordCount() {
-            const val = document.getElementById('transcript-editor').value.trim();
-            const words = val ? val.split(/\s+/).length : 0;
-            document.getElementById('transcript-word-count').innerText = `${words} words`;
+        function syncNarrativeEditorViews() {
+            const sideVal = document.getElementById('transcript-editor')?.value || '';
+            const mainEditor = document.getElementById('narrative-editor-main');
+            if (mainEditor && (!mainEditor.value || mainEditor.value !== sideVal)) {
+                mainEditor.value = sideVal;
+            }
+            updateTranscriptWordCount();
         }
 
-        function handleTranscriptInput() {
+        function handleMainNarrativeInput() {
+            const mainVal = document.getElementById('narrative-editor-main')?.value || '';
+            const sideEditor = document.getElementById('transcript-editor');
+            if (sideEditor) sideEditor.value = mainVal;
             updateTranscriptWordCount();
+        }
+
+        function handleSidebarTranscriptInput() {
+            const sideVal = document.getElementById('transcript-editor')?.value || '';
+            const mainEditor = document.getElementById('narrative-editor-main');
+            if (mainEditor) mainEditor.value = sideVal;
+            updateTranscriptWordCount();
+        }
+
+        function updateTranscriptWordCount() {
+            const val = document.getElementById('transcript-editor')?.value?.trim() || '';
+            const words = val ? val.split(/\s+/).filter(Boolean).length : 0;
+            const sideCount = document.getElementById('transcript-word-count');
+            if (sideCount) sideCount.innerText = `${words} words`;
+            const mainCount = document.getElementById('narrative-word-count-main');
+            if (mainCount) mainCount.innerText = `${words} words`;
+        }
+
+        function updateResearchAstMetrics() {
+            if (!selectedEpisode || !selectedEpisode.content) return;
+            const text = selectedEpisode.content;
+
+            // Math expressions count
+            const blockMaths = (text.match(/\$\$[\s\S]*?\$\$/g) || []).length;
+            const inlineMaths = (text.match(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g) || []).length;
+            const totalMath = blockMaths + inlineMaths;
+            const eqEl = document.getElementById('ast-eq-count');
+            if (eqEl) eqEl.innerText = `${totalMath} (${blockMaths} display, ${inlineMaths} inline)`;
+
+            // Citations count
+            const citations = (text.match(/\[\^\d+\]/g) || []).length;
+            const citeEl = document.getElementById('ast-cite-count');
+            if (citeEl) citeEl.innerText = `${citations} footnotes`;
+
+            // Title words
+            const h1Match = text.match(/^#\s+(?:(?:\d+)\s*[:\s]*)?\s*(.*)$/m);
+            const title = h1Match ? h1Match[1].trim() : 'Untitled';
+            const titleWords = title.split(/\s+/).filter(Boolean).length;
+            const titleEl = document.getElementById('ast-title-words');
+            if (titleEl) {
+                titleEl.innerText = `${titleWords} / 5 words`;
+                titleEl.style.color = titleWords <= 5 ? 'var(--accent-emerald)' : '#dc2626';
+            }
+
+            const sidebarTagEl = document.getElementById('ast-sidebar-tag');
+            const hasSidebarTag = text.includes('<!-- SIDEBAR_TITLE:');
+            if (sidebarTagEl) {
+                sidebarTagEl.innerText = hasSidebarTag ? 'Present' : 'Auto-Injected';
+            }
+        }
+
+        async function loadDdmaStatus(filename) {
+            if (!filename) return;
+            try {
+                const res = await fetch(`/api/ddma/status?filename=${encodeURIComponent(filename)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+
+                // Update Right Studio Deck
+                const clipsBadge = document.getElementById('ddma-deck-clips-count');
+                if (clipsBadge) clipsBadge.innerText = `${data.clips_count || 0} Loaded`;
+
+                const audioBadge = document.getElementById('ddma-deck-audio-status');
+                if (audioBadge) {
+                    audioBadge.innerText = data.has_audio ? 'Ready' : 'Missing';
+                    audioBadge.style.color = data.has_audio ? 'var(--accent-emerald)' : 'var(--text-dark-muted)';
+                }
+
+                const transBadge = document.getElementById('ddma-deck-transcript-status');
+                if (transBadge) {
+                    transBadge.innerText = data.has_transcript ? 'Ready' : 'Missing';
+                    transBadge.style.color = data.has_transcript ? 'var(--accent-emerald)' : 'var(--text-dark-muted)';
+                }
+
+                // Render Media Tab Grid Deck
+                const container = document.getElementById('media-clips-grid-deck');
+                if (!container) return;
+
+                if (data.clips && data.clips.length > 0) {
+                    container.innerHTML = data.clips.map((clip, idx) => `
+                        <div class="infographic-card" style="max-width: 100%;">
+                            <div class="infographic-video-box">
+                                <video src="${clip.url}" playsinline loop preload="metadata" muted autoplay></video>
+                                <button class="infographic-audio-toggle" onclick="toggleInfographicAudio(this)" title="Toggle Sound">🔇</button>
+                            </div>
+                            <div class="infographic-card-footer">
+                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${escapeHtml(clip.label || clip.name)}</span>
+                                <span style="color: var(--accent-amber); font-weight: 700;">Clip #${idx + 1}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="grid-column: 1 / -1; background: #ffffff; border: 1px dashed var(--border-light); border-radius: 8px; padding: 2.5rem 2rem; text-align: center;">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎬</div>
+                            <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark-primary); margin-bottom: 0.35rem;">No 740×740 Video Clips Found</h3>
+                            <p style="font-size: 0.8rem; color: var(--text-dark-muted); max-width: 480px; margin: 0 auto 1.25rem;">
+                                This episode does not have generated infographic clips in <code style="font-family: var(--font-mono);">src/ddma/docs/episodes/${escapeHtml(data.clean_id)}/clips/</code> yet.
+                            </p>
+                            <button class="btn-cmd primary" style="padding: 0.55rem 1.25rem;" onclick="launchDdmaStudio()">
+                                🚀 Open DDMA Studio to Generate Clips
+                            </button>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                console.error("Failed to load DDMA status:", err);
+            }
+        }
+
+        async function launchDdmaStudio() {
+            try {
+                showToast('🚀 Launching DDMA Studio on Port 8000...');
+                const res = await fetch('/api/ddma/launch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: selectedEpisode ? selectedEpisode.filename : '' })
+                });
+                const data = await res.json();
+                const url = data.curator_url || 'http://localhost:8000';
+                window.open(url, '_blank');
+            } catch (err) {
+                console.error("Failed to launch DDMA:", err);
+                window.open('http://localhost:8000', '_blank');
+            }
         }
 
         function toggleVimMode() {
             isVimModeActive = !isVimModeActive;
-            const badge = document.getElementById('vim-mode-indicator');
+            const badge1 = document.getElementById('vim-mode-indicator');
+            const badge2 = document.getElementById('vim-mode-indicator-main');
             if (isVimModeActive) {
                 vimCurrentState = 'NORMAL';
-                badge.innerText = 'VIM: NORMAL';
-                badge.className = 'vim-mode-badge';
+                if (badge1) { badge1.innerText = 'VIM: NORMAL'; badge1.className = 'vim-mode-badge'; }
+                if (badge2) { badge2.innerText = 'VIM: NORMAL'; badge2.className = 'vim-mode-badge'; }
                 showToast('Vim mode enabled (hjkl, i, Esc, :w)');
             } else {
-                badge.innerText = 'VIM: OFF';
-                badge.className = 'vim-mode-badge off';
+                if (badge1) { badge1.innerText = 'VIM: OFF'; badge1.className = 'vim-mode-badge off'; }
+                if (badge2) { badge2.innerText = 'VIM: OFF'; badge2.className = 'vim-mode-badge off'; }
                 showToast('Standard editor mode');
             }
         }
 
-        // Lightweight Vim keybinding listener for transcript editor
-        const editorEl = document.getElementById('transcript-editor');
-        editorEl.addEventListener('keydown', (e) => {
-            if (!isVimModeActive) return;
+        // Attach lightweight Vim keybindings to target textarea
+        function attachVimListener(textareaEl) {
+            if (!textareaEl) return;
+            textareaEl.addEventListener('keydown', (e) => {
+                if (!isVimModeActive) return;
 
-            const badge = document.getElementById('vim-mode-indicator');
+                const badge1 = document.getElementById('vim-mode-indicator');
+                const badge2 = document.getElementById('vim-mode-indicator-main');
 
-            if (e.key === 'Escape') {
-                vimCurrentState = 'NORMAL';
-                badge.innerText = 'VIM: NORMAL';
-                badge.className = 'vim-mode-badge';
-                return;
-            }
-
-            if (vimCurrentState === 'NORMAL') {
-                if (e.key === 'i' || e.key === 'a' || e.key === 'o') {
-                    e.preventDefault();
-                    vimCurrentState = 'INSERT';
-                    badge.innerText = 'VIM: INSERT';
-                    badge.className = 'vim-mode-badge insert';
-                    if (e.key === 'a') {
-                        editorEl.selectionStart = Math.min(editorEl.textLength, editorEl.selectionStart + 1);
-                        editorEl.selectionEnd = editorEl.selectionStart;
-                    } else if (e.key === 'o') {
-                        const pos = editorEl.selectionStart;
-                        const nextNewline = editorEl.value.indexOf('\n', pos);
-                        const insertPos = nextNewline === -1 ? editorEl.textLength : nextNewline;
-                        editorEl.value = editorEl.value.slice(0, insertPos) + '\n' + editorEl.value.slice(insertPos);
-                        editorEl.selectionStart = editorEl.selectionEnd = insertPos + 1;
-                    }
+                if (e.key === 'Escape') {
+                    vimCurrentState = 'NORMAL';
+                    if (badge1) { badge1.innerText = 'VIM: NORMAL'; badge1.className = 'vim-mode-badge'; }
+                    if (badge2) { badge2.innerText = 'VIM: NORMAL'; badge2.className = 'vim-mode-badge'; }
                     return;
                 }
 
-                // Normal mode navigation
-                if (e.key === 'h') { e.preventDefault(); editorEl.selectionStart = editorEl.selectionEnd = Math.max(0, editorEl.selectionStart - 1); }
-                else if (e.key === 'l') { e.preventDefault(); editorEl.selectionStart = editorEl.selectionEnd = Math.min(editorEl.textLength, editorEl.selectionStart + 1); }
-                else if (e.key === '0') { e.preventDefault(); const lineStart = editorEl.value.lastIndexOf('\n', editorEl.selectionStart - 1) + 1; editorEl.selectionStart = editorEl.selectionEnd = lineStart; }
-                else if (e.key === '$') { e.preventDefault(); const lineEnd = editorEl.value.indexOf('\n', editorEl.selectionStart); editorEl.selectionStart = editorEl.selectionEnd = lineEnd === -1 ? editorEl.textLength : lineEnd; }
-                else if (e.key === 'x') {
-                    e.preventDefault();
-                    const pos = editorEl.selectionStart;
-                    editorEl.value = editorEl.value.slice(0, pos) + editorEl.value.slice(pos + 1);
-                    editorEl.selectionStart = editorEl.selectionEnd = pos;
-                    updateTranscriptWordCount();
-                } else if (e.key === 'w' && e.ctrlKey) {
-                    e.preventDefault();
-                    saveTranscript();
+                if (vimCurrentState === 'NORMAL') {
+                    if (e.key === 'i' || e.key === 'a' || e.key === 'o') {
+                        e.preventDefault();
+                        vimCurrentState = 'INSERT';
+                        if (badge1) { badge1.innerText = 'VIM: INSERT'; badge1.className = 'vim-mode-badge insert'; }
+                        if (badge2) { badge2.innerText = 'VIM: INSERT'; badge2.className = 'vim-mode-badge insert'; }
+                        if (e.key === 'a') {
+                            textareaEl.selectionStart = Math.min(textareaEl.textLength, textareaEl.selectionStart + 1);
+                            textareaEl.selectionEnd = textareaEl.selectionStart;
+                        } else if (e.key === 'o') {
+                            const pos = textareaEl.selectionStart;
+                            const nextNewline = textareaEl.value.indexOf('\n', pos);
+                            const insertPos = nextNewline === -1 ? textareaEl.textLength : nextNewline;
+                            textareaEl.value = textareaEl.value.slice(0, insertPos) + '\n' + textareaEl.value.slice(insertPos);
+                            textareaEl.selectionStart = textareaEl.selectionEnd = insertPos + 1;
+                        }
+                        return;
+                    }
+
+                    // Normal mode navigation
+                    if (e.key === 'h') { e.preventDefault(); textareaEl.selectionStart = textareaEl.selectionEnd = Math.max(0, textareaEl.selectionStart - 1); }
+                    else if (e.key === 'l') { e.preventDefault(); textareaEl.selectionStart = textareaEl.selectionEnd = Math.min(textareaEl.textLength, textareaEl.selectionStart + 1); }
+                    else if (e.key === '0') { e.preventDefault(); const lineStart = textareaEl.value.lastIndexOf('\n', textareaEl.selectionStart - 1) + 1; textareaEl.selectionStart = textareaEl.selectionEnd = lineStart; }
+                    else if (e.key === '$') { e.preventDefault(); const lineEnd = textareaEl.value.indexOf('\n', textareaEl.selectionStart); textareaEl.selectionStart = textareaEl.selectionEnd = lineEnd === -1 ? textareaEl.textLength : lineEnd; }
+                    else if (e.key === 'x') {
+                        e.preventDefault();
+                        const pos = textareaEl.selectionStart;
+                        textareaEl.value = textareaEl.value.slice(0, pos) + textareaEl.value.slice(pos + 1);
+                        textareaEl.selectionStart = textareaEl.selectionEnd = pos;
+                        updateTranscriptWordCount();
+                    } else if (e.key === 'w' && e.ctrlKey) {
+                        e.preventDefault();
+                        saveTranscript();
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        attachVimListener(document.getElementById('transcript-editor'));
+        attachVimListener(document.getElementById('narrative-editor-main'));
 
         function copySocialNarrative() {
             if (!selectedEpisode) {
                 showToast('Please select an episode first');
                 return;
             }
-            const transcript = document.getElementById('transcript-editor').value.trim();
+            const transcript = (document.getElementById('transcript-editor')?.value || document.getElementById('narrative-editor-main')?.value || '').trim();
             if (!transcript) {
                 showToast('Transcript is empty. Transcribe audio or paste text first!');
                 return;

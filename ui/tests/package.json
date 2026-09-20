@@ -1,0 +1,13 @@
+{
+  "name": "md2-cockpit-e2e-tests",
+  "version": "1.0.0",
+  "description": "Puppeteer E2E test suite for MD2 Ingest Cockpit",
+  "main": "cockpit_e2e.js",
+  "scripts": {
+    "test": "node cockpit_e2e.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.4.0",
+    "puppeteer-core": "^24.43.1"
+  }
+}
