@@ -1329,25 +1329,32 @@
                 </div>
             </div>
 
-            <!-- TAB 2: 🎙️ NARRATIVE (READ-ONLY EDITORIAL PAPER VIEW + SMART STREAMLINER + VIM ON DEMAND) -->
+            <!-- TAB 2: 🎙️ NARRATIVE (EDITORIAL NOSTR PUBLICATION + SPOKEN TRANSCRIPT MODES) -->
             <div class="tab-view preview-content-scroll" id="tab-view-narrative">
                 <div class="paper-sheet" id="narrative-paper-sheet">
                     <!-- Narrative Action Toolbar -->
-                    <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                        <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-                            <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="Streamline monotonic speech walls into paragraphs & isolate promotions">
-                                <span>✨</span> Streamline (AI)
+                    <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <!-- Segmented Mode Switcher: Nostr Article vs Spoken Transcript -->
+                            <div class="narrative-segmented-control" style="display: inline-flex; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px; gap: 2px;">
+                                <button type="button" class="narrative-mode-pill active" id="btn-mode-nostr" onclick="setNarrativeDisplayMode('nostr')" style="border: none; background: #ffffff; color: var(--text-dark-primary); font-size: 0.76rem; font-weight: 700; padding: 0.35rem 0.85rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); cursor: pointer; transition: all 0.15s ease;">
+                                    ⚡ Nostr Article
+                                </button>
+                                <button type="button" class="narrative-mode-pill" id="btn-mode-transcript" onclick="setNarrativeDisplayMode('transcript')" style="border: none; background: transparent; color: var(--text-dark-muted); font-size: 0.76rem; font-weight: 600; padding: 0.35rem 0.85rem; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;">
+                                    📄 Spoken Transcript
+                                </button>
+                            </div>
+
+                            <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="Intelligently format into publication-ready Nostr Markdown with semantic headings & entity bolding">
+                                <span>⚡</span> Format for Nostr (AI)
                             </button>
-                            <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / Editor">
+                            <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / gVim">
                                 <span>📟</span> Edit in Vim (.md)
-                            </button>
-                            <button class="btn-cmd" id="btn-toggle-source" onclick="toggleNarrativeSource()" title="Toggle raw Markdown editor">
-                                <span>✏️</span> Toggle Source
                             </button>
                         </div>
                         <div style="display: flex; align-items: center; gap: 0.4rem;">
-                            <button class="btn-cmd emerald" id="btn-copy-social" onclick="copySocialNarrative()" title="Copy formatted social narrative with canonical backlink">
-                                <span>📋</span> Copy Narrative
+                            <button class="btn-cmd emerald" id="btn-copy-social" onclick="copyNostrMarkdown()" title="Copy publication-ready Nostr Long-Form Markdown (NIP-23) to clipboard">
+                                <span>📋</span> Copy for Nostr
                             </button>
                         </div>
                     </div>
@@ -1357,17 +1364,6 @@
 
                     <!-- H1 Header -->
                     <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
-
-                    <!-- Collapsible Raw Markdown Source Editor (Hidden by default) -->
-                    <div id="narrative-raw-editor-wrap" style="display: none; margin: 1.25rem 0 1.75rem 0; border: 1px solid #27272a; border-radius: 8px; overflow: hidden; background: #18181b;">
-                        <div style="background: #27272a; padding: 0.45rem 0.85rem; display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.72rem; color: #d4d4d8;">
-                            <span>narrative.md (Raw Source Editor)</span>
-                            <div style="display: flex; gap: 0.4rem; align-items: center;">
-                                <button class="btn-cmd emerald" style="padding: 0.2rem 0.6rem; font-size: 0.68rem;" onclick="saveRawNarrative()">💾 Save Markdown</button>
-                            </div>
-                        </div>
-                        <textarea id="narrative-raw-editor" style="width: 100%; min-height: 250px; background: #18181b; color: #f4f4f5; font-family: var(--font-mono); font-size: 0.84rem; line-height: 1.6; padding: 1rem; border: none; outline: none; resize: vertical;" placeholder="Raw narrative markdown content..." oninput="handleRawNarrativeInput()"></textarea>
-                    </div>
 
                     <!-- Read-Only Rendered Narrative Body -->
                     <div class="rendered-body" id="narrative-rendered-body">
@@ -2235,6 +2231,45 @@ if __name__ == '__main__':
             `;
         }
 
+        let narrativeDisplayMode = 'nostr'; // 'nostr' | 'transcript'
+
+        function setNarrativeDisplayMode(mode) {
+            narrativeDisplayMode = mode;
+            const btnNostr = document.getElementById('btn-mode-nostr');
+            const btnTrans = document.getElementById('btn-mode-transcript');
+            
+            if (mode === 'nostr') {
+                if (btnNostr) {
+                    btnNostr.classList.add('active');
+                    btnNostr.style.background = '#ffffff';
+                    btnNostr.style.color = 'var(--text-dark-primary)';
+                    btnNostr.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+                }
+                if (btnTrans) {
+                    btnTrans.classList.remove('active');
+                    btnTrans.style.background = 'transparent';
+                    btnTrans.style.color = 'var(--text-dark-muted)';
+                    btnTrans.style.boxShadow = 'none';
+                }
+                showToast('⚡ Viewing publication-ready Nostr Article');
+            } else {
+                if (btnTrans) {
+                    btnTrans.classList.add('active');
+                    btnTrans.style.background = '#ffffff';
+                    btnTrans.style.color = 'var(--text-dark-primary)';
+                    btnTrans.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+                }
+                if (btnNostr) {
+                    btnNostr.classList.remove('active');
+                    btnNostr.style.background = 'transparent';
+                    btnNostr.style.color = 'var(--text-dark-muted)';
+                    btnNostr.style.boxShadow = 'none';
+                }
+                showToast('📄 Viewing Spoken Transcript');
+            }
+            renderNarrativeContent();
+        }
+
         function renderNarrativeTab(epData, audioData) {
             if (!epData) return;
             const cleanId = epData.filename.replace('.md', '').replace(/^_/, '');
@@ -2248,31 +2283,35 @@ if __name__ == '__main__':
                 carouselWrap.innerHTML = buildInfographicCarouselHtml(epData.videos, cleanId);
             }
 
-            const narrativeText = (audioData?.narrative_md || audioData?.transcript || '').trim();
-            const renderedBodyEl = document.getElementById('narrative-rendered-body');
-            const rawEditorEl = document.getElementById('narrative-raw-editor');
-
-            if (rawEditorEl) {
-                rawEditorEl.value = narrativeText;
-            }
-
-            if (renderedBodyEl) {
-                if (narrativeText) {
-                    renderedBodyEl.innerHTML = marked.parse(narrativeText);
-                } else {
-                    renderedBodyEl.innerHTML = `
-                        <div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
-                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎙️</div>
-                            <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark-secondary);">No narrative transcript loaded for this episode.</p>
-                            <p style="font-size: 0.82rem;">Upload an audio file in the Audio Studio deck and run Whisper, or click <strong>✨ Streamline (AI)</strong>.</p>
-                        </div>
-                    `;
-                }
-            }
+            renderNarrativeContent();
 
             const syndicationWrap = document.getElementById('narrative-bottom-syndication');
             if (syndicationWrap) {
                 syndicationWrap.innerHTML = buildSyndicationAndWalletHtml(cleanId, true);
+            }
+        }
+
+        function renderNarrativeContent() {
+            const renderedBodyEl = document.getElementById('narrative-rendered-body');
+            if (!renderedBodyEl) return;
+
+            let targetText = '';
+            if (narrativeDisplayMode === 'nostr') {
+                targetText = (currentAudioData?.narrative_md || currentAudioData?.transcript || '').trim();
+            } else {
+                targetText = (currentAudioData?.transcript || currentAudioData?.narrative_md || '').trim();
+            }
+
+            if (targetText) {
+                renderedBodyEl.innerHTML = marked.parse(targetText);
+            } else {
+                renderedBodyEl.innerHTML = `
+                    <div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎙️</div>
+                        <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark-secondary);">No transcript loaded for this episode.</p>
+                        <p style="font-size: 0.82rem;">Upload an audio file in the Audio Studio deck and run Whisper, or click <strong>⚡ Format for Nostr (AI)</strong>.</p>
+                    </div>
+                `;
             }
         }
 
@@ -2692,93 +2731,49 @@ if __name__ == '__main__':
                 return;
             }
             const btn = document.getElementById('btn-streamline-ai');
-            if (btn) btn.innerHTML = '<span>⏳</span> Streamlining...';
+            if (btn) btn.innerHTML = '<span>⏳</span> Formatting...';
             try {
-                const rawEditorVal = document.getElementById('narrative-raw-editor')?.value;
                 const res = await fetch('/api/transcript/streamline', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         filename: selectedEpisode.filename,
-                        text: rawEditorVal || ''
+                        title: selectedEpisode.title || ''
                     })
                 });
                 const data = await res.json();
                 if (data.success) {
                     if (!currentAudioData) currentAudioData = {};
                     currentAudioData.narrative_md = data.streamlined;
-                    currentAudioData.transcript = data.streamlined;
-                    renderNarrativeTab(selectedEpisode, currentAudioData);
-
-                    const transcriptEditor = document.getElementById('transcript-editor');
-                    if (transcriptEditor) {
-                        transcriptEditor.value = data.streamlined;
-                        updateTranscriptWordCount();
-                    }
-
-                    showToast(`✨ Streamlined paragraphs (${data.promo_count} promo blocks isolated)!`);
+                    setNarrativeDisplayMode('nostr');
+                    showToast(`⚡ Formatted Nostr Article (${data.promo_count} promo blocks isolated)!`);
                 } else {
-                    showToast(`Streamline error: ${data.error || 'Failed'}`);
+                    showToast(`Formatting error: ${data.error || 'Failed'}`);
                 }
             } catch (err) {
-                console.error("Streamline failed:", err);
-                showToast('Streamline request failed');
+                console.error("Formatting failed:", err);
+                showToast('Formatting request failed');
             } finally {
-                if (btn) btn.innerHTML = '<span>✨</span> Streamline (AI)';
+                if (btn) btn.innerHTML = '<span>⚡</span> Format for Nostr (AI)';
             }
         }
 
-        function toggleNarrativeSource() {
-            const wrap = document.getElementById('narrative-raw-editor-wrap');
-            const btn = document.getElementById('btn-toggle-source');
-            if (!wrap) return;
-            if (wrap.style.display === 'none' || !wrap.style.display) {
-                wrap.style.display = 'block';
-                if (btn) btn.classList.add('primary');
-            } else {
-                wrap.style.display = 'none';
-                if (btn) btn.classList.remove('primary');
+        function copyNostrMarkdown() {
+            if (!selectedEpisode) {
+                showToast('Please select an episode first');
+                return;
             }
-        }
-
-        async function saveRawNarrative() {
-            if (!selectedEpisode) return;
-            const text = document.getElementById('narrative-raw-editor')?.value || '';
-            try {
-                const res = await fetch('/api/transcript/save', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        filename: selectedEpisode.filename,
-                        transcript: text
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    if (!currentAudioData) currentAudioData = {};
-                    currentAudioData.narrative_md = text;
-                    currentAudioData.transcript = text;
-                    renderNarrativeTab(selectedEpisode, currentAudioData);
-                    
-                    const transcriptEditor = document.getElementById('transcript-editor');
-                    if (transcriptEditor) {
-                        transcriptEditor.value = text;
-                        updateTranscriptWordCount();
-                    }
-                    showToast('💾 Narrative markdown saved!');
-                }
-            } catch (err) {
-                console.error("Failed to save raw narrative:", err);
-                showToast('Failed to save narrative markdown');
+            const mdText = (currentAudioData?.narrative_md || currentAudioData?.transcript || document.getElementById('transcript-editor')?.value || '').trim();
+            if (!mdText) {
+                showToast('Narrative is empty. Format with AI or transcribe audio first!');
+                return;
             }
-        }
 
-        function handleRawNarrativeInput() {
-            const rawVal = document.getElementById('narrative-raw-editor')?.value || '';
-            const sideEditor = document.getElementById('transcript-editor');
-            if (sideEditor) sideEditor.value = rawVal;
-            updateTranscriptWordCount();
+            navigator.clipboard.writeText(mdText).then(() => {
+                showToast('📋 Nostr Article copied to clipboard! (Ready for Primal / Habla)');
+            });
         }
+        window.copySocialNarrative = copyNostrMarkdown;
 
         async function openExternalVim() {
             if (!selectedEpisode) return;
@@ -2795,7 +2790,7 @@ if __name__ == '__main__':
                     const edName = data.editor || 'Vim';
                     showToast(`📟 Opened narrative.md in ${edName}!`);
                 } else {
-                    showToast(`Could not open external editor`);
+                    showToast(`Could not open external editor: ${data.error || ''}`);
                 }
             } catch (err) {
                 console.error("External editor launch error:", err);
@@ -2803,19 +2798,7 @@ if __name__ == '__main__':
             }
         }
 
-        function syncNarrativeEditorViews() {
-            const sideVal = document.getElementById('transcript-editor')?.value || '';
-            const rawEditor = document.getElementById('narrative-raw-editor');
-            if (rawEditor && (!rawEditor.value || rawEditor.value !== sideVal)) {
-                rawEditor.value = sideVal;
-            }
-            updateTranscriptWordCount();
-        }
-
         function handleSidebarTranscriptInput() {
-            const sideVal = document.getElementById('transcript-editor')?.value || '';
-            const rawEditor = document.getElementById('narrative-raw-editor');
-            if (rawEditor) rawEditor.value = sideVal;
             updateTranscriptWordCount();
         }
 
@@ -3000,29 +2983,6 @@ if __name__ == '__main__':
         }
 
         attachVimListener(document.getElementById('transcript-editor'));
-        attachVimListener(document.getElementById('narrative-raw-editor'));
-
-        function copySocialNarrative() {
-            if (!selectedEpisode) {
-                showToast('Please select an episode first');
-                return;
-            }
-            const rawText = (document.getElementById('narrative-raw-editor')?.value || currentAudioData?.narrative_md || currentAudioData?.transcript || document.getElementById('transcript-editor')?.value || '').trim();
-            if (!rawText) {
-                showToast('Transcript is empty. Transcribe audio or paste text first!');
-                return;
-            }
-
-            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
-            const epTitle = selectedEpisode.title || 'Knowledge Deep Dive';
-            const canonicalUrl = `https://deepdive.shutri.com/${cleanId}.html`;
-
-            const narrativeText = `🎙️ Deep Dive: ${epTitle}\n\n${rawText}\n\n---\n🔬 Explore the full peer-reviewed research paper with mathematical proofs & interactive models on:\n${canonicalUrl}`;
-
-            navigator.clipboard.writeText(narrativeText).then(() => {
-                showToast('📋 Social narrative copied to clipboard with backlink!');
-            });
-        }
 
         // Keyboard shortcuts
         window.addEventListener('keydown', (e) => {

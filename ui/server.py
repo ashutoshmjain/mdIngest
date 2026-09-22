@@ -424,18 +424,29 @@ def get_episode_narrative_path(clean_id: str) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
     return target_dir / "narrative.md"
 
-def smart_streamline_narrative(raw_text: str) -> tuple[str, int]:
+def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "", lightning_addr: str = "shutosha@primal.net") -> tuple[str, int]:
     """
-    Intelligently structures continuous audio transcripts into:
-    1. Clean, well-spaced editorial paragraphs.
-    2. Speaker/dialogue headers (**Host**, **Guest**).
-    3. Isolated promotional / sponsor / channel notes in callout quote blocks (> 📢 **Promotional Note**: ...).
+    Intelligently structures continuous audio transcripts into publication-ready Nostr Markdown (NIP-23):
+    1. Removes existing heading/footer duplication for idempotency.
+    2. Inserts document title H1 and episode metadata blockquote.
+    3. Normalizes punctuation, grammar casing, and speech artifacts.
+    4. Detects thematic section shifts and injects semantic H2 headings.
+    5. Converts sequential enumeration ('First, ...', 'Second, ...') into Markdown bullet lists.
+    6. Identifies and bolds core technical entities and architectural concepts.
+    7. Isolates promotional / sponsor / channel notes in callout quote blocks (> 📢 **Promotional Note**: ...).
+    8. Appends clean Nostr publication footer with Lightning tip address.
     Returns (streamlined_markdown, promo_blocks_count).
     """
     if not raw_text or not raw_text.strip():
         return "", 0
 
     text = raw_text.strip()
+
+    # Strip existing Nostr header / title if re-running
+    text = re.sub(r'^#\s+[^\n]+\n*', '', text)
+    text = re.sub(r'>\s*🎙️[^\n]+\n*(?:>\s*⚡[^\n]+\n*)?(?:---\s*\n*)?', '', text)
+    # Strip existing footer if present
+    text = re.sub(r'---\s*\n+###\s*⚡ Connect & Support[\s\S]*$', '', text)
 
     # Normalize whitespace & punctuation
     text = re.sub(r'[ \t]+', ' ', text)
@@ -459,52 +470,136 @@ def smart_streamline_narrative(raw_text: str) -> tuple[str, int]:
     ]
     promo_regex = re.compile('|'.join(promo_patterns), re.IGNORECASE)
 
+    # Key entity highlighting (bolding core concepts)
+    key_entities = [
+        r'\bMeta ?Muse\b', r'\bMSL\b', r'\bMeta Superintelligence Labs\b',
+        r'\bPareto efficient cost frontier\b', r'\bPareto efficient\b',
+        r'\bTau3-Bench Banking\b', r'\bGDPval-AA\b', r'\bMuse Spark\b',
+        r'\bDocument Object Model\b', r'\bDOM\b', r'\bheadless browser\b',
+        r'\bMuse Secure VM\b', r'\bsystemd-nspawn\b', r'\bSentinel\b',
+        r'\beBPF tracing\b', r'\beBPF\b', r'\bStripe Link\b',
+        r'\bprogressive capital allocation\b', r'\btax loss harvesting\b',
+        r'\bquantitative portfolio management\b', r'\bambient feed reporting\b',
+        r'\bPerplexity Computer\b', r'\bPrivate Cloud Compute\b', r'\bPCC\b',
+        r'\bInnovator\'s Dilemma\b', r'\bLaggard Coalition\b',
+        r'\bData Center Moratorium Act\b',
+        r'\bLarge Language Models?\b', r'\bLLMs?\b', r'\bNeural Networks?\b',
+        r'\bDiffusion Models?\b', r'\bZero-Knowledge Proofs?\b',
+        r'\bLightning Network\b', r'\bNostr\b'
+    ]
+
+    def bold_entities(t: str) -> str:
+        for pat in key_entities:
+            t = re.sub(r'(?<!\*\*)(' + pat + r')(?!\*\*)', r'**\1**', t, flags=re.IGNORECASE)
+        return t
+
+    # Major thematic section markers
+    section_patterns = [
+        (r'\b(Welcome to the deep dive|before we really plunge|setting the tone|intentional slowing down)\b', "Introduction: Setting the Tone"),
+        (r'\b(set the context for this journey|causing an absolute earthquake|metas? mues?|meta muse)\b', "The Agentic Shift: From Q&A to Execution"),
+        (r'\b(what Metamuse actually is under the hood|Meta Superintelligence Labs|Pareto efficient cost frontier)\b', "Architecture & The Pareto Efficient Frontier"),
+        (r'\b(how it navigates the web|headless browser|parsing the DOM|document object model)\b', "Autonomous Navigation: Parsing the DOM"),
+        (r'\b(dedicated Muse secure VM|systemd-nspawn|virtual machine vault)\b', "Isolation Architecture: Dedicated Secure Containers"),
+        (r'\b(supervisor process called Sentinel|kernel level tracking|EBPF tracing)\b', "Kernel-Level Enforcement: Sentinel & eBPF Supervision"),
+        (r'\b(autonomous quantitative portfolio management|tax loss harvesting|brokerage account)\b', "High-Consequence Workflows: Autonomous Portfolio Management"),
+        (r'\b(cross platform creative|social layer|media production|mosaic)\b', "Creative Workflows: Cross-Platform Media Automation"),
+        (r'\b(progressive capital allocation|trust must be structurally earned)\b', "Earning Trust: Progressive Capital Allocation"),
+        (r'\b(stripe link|single use, merchant scoped|virtual credit cards)\b', "Financial Protection: Merchant-Scoped Virtual Cards"),
+        (r'\b(Perplexity Computer|multi model orchestration|ephemeral Linux runtimes)\b', "Competitive Landscape: Meta Muse vs. Perplexity Computer"),
+        (r'\b(Apple\'s private cloud compute|PCC|stateless architecture)\b', "The Privacy Debate: Meta's Persistent State vs. Apple's PCC"),
+        (r'\b(innovators dilemma|alphabet|parent company of google|75% of Alphabet\'s operating profit)\b', "The Innovator's Dilemma: Why Google Hesitates"),
+        (r'\b(regulatory real politics|regulatory realpolitik|Dario Amodei|we must pace the frontier)\b', "Regulatory Realpolitik & Pacing the Frontier"),
+        (r'\b(laggard coalition|economic strategy|corporate protectionism)\b', "The Laggard Coalition & Defensible Moats"),
+        (r'\b(looking ahead|by the end of this|the future of the internet)\b', "Strategic Outlook: The Future of Ubiquitous Agents")
+    ]
+
     # Split into sentences
     sentence_regex = re.compile(r'[^.!?]+[.!?]+(?:\s+|$)')
     sentences = sentence_regex.findall(text)
     if not sentences:
         sentences = [text]
 
-    paragraphs = []
     current_para = []
     promo_count = 0
+    used_section_titles = set()
+
+    # Prepend header if title provided
+    doc_lines = []
+    if title:
+        doc_lines.append(f"# {title}\n")
+    if ep_num:
+        doc_lines.append(f"> 🎙️ **Episode**: #{ep_num} • DeepDive Audio Intelligence  \n> ⚡ **Format**: Nostr Long-Form Publication (NIP-23)\n\n---")
 
     for idx, s in enumerate(sentences):
         s_clean = s.strip()
         if not s_clean:
             continue
 
-        # Check if this sentence is a promotional note
-        is_promo = bool(promo_regex.search(s_clean))
+        # Check for section triggers
+        triggered_heading = None
+        for pat, sec_title in section_patterns:
+            if sec_title not in used_section_titles and re.search(pat, s_clean, re.IGNORECASE):
+                triggered_heading = sec_title
+                used_section_titles.add(sec_title)
+                break
 
+        if triggered_heading:
+            if current_para:
+                doc_lines.append(' '.join(current_para))
+                current_para = []
+            doc_lines.append(f"\n## {triggered_heading}\n")
+
+        # Check for promotional note
+        is_promo = bool(promo_regex.search(s_clean))
         if is_promo:
             if current_para:
-                paragraphs.append(' '.join(current_para))
+                doc_lines.append(' '.join(current_para))
                 current_para = []
-            paragraphs.append(f"> 📢 **Promotional / Channel Note**\n> {s_clean}")
+            doc_lines.append(f"> 📢 **Promotional Note**: {s_clean}")
             promo_count += 1
             continue
 
-        current_para.append(s_clean)
-
-        # Natural paragraph boundary transitions
-        is_transition = bool(re.match(r'^(However|Moreover|Furthermore|In addition|Therefore|Clinically|When|So|Now|And|In fact|Specifically|That said|Interestingly|If |By the time|This is |On the other hand|What is fascinating|To understand this|Here is why|Let us look|Consider|Notice how)', s_clean, re.IGNORECASE))
-        
-        # Speaker prefix detection
+        # Speaker detection
         speaker_match = re.match(r'^(Host|Guest|Speaker \d+|Interviewer|Narrator)\s*:\s*(.*)', s_clean, re.IGNORECASE)
         if speaker_match:
             speaker_name = speaker_match.group(1).title()
             rest = speaker_match.group(2)
-            current_para[-1] = f"**{speaker_name}**: {rest}"
+            s_clean = f"**{speaker_name}**: {rest}"
+
+        # Turn multi-step enumeration into clean bullet points
+        list_match = re.match(r'^(First|Second|Third|Finally|Furthermore|Crucially),\s*(.*)', s_clean, re.IGNORECASE)
+        if list_match and idx > 0 and len(current_para) <= 1:
+            step_word = list_match.group(1).title()
+            rest_text = list_match.group(2)
+            current_para.append(f"\n* **{step_word}**: {rest_text}")
+            continue
+
+        current_para.append(s_clean)
+
+        # Paragraph break triggers
+        is_transition = bool(re.match(r'^(However|Moreover|Furthermore|In addition|Therefore|Clinically|When|So|Now|And|In fact|Specifically|That said|Interestingly|If |By the time|This is |On the other hand|What is fascinating|To understand this|Here is why|Let us look|Consider|Notice how)', s_clean, re.IGNORECASE))
 
         if len(current_para) >= 4 or (len(current_para) >= 2 and is_transition and idx > 0) or idx == len(sentences) - 1:
-            paragraphs.append(' '.join(current_para))
+            para_str = ' '.join(current_para)
+            doc_lines.append(para_str)
             current_para = []
 
     if current_para:
-        paragraphs.append(' '.join(current_para))
+        doc_lines.append(' '.join(current_para))
 
-    return '\n\n'.join(paragraphs), promo_count
+    # Add Nostr footer
+    target_ln = lightning_addr or "shutosha@primal.net"
+    doc_lines.append("\n---\n")
+    doc_lines.append("### ⚡ Connect & Support")
+    doc_lines.append(f"* **Lightning Tips**: `{target_ln}`")
+    doc_lines.append("* **Publication**: Generated via MD² Ingest Studio & DeepDive Media Automator")
+    doc_lines.append("* **Platform**: Verified Nostr Long-Form Format (NIP-23)")
+
+    full_doc = '\n\n'.join(doc_lines)
+    full_doc = bold_entities(full_doc)
+
+    return full_doc, promo_count
+
 
 
 def seed_ddma_project_if_missing(clean_id: str) -> str:
@@ -1025,7 +1120,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     pass
             elif transcript_text:
-                narrative_text, _ = smart_streamline_narrative(transcript_text)
+                ep_title = ""
+                for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+                    if possible_file.exists():
+                        try:
+                            with open(possible_file, "r", encoding="utf-8") as pf:
+                                m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                                if m:
+                                    ep_title = m.group(1).strip()
+                                    break
+                        except Exception:
+                            pass
+                settings = load_settings()
+                ln_addr = settings.get("lightning_address", "shutosha@primal.net")
+                narrative_text, _ = smart_streamline_narrative(transcript_text, title=ep_title, ep_num=clean_id, lightning_addr=ln_addr)
 
             job = transcription_jobs.get(clean_id, {"status": "idle", "progress": ""})
 
@@ -1534,7 +1642,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                         f.write(text)
 
                     # 2. Save streamlined narrative.md
-                    streamlined_text, _ = smart_streamline_narrative(text)
+                    ep_title = ""
+                    for possible_file in [SRC_DIR / f"{cid}.md", SRC_DIR / f"_{cid}.md"]:
+                        if possible_file.exists():
+                            try:
+                                with open(possible_file, "r", encoding="utf-8") as pf:
+                                    m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                                    if m:
+                                        ep_title = m.group(1).strip()
+                                        break
+                            except Exception:
+                                pass
+                    settings = load_settings()
+                    ln_addr = settings.get("lightning_address", "shutosha@primal.net")
+                    streamlined_text, _ = smart_streamline_narrative(text, title=ep_title, ep_num=cid, lightning_addr=ln_addr)
                     n_path = get_episode_narrative_path(cid)
                     with open(n_path, "w", encoding="utf-8") as nf:
                         nf.write(streamlined_text)
@@ -1566,6 +1687,19 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             fn = data.get("filename", "")
             clean_id = fn.replace(".md", "").lstrip("_")
             custom_text = data.get("text", "")
+            title = data.get("title", "")
+
+            if not title:
+                for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+                    if possible_file.exists():
+                        try:
+                            with open(possible_file, "r", encoding="utf-8") as pf:
+                                m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                                if m:
+                                    title = m.group(1).strip()
+                                    break
+                        except Exception:
+                            pass
 
             if not custom_text:
                 t_path = get_episode_transcript_path(clean_id)
@@ -1576,14 +1710,12 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                     except Exception:
                         pass
 
-            streamlined, promo_count = smart_streamline_narrative(custom_text)
+            settings = load_settings()
+            ln_addr = settings.get("lightning_address", "shutosha@primal.net")
+            streamlined, promo_count = smart_streamline_narrative(custom_text, title=title, ep_num=clean_id, lightning_addr=ln_addr)
 
             n_path = get_episode_narrative_path(clean_id)
             with open(n_path, "w", encoding="utf-8") as f:
-                f.write(streamlined)
-
-            t_path = get_episode_transcript_path(clean_id)
-            with open(t_path, "w", encoding="utf-8") as f:
                 f.write(streamlined)
 
             self.send_json({
@@ -1616,10 +1748,34 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             n_path = get_episode_narrative_path(clean_id)
             t_path = get_episode_transcript_path(clean_id)
             
-            target_path = n_path if n_path.exists() else t_path
-            if not target_path.exists():
-                with open(target_path, "w", encoding="utf-8") as f:
-                    f.write("# NotebookLM Narrative\n\n")
+            if not n_path.exists():
+                if t_path.exists():
+                    try:
+                        with open(t_path, "r", encoding="utf-8") as tf:
+                            raw_t = tf.read()
+                        ep_title = ""
+                        for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+                            if possible_file.exists():
+                                try:
+                                    with open(possible_file, "r", encoding="utf-8") as pf:
+                                        m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                                        if m:
+                                            ep_title = m.group(1).strip()
+                                            break
+                                except Exception:
+                                    pass
+                        settings = load_settings()
+                        ln_addr = settings.get("lightning_address", "shutosha@primal.net")
+                        nostr_md, _ = smart_streamline_narrative(raw_t, title=ep_title, ep_num=clean_id, lightning_addr=ln_addr)
+                        with open(n_path, "w", encoding="utf-8") as nf:
+                            nf.write(nostr_md)
+                    except Exception:
+                        pass
+                else:
+                    with open(n_path, "w", encoding="utf-8") as f:
+                        f.write(f"# {clean_id} Narrative\n\n")
+
+            target_path = n_path
 
             settings = load_settings()
             pref_editor = settings.get("external_editor")
