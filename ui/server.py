@@ -1621,22 +1621,110 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 with open(target_path, "w", encoding="utf-8") as f:
                     f.write("# NotebookLM Narrative\n\n")
 
+            settings = load_settings()
+            pref_editor = settings.get("external_editor")
+
+            local_gvim = os.path.expandvars(r"%LOCALAPPDATA%\Programs\Vim\gvim.exe")
+            local_vim = os.path.expandvars(r"%LOCALAPPDATA%\Programs\Vim\vim.exe")
+
+            editor_candidates = []
+            if pref_editor:
+                editor_candidates.append(pref_editor)
+            for ed in ["gvim", "code", "nvim", "vim", "notepad"]:
+                if ed not in editor_candidates:
+                    editor_candidates.append(ed)
+
             editor_opened = False
-            for ed in ["nvim", "gvim", "vim", "code", "notepad"]:
+            opened_ed_name = None
+
+            for ed in editor_candidates:
                 try:
-                    if shutil.which(ed):
-                        subprocess.Popen([ed, str(target_path)])
-                        editor_opened = True
-                        break
-                except Exception:
-                    pass
+                    ed_path = shutil.which(ed)
+                    if not ed_path and sys.platform == "win32":
+                        if "gvim" in ed.lower() and os.path.exists(local_gvim):
+                            ed_path = local_gvim
+                        elif "vim" in ed.lower() and os.path.exists(local_vim):
+                            ed_path = local_vim
+
+                    if ed_path:
+                        if sys.platform == "win32":
+                            # Primary launch on Windows: use Explorer ShellWindows dispatch so the window
+                            # appears directly on the interactive user desktop even if server is a daemon/task
+                            ps_script = f"""
+                            $sw = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'{{9BA05972-F6A8-11CF-A442-00A0C90A8F39}}'))
+                            $app = $null
+                            if ($sw -and $sw.Count -gt 0) {{
+                                $app = $sw.Item(0).Document.Application
+                            }} else {{
+                                $desktop = $sw.FindWindowSW([ref]0, [ref]0, 8, [ref]0, 1)
+                                if ($desktop) {{
+                                    $app = $desktop.Document.Application
+                                }}
+                            }}
+                            if ($app) {{
+                                $app.ShellExecute('{ed_path}', '"{target_path}"', '', 'open', 1)
+                                exit 0
+                            }} else {{
+                                exit 1
+                            }}
+                            """
+                            try:
+                                res = subprocess.run(
+                                    ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+                                    capture_output=True,
+                                    timeout=5
+                                )
+                                if res.returncode == 0:
+                                    editor_opened = True
+                                    opened_ed_name = ed
+                                    print(f"[EXT-EDITOR] Successfully launched {ed} via Explorer ShellWindows for {target_path}")
+                                    break
+                            except Exception as sh_err:
+                                print(f"[EXT-EDITOR] Explorer dispatch failed ({sh_err}), trying standard subprocess")
+
+                            # Fallback if Explorer COM was unavailable
+                            if ed.lower() in ("vim", "nvim"):
+                                subprocess.Popen(
+                                    f'start "" "{ed_path}" "{target_path}"',
+                                    shell=True
+                                )
+                            else:
+                                subprocess.Popen(
+                                    [ed_path, str(target_path)],
+                                    stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL,
+                                    close_fds=True
+                                )
+                            editor_opened = True
+                            opened_ed_name = ed
+                            print(f"[EXT-EDITOR] Successfully launched {ed} ({ed_path}) for {target_path}")
+                            break
+                        else:
+                            subprocess.Popen(
+                                [ed_path, str(target_path)],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                close_fds=True
+                            )
+                            editor_opened = True
+                            opened_ed_name = ed
+                            break
+                except Exception as ex:
+                    print(f"[EXT-EDITOR] Failed to launch editor {ed}: {ex}")
 
             if not editor_opened:
                 if sys.platform == "win32":
-                    os.startfile(str(target_path))
-                    editor_opened = True
+                    try:
+                        os.startfile(str(target_path))
+                        editor_opened = True
+                        opened_ed_name = "Default System Editor"
+                        print(f"[EXT-EDITOR] Successfully opened via os.startfile: {target_path}")
+                    except Exception as os_err:
+                        print(f"[EXT-EDITOR] os.startfile failed: {os_err}")
 
-            self.send_json({"success": editor_opened, "path": str(target_path)})
+            self.send_json({"success": editor_opened, "path": str(target_path), "editor": opened_ed_name})
             return
 
         if path == "/api/ddma/launch":

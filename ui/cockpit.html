@@ -1704,6 +1704,11 @@ if __name__ == '__main__':
                 </select>
             </div>
 
+            <div class="form-group">
+                <label class="form-label">External Text Editor (e.g. gvim, vim, code, notepad)</label>
+                <input type="text" class="form-input" id="setting-external-editor" placeholder="gvim">
+            </div>
+
             <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="saveSettings()">
                 💾 Save Configuration
             </button>
@@ -2450,6 +2455,9 @@ if __name__ == '__main__':
                 if (document.getElementById('setting-whisper-model')) {
                     document.getElementById('setting-whisper-model').value = currentStatus.settings.whisper_model || 'small.en';
                 }
+                if (document.getElementById('setting-external-editor')) {
+                    document.getElementById('setting-external-editor').value = currentStatus.settings.external_editor || 'gvim';
+                }
             }
         }
 
@@ -2466,7 +2474,8 @@ if __name__ == '__main__':
                 fountain_url: document.getElementById('setting-fountain').value,
                 lightning_address: document.getElementById('setting-lightning').value,
                 whisper_model: document.getElementById('setting-whisper-model') ? document.getElementById('setting-whisper-model').value : 'small.en',
-                whisper_word_timestamps: true
+                whisper_word_timestamps: true,
+                external_editor: document.getElementById('setting-external-editor') ? document.getElementById('setting-external-editor').value.trim() : 'gvim'
             };
             await fetch('/api/settings', {
                 method: 'POST',
@@ -2783,12 +2792,14 @@ if __name__ == '__main__':
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showToast(`📟 Opened narrative.md in system editor!`);
+                    const edName = data.editor || 'Vim';
+                    showToast(`📟 Opened narrative.md in ${edName}!`);
                 } else {
                     showToast(`Could not open external editor`);
                 }
             } catch (err) {
                 console.error("External editor launch error:", err);
+                showToast(`Failed to launch editor: ${err.message}`);
             }
         }
 

@@ -12,5 +12,6 @@
   "recent_window_size": 21,
   "whisper_model": "small.en",
   "whisper_word_timestamps": true,
+  "external_editor": "gvim",
   "port": 8088
 }

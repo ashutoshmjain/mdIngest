@@ -7,7 +7,11 @@ echo ==================================================
 echo.
 echo Launching the md² Publishing Cockpit Server...
 echo.
-python ingest/server.py
+if exist "ingest\server.py" (
+    python ingest\server.py
+) else if exist "ui\server.py" (
+    python ui\server.py
+)
 echo.
 echo Server has stopped.
 pause
