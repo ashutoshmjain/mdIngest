@@ -1747,23 +1747,27 @@ if __name__ == '__main__':
                 currentStatus = data;
                 renderLedgerTree(data);
 
-                document.getElementById('top-ep-num').value = `# ${data.next_episode_number} (Auto)`;
-                document.getElementById('meta-alloc').innerText = `# ${data.next_episode_number}`;
+                const topEpNum = document.getElementById('top-ep-num');
+                if (topEpNum) topEpNum.value = `# ${data.next_episode_number} (Auto)`;
+                const metaAlloc = document.getElementById('meta-alloc');
+                if (metaAlloc) metaAlloc.innerText = `# ${data.next_episode_number}`;
 
                 // Update mdserve live button status
                 const serveBtn = document.getElementById('btn-serve');
-                if (data.is_serving) {
-                    serveBtn.style.background = '#dcfce7';
-                    serveBtn.style.color = '#166534';
-                    serveBtn.style.borderColor = '#86efac';
-                    serveBtn.innerHTML = '<span>🟢</span> mdserve:3000';
-                    serveBtn.title = 'mdBook is Running (Click to Stop)';
-                } else {
-                    serveBtn.style.background = '';
-                    serveBtn.style.color = '';
-                    serveBtn.style.borderColor = '';
-                    serveBtn.innerHTML = '<span>📖</span> mdserve (Local)';
-                    serveBtn.title = 'Start mdBook Preview Server on Port 3000';
+                if (serveBtn) {
+                    if (data.is_serving) {
+                        serveBtn.style.background = '#dcfce7';
+                        serveBtn.style.color = '#166534';
+                        serveBtn.style.borderColor = '#86efac';
+                        serveBtn.innerHTML = '<span>🟢</span> mdserve:3000';
+                        serveBtn.title = 'mdBook is Running (Click to Stop)';
+                    } else {
+                        serveBtn.style.background = '';
+                        serveBtn.style.color = '';
+                        serveBtn.style.borderColor = '';
+                        serveBtn.innerHTML = '<span>📖</span> mdserve (Local)';
+                        serveBtn.title = 'Start mdBook Preview Server on Port 3000';
+                    }
                 }
 
                 // Auto-select first mempool or template episode if none selected
@@ -1780,7 +1784,9 @@ if __name__ == '__main__':
         }
 
         function renderLedgerTree(data) {
+            if (!data) data = currentStatus || {};
             const container = document.getElementById('tree-scroll-area');
+            if (!container) return;
             let html = '';
 
             // 1. Mempool Section (Active Unconfirmed Drafts)
@@ -1796,7 +1802,7 @@ if __name__ == '__main__':
                     const isEditing = currentlyEditingFilename === item.filename;
 
                     html += `
-                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" ondblclick="startInlineEdit('${item.filename}', false)" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
+                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
                         <div class="ep-card-meta">
                             <span class="ep-card-num" style="color: #92400e;">_${item.slug}</span>
                             <div style="display: flex; align-items: center; gap: 0.25rem;">
@@ -1835,7 +1841,7 @@ if __name__ == '__main__':
                     const prefix = item.number ? `${item.number} : ` : '';
 
                     html += `
-                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" ondblclick="startInlineEdit('${item.filename}', true)" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
+                    <div class="ep-card ${activeClass}" id="card-${escapeId(item.filename)}" onclick="if(!event.target.closest('.inline-title-editor-wrap') && !event.target.closest('.btn-edit-title-icon')) loadEpisode('${item.filename}')">
                         <div class="ep-card-meta">
                             <span class="ep-card-num"># ${item.number || item.slug}</span>
                             <div style="display: flex; align-items: center; gap: 0.3rem;">
@@ -2020,12 +2026,18 @@ if __name__ == '__main__':
         async function loadEpisode(filename) {
             try {
                 const res = await fetch(`/api/episode?filename=${encodeURIComponent(filename)}`);
-                if (!res.ok) return;
+                if (!res.ok) {
+                    showToast(`Failed to fetch episode (${res.status})`);
+                    return;
+                }
                 const data = await res.json();
                 selectedEpisode = data;
 
-                document.getElementById('current-preview-file').innerText = `src/${data.filename}`;
-                document.getElementById('preview-words').innerText = data.word_count;
+                const currFileEl = document.getElementById('current-preview-file');
+                if (currFileEl) currFileEl.innerText = `src/${data.filename}`;
+
+                const previewWordsEl = document.getElementById('preview-words');
+                if (previewWordsEl) previewWordsEl.innerText = data.word_count;
 
                 const cleanId = data.filename.replace('.md', '').replace(/^_/, '');
                 const titleOnly = (data.title || 'Knowledge Deep Dive').replace(/^\d+\s*:\s*/, '');
@@ -2041,15 +2053,20 @@ if __name__ == '__main__':
                 loadDdmaStatus(data.filename);
 
                 const stageTag = document.getElementById('current-stage-tag');
-                if (data.is_draft) {
-                    stageTag.innerText = 'MEMPOOL DRAFT';
-                    stageTag.style.background = '#fef3c7';
-                    stageTag.style.color = '#92400e';
-                    document.getElementById('btn-lock').style.display = 'inline-flex';
-                } else {
-                    stageTag.innerText = `TEMPLATE (${data.filename.replace('.md', '')})`;
-                    stageTag.style.background = '#dbeafe';
-                    stageTag.style.color = '#1e40af';
+                if (stageTag) {
+                    if (data.is_draft) {
+                        stageTag.innerText = 'MEMPOOL DRAFT';
+                        stageTag.style.background = '#fef3c7';
+                        stageTag.style.color = '#92400e';
+                        const lockBtn = document.getElementById('btn-lock');
+                        if (lockBtn) lockBtn.style.display = 'inline-flex';
+                    } else {
+                        stageTag.innerText = `TEMPLATE (${data.filename.replace('.md', '')})`;
+                        stageTag.style.background = '#dbeafe';
+                        stageTag.style.color = '#1e40af';
+                        const lockBtn = document.getElementById('btn-lock');
+                        if (lockBtn) lockBtn.style.display = 'none';
+                    }
                 }
 
                 renderMarkdownInPreview(data.content);
@@ -2057,6 +2074,7 @@ if __name__ == '__main__':
                 renderLedgerTree(currentStatus);
             } catch (err) {
                 console.error("Failed to load episode:", err);
+                showToast("Failed to load episode: " + err.message);
             }
         }
 
@@ -2143,74 +2161,95 @@ if __name__ == '__main__':
 
         function renderMarkdownInPreview(mdContent) {
             const sheet = document.getElementById('paper-sheet');
-            const h1Match = mdContent.match(/^#\s+(.*)$/m);
-            const title = h1Match ? h1Match[1] : "Untitled Episode";
-            let bodyContent = mdContent.replace(/^#\s+.*$/m, '').trim();
-            bodyContent = bodyContent.replace(/<!-- VIDEO_STRIP_START -->[\s\S]*?<!-- VIDEO_STRIP_END -->/gi, '').trim();
-
-            const blockMaths = [];
-            const inlineMaths = [];
-
-            let protectedMd = bodyContent.replace(/\$\$([\s\S]*?)\$\$/g, (m, code) => {
-                const idx = blockMaths.length;
-                blockMaths.push(code.trim());
-                return `%%%KATEX_BLOCK_${idx}%%%`;
-            });
-
-            protectedMd = protectedMd.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g, (m, code) => {
-                const idx = inlineMaths.length;
-                inlineMaths.push(code.trim());
-                return `%%%KATEX_INLINE_${idx}%%%`;
-            });
-
-            let parsedHtml = marked.parse(protectedMd);
-
-            parsedHtml = parsedHtml.replace(/%%%KATEX_BLOCK_(\d+)%%%/g, (m, idx) => {
-                const formula = blockMaths[parseInt(idx, 10)];
-                if (!formula) return "";
-                try {
-                    if (window.katex) {
-                        return `<div class="katex-display-block">${katex.renderToString(formula, { displayMode: true, throwOnError: false })}</div>`;
-                    }
-                    return `<div class="katex-display-block">$$${formula}$$</div>`;
-                } catch(e) {
-                    return `<div class="katex-error">$$${formula}$$</div>`;
-                }
-            });
-
-            parsedHtml = parsedHtml.replace(/%%%KATEX_INLINE_(\d+)%%%/g, (m, idx) => {
-                const formula = inlineMaths[parseInt(idx, 10)];
-                if (!formula) return "";
-                try {
-                    if (window.katex) {
-                        return `<span class="katex-inline">${katex.renderToString(formula, { displayMode: false, throwOnError: false })}</span>`;
-                    }
-                    return `$${formula}$`;
-                } catch(e) {
-                    return `<span>$${formula}$</span>`;
-                }
-            });
-
-            const cleanId = selectedEpisode ? selectedEpisode.filename.replace('.md', '').replace(/^_/, '') : '';
-            const carouselHtml = buildInfographicCarouselHtml(selectedEpisode?.videos, cleanId);
-            const walletAndAudioHtml = buildSyndicationAndWalletHtml(cleanId, false);
-
-            let finalBodyHtml = parsedHtml;
-            const hasExistingSocials = finalBodyHtml.includes('lightning-widget') || finalBodyHtml.includes('<!-- SOCIALS_START -->');
-            if (!hasExistingSocials) {
-                const citedMatch = finalBodyHtml.search(/<h[2-4][^>]*>\s*(<strong>)?\s*(Works Cited|References|Sources)/i);
-                if (citedMatch !== -1) {
-                    finalBodyHtml = finalBodyHtml.slice(0, citedMatch) + walletAndAudioHtml + finalBodyHtml.slice(citedMatch);
-                } else {
-                    finalBodyHtml += walletAndAudioHtml;
-                }
+            if (!sheet) return;
+            if (!mdContent) {
+                sheet.innerHTML = `<p style="color: var(--text-dark-secondary);">No content available for this episode.</p>`;
+                return;
             }
 
-            sheet.innerHTML = `
-                <h1 class="paper-h1">${title}</h1>
-                ${carouselHtml}
-                <div class="rendered-body">${finalBodyHtml}</div>
-            `;
+            try {
+                const h1Match = mdContent.match(/^#\s+(.*)$/m);
+                const title = h1Match ? h1Match[1] : "Untitled Episode";
+                let bodyContent = mdContent.replace(/^#\s+.*$/m, '').trim();
+                bodyContent = bodyContent.replace(/<!-- VIDEO_STRIP_START -->[\s\S]*?<!-- VIDEO_STRIP_END -->/gi, '').trim();
+
+                const blockMaths = [];
+                const inlineMaths = [];
+
+                let protectedMd = bodyContent.replace(/\$\$([\s\S]*?)\$\$/g, (m, code) => {
+                    const idx = blockMaths.length;
+                    blockMaths.push(code.trim());
+                    return `%%%KATEX_BLOCK_${idx}%%%`;
+                });
+
+                protectedMd = protectedMd.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g, (m, code) => {
+                    const idx = inlineMaths.length;
+                    inlineMaths.push(code.trim());
+                    return `%%%KATEX_INLINE_${idx}%%%`;
+                });
+
+                let parsedHtml = '';
+                if (typeof marked !== 'undefined' && marked.parse) {
+                    parsedHtml = marked.parse(protectedMd);
+                } else {
+                    parsedHtml = `<div style="white-space: pre-wrap; font-family: var(--font-sans);">${escapeHtml(protectedMd)}</div>`;
+                }
+
+                parsedHtml = parsedHtml.replace(/%%%KATEX_BLOCK_(\d+)%%%/g, (m, idx) => {
+                    const formula = blockMaths[parseInt(idx, 10)];
+                    if (!formula) return "";
+                    try {
+                        if (typeof katex !== 'undefined' && katex.renderToString) {
+                            return `<div class="katex-display-block">${katex.renderToString(formula, { displayMode: true, throwOnError: false })}</div>`;
+                        }
+                        return `<div class="katex-display-block">$$${escapeHtml(formula)}$$</div>`;
+                    } catch(e) {
+                        return `<div class="katex-error">$$${escapeHtml(formula)}$$</div>`;
+                    }
+                });
+
+                parsedHtml = parsedHtml.replace(/%%%KATEX_INLINE_(\d+)%%%/g, (m, idx) => {
+                    const formula = inlineMaths[parseInt(idx, 10)];
+                    if (!formula) return "";
+                    try {
+                        if (typeof katex !== 'undefined' && katex.renderToString) {
+                            return `<span class="katex-inline">${katex.renderToString(formula, { displayMode: false, throwOnError: false })}</span>`;
+                        }
+                        return `$${escapeHtml(formula)}$`;
+                    } catch(e) {
+                        return `<span>$${escapeHtml(formula)}$</span>`;
+                    }
+                });
+
+                const cleanId = selectedEpisode ? selectedEpisode.filename.replace('.md', '').replace(/^_/, '') : '';
+                const carouselHtml = buildInfographicCarouselHtml(selectedEpisode?.videos, cleanId);
+                const walletAndAudioHtml = buildSyndicationAndWalletHtml(cleanId, false);
+
+                let finalBodyHtml = parsedHtml;
+                const hasExistingSocials = finalBodyHtml.includes('lightning-widget') || finalBodyHtml.includes('<!-- SOCIALS_START -->');
+                if (!hasExistingSocials) {
+                    const citedMatch = finalBodyHtml.search(/<h[2-4][^>]*>\s*(<strong>)?\s*(Works Cited|References|Sources)/i);
+                    if (citedMatch !== -1) {
+                        finalBodyHtml = finalBodyHtml.slice(0, citedMatch) + walletAndAudioHtml + finalBodyHtml.slice(citedMatch);
+                    } else {
+                        finalBodyHtml += walletAndAudioHtml;
+                    }
+                }
+
+                sheet.innerHTML = `
+                    <h1 class="paper-h1">${title}</h1>
+                    ${carouselHtml}
+                    <div class="rendered-body">${finalBodyHtml}</div>
+                `;
+            } catch (err) {
+                console.error("renderMarkdownInPreview error:", err);
+                sheet.innerHTML = `
+                    <div style="color: #dc2626; padding: 1rem; font-family: var(--font-mono); font-size: 0.85rem;">
+                        ⚠️ Preview Render Error: ${err.message}
+                    </div>
+                    <pre style="white-space: pre-wrap; font-size: 0.8rem; background: #f8fafc; padding: 1rem; border-radius: 6px;">${escapeHtml(mdContent)}</pre>
+                `;
+            }
         }
 
         let narrativeDisplayMode = 'nostr'; // 'nostr' | 'transcript'
