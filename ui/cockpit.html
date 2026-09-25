@@ -2569,14 +2569,16 @@ if __name__ == '__main__':
                 }
 
                 // Populate sidebar transcript editor
-                if (data.transcript && (!transcriptEditor.value || transcriptEditor.getAttribute('data-loaded-file') !== filename)) {
-                    transcriptEditor.value = data.transcript;
-                    transcriptEditor.setAttribute('data-loaded-file', filename);
-                    updateTranscriptWordCount();
-                } else if (!data.transcript && transcriptEditor.getAttribute('data-loaded-file') !== filename) {
-                    transcriptEditor.value = '';
-                    transcriptEditor.setAttribute('data-loaded-file', filename);
-                    updateTranscriptWordCount();
+                if (transcriptEditor) {
+                    if (data.transcript && (!transcriptEditor.value || transcriptEditor.getAttribute('data-loaded-file') !== filename)) {
+                        transcriptEditor.value = data.transcript;
+                        transcriptEditor.setAttribute('data-loaded-file', filename);
+                        updateTranscriptWordCount();
+                    } else if (!data.transcript && transcriptEditor.getAttribute('data-loaded-file') !== filename) {
+                        transcriptEditor.value = '';
+                        transcriptEditor.setAttribute('data-loaded-file', filename);
+                        updateTranscriptWordCount();
+                    }
                 }
 
                 // Render Narrative Tab with fresh audio & transcript data
@@ -2685,7 +2687,8 @@ if __name__ == '__main__':
 
         async function saveTranscript() {
             if (!selectedEpisode) return;
-            const text = document.getElementById('transcript-editor').value;
+            const editor = document.getElementById('transcript-editor');
+            const text = editor ? editor.value : (currentAudioData?.transcript || '');
             try {
                 const res = await fetch('/api/transcript/save', {
                     method: 'POST',
