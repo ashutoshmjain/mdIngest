@@ -392,7 +392,7 @@ def find_episode_cover(slug_or_num: str) -> bool:
 transcription_jobs = {}
 
 def get_episode_audio_path(clean_id: str) -> Path | None:
-    """Discovers local NotebookLM audio file for an episode."""
+    """Discovers local audio file for an episode."""
     possible_dirs = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,

@@ -1469,17 +1469,17 @@
 
             <!-- SECTION 2: NARRATIVE DECK (AUDIO DROPZONE, PLAYER, WHISPER STT) -->
             <div class="right-deck-section" id="right-deck-narrative">
-                <!-- 1. NotebookLM Audio Deep Dive Section -->
+                <!-- 1. Audio Track Section -->
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.5rem;">
-                        <span>🎙️ NotebookLM Audio</span>
+                        <span>🎙️ Audio Track</span>
                         <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
                     </div>
 
                     <!-- Dropzone / Audio Selector -->
                     <div class="btn-select-file" id="audio-dropzone" onclick="document.getElementById('audio-file-input').click()">
                         <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎵</div>
-                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop NotebookLM Audio</div>
+                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop Audio</div>
                         <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted);">.mp3, .wav, .m4a (Gitignored)</div>
                         <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a,.ogg,.aac" style="display: none;" onchange="handleAudioFileSelected(event)">
                     </div>
