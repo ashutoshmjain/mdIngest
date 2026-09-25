@@ -2901,20 +2901,56 @@ if __name__ == '__main__':
             }
         }
 
-        async function launchDdmaStudio() {
+        function launchDdmaStudio() {
+            let epNum = '';
+            if (selectedEpisode) {
+                epNum = selectedEpisode.number || (selectedEpisode.filename ? selectedEpisode.filename.replace(/\D/g, '') : '');
+            }
+            if (!epNum) {
+                const activeEl = document.querySelector('.block-item.active, .tree-item.active');
+                if (activeEl && activeEl.dataset && activeEl.dataset.number) {
+                    epNum = activeEl.dataset.number;
+                }
+            }
+            
+            const targetUrl = epNum ? `http://localhost:8000/curator.html?project=episode_${epNum}` : 'http://localhost:8000/curator.html';
+            
+            showToast('🚀 Opening DDMA Studio (Port 8000)...');
+
+            // CRITICAL: Open window synchronously directly during user gesture so Chrome/Edge popup blocker will NOT block it!
+            let newWindow = null;
             try {
-                showToast('🚀 Launching DDMA Studio on Port 8000...');
-                const res = await fetch('/api/ddma/launch', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename: selectedEpisode ? selectedEpisode.filename : '' })
-                });
-                const data = await res.json();
-                const url = data.curator_url || 'http://localhost:8000/curator.html';
-                window.open(url, '_blank');
-            } catch (err) {
-                console.error("Failed to launch DDMA:", err);
-                window.open('http://localhost:8000/curator.html', '_blank');
+                newWindow = window.open(targetUrl, '_blank');
+            } catch (wErr) {
+                console.warn("window.open failed:", wErr);
+            }
+
+            // Sync with backend /api/ddma/launch in background to ensure DDMA project is seeded & ready
+            const postFilename = selectedEpisode ? selectedEpisode.filename : (epNum ? `${epNum}.md` : '');
+            fetch('/api/ddma/launch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: postFilename })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.curator_url && newWindow && !newWindow.closed) {
+                    try {
+                        if (newWindow.location.href !== data.curator_url) {
+                            newWindow.location.href = data.curator_url;
+                        }
+                    } catch (navErr) {
+                        // Ignore any cross-origin framing checks
+                    }
+                }
+            })
+            .catch(err => {
+                console.warn("DDMA background sync error:", err);
+            });
+
+            // Fallback: If browser popup blocker completely disallowed window.open, navigate current window
+            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                window.location.href = targetUrl;
             }
         }
 
