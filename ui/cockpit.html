@@ -1516,23 +1516,6 @@
                     </button>
                     <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
                 </div>
-
-                <!-- 3. Sidebar Transcript Mini-Editor & Tools -->
-                <div class="audio-card" style="padding-bottom: 0.5rem;">
-                    <div class="studio-title" style="margin-bottom: 0.4rem;">
-                        <span>📝 Quick Transcript Deck</span>
-                        <span class="vim-mode-badge" id="vim-mode-indicator">VIM: NORMAL</span>
-                    </div>
-
-                    <div class="transcript-container">
-                        <div class="transcript-toolbar">
-                            <span id="transcript-word-count">0 words</span>
-                            <div style="display: flex; gap: 0.4rem;">
-                                <button class="btn-cmd emerald" style="padding: 0.15rem 0.45rem; font-size: 0.65rem;" onclick="saveTranscript()" title="Save transcript.txt">💾 Save</button>
-                            </div>
-                        </div>
-                        <textarea class="transcript-textarea" id="transcript-editor" placeholder="Audio transcript..." oninput="handleSidebarTranscriptInput()"></textarea>
-                    </div>
                 </div>
             </div>
 
