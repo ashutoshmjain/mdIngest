@@ -1418,9 +1418,6 @@
                         </button>
                     </div>
 
-                    <!-- 740x740 Infographic Video Carousel container in Media Tab -->
-                    <div id="media-video-carousel-wrap" style="margin-bottom: 1.5rem;"></div>
-
                     <div id="media-clips-grid-deck" class="media-grid-container">
                         <!-- Populated by JS -->
                     </div>
@@ -2928,14 +2925,10 @@ if __name__ == '__main__':
                     transBadge.style.color = data.has_transcript ? 'var(--accent-emerald)' : 'var(--text-dark-muted)';
                 }
 
-                // Render Media Tab Carousel & Grid Deck
-                const carouselContainer = document.getElementById('media-video-carousel-wrap');
+                // Render Media Tab Grid Deck
                 const container = document.getElementById('media-clips-grid-deck');
 
                 if (data.clips && data.clips.length > 0) {
-                    if (carouselContainer) {
-                        carouselContainer.innerHTML = buildInfographicCarouselHtml(data.clips, data.clean_id);
-                    }
                     if (container) {
                         container.innerHTML = data.clips.map((clip, idx) => `
                             <div class="infographic-card" style="max-width: 100%;">
@@ -2951,7 +2944,6 @@ if __name__ == '__main__':
                         `).join('');
                     }
                 } else {
-                    if (carouselContainer) carouselContainer.innerHTML = '';
                     if (container) {
                         container.innerHTML = `
                             <div style="grid-column: 1 / -1; background: #ffffff; border: 1px dashed var(--border-light); border-radius: 8px; padding: 2.5rem 2rem; text-align: center;">
