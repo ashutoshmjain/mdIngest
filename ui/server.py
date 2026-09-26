@@ -23,6 +23,7 @@ from pathlib import Path
 from datetime import datetime
 import ast
 import socket
+import time
 
 # Working directories
 INGEST_DIR = Path(__file__).resolve().parent
@@ -47,7 +48,7 @@ def is_ddma_curator_running() -> bool:
         return True
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.2)
+            s.settimeout(0.04)
             return s.connect_ex(('127.0.0.1', 8000)) == 0
     except Exception:
         return False
@@ -59,7 +60,7 @@ def is_mdserve_running() -> bool:
         return True
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.2)
+            s.settimeout(0.04)
             return s.connect_ex(('127.0.0.1', 3000)) == 0
     except Exception:
         return False
@@ -320,12 +321,21 @@ def extract_python_payload(payload_code: str) -> tuple[str, str, int, int]:
 
     raise ValueError("Could not extract markdown content from the uploaded payload.")
 
+_ep_videos_cache: dict[str, tuple[float, list[dict]]] = {}
+
 def find_episode_videos(slug_or_num: str) -> list[dict]:
     """
     Discovers video clips across canonical DDMA episodes store (src/ddma/docs/episodes/)
-    and legacy fallback directories per agent.md.
+    and fallback directories across both deepDive and sibling ddma workspaces.
+    Cached for 2.0s to eliminate redundant disk queries when loading tabs.
     """
     clean_id = str(slug_or_num).replace('.md', '').lstrip('_')
+    now = time.time()
+    if clean_id in _ep_videos_cache:
+        c_time, c_clips = _ep_videos_cache[clean_id]
+        if now - c_time < 2.0:
+            return c_clips
+
     candidates = []
 
     # 1. Modern Canonical DDMA Standard (src/ddma/docs/episodes/<ep>/clips/)
@@ -333,24 +343,33 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
     if canonical_ep_dir.exists():
         candidates.extend(canonical_ep_dir.glob("*.mp4"))
 
-    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4 (Root fallback)
-    ep_clips_dir = PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id / "clips"
-    if ep_clips_dir.exists():
-        candidates.extend(ep_clips_dir.glob("*.mp4"))
+    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4 (Root fallback in deepDive & sibling ddma)
+    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+        ep_clips_dir = ddma_root / "docs" / "episodes" / clean_id / "clips"
+        if ep_clips_dir.exists():
+            candidates.extend(ep_clips_dir.glob("*.mp4"))
 
-    # 3. Legacy episodes store (src/vid/<clean_id>-*.mp4)
+    # 3. ddma/projects/episode_<id>/clips (Draft and working clips)
+    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+        proj_clips = ddma_root / "projects" / f"episode_{clean_id}" / "clips"
+        if proj_clips.exists():
+            candidates.extend(proj_clips.glob("*.mp4"))
+
+    # 4. ddma/clips/<clean_id>-*.mp4 (ddma root clips folder in both deepDive and sibling ddma)
+    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+        clips_folder = ddma_root / "clips"
+        if clips_folder.exists():
+            candidates.extend(clips_folder.glob(f"{clean_id}-*.mp4"))
+
+    # 5. Legacy episodes store (src/vid/<clean_id>-*.mp4)
     candidates.extend(VID_DIR.glob(f"{clean_id}-*.mp4"))
     candidates.extend(VID_DIR.glob(f"_{clean_id}-*.mp4"))
 
-    # 4. ddma/docs/assets/clips/<clean_id>-*.mp4
-    assets_clips_dir = PROJECT_ROOT / "ddma" / "docs" / "assets" / "clips"
-    if assets_clips_dir.exists():
-        candidates.extend(assets_clips_dir.glob(f"{clean_id}-*.mp4"))
-
-    # 5. ddma/clips/<clean_id>-*.mp4
-    ddma_clips_dir = PROJECT_ROOT / "ddma" / "clips"
-    if ddma_clips_dir.exists():
-        candidates.extend(ddma_clips_dir.glob(f"{clean_id}-*.mp4"))
+    # 6. ddma/docs/assets/clips/<clean_id>-*.mp4
+    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+        assets_clips_dir = ddma_root / "docs" / "assets" / "clips"
+        if assets_clips_dir.exists():
+            candidates.extend(assets_clips_dir.glob(f"{clean_id}-*.mp4"))
 
     seen = set()
     final_clips = []
@@ -360,10 +379,22 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
             continue
         seen.add(name)
         clip_label = name.replace('.mp4', '').replace('_', ' ')
+        
+        # Build canonical streaming URL
+        if "docs" in str(path) and "episodes" in str(path):
+            url = f"/media/ddma/docs/episodes/{clean_id}/clips/{name}"
+        elif "projects" in str(path):
+            url = f"/media/ddma/projects/episode_{clean_id}/clips/{name}"
+        elif "clips" in str(path):
+            url = f"/media/ddma/clips/{name}"
+        else:
+            url = f"/vid/{name}"
+
         final_clips.append({
             "name": name,
-            "url": f"/media/ddma/docs/episodes/{clean_id}/clips/{name}" if "ddma" in str(path) else f"/vid/{name}",
-            "label": clip_label
+            "url": url,
+            "label": clip_label,
+            "size_bytes": path.stat().st_size if path.exists() else 0
         })
 
     def sort_key(clip):
@@ -371,6 +402,7 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
         return [int(n) for n in nums] if nums else [clip["name"]]
 
     final_clips.sort(key=sort_key)
+    _ep_videos_cache[clean_id] = (now, final_clips)
     return final_clips
 
 def find_episode_cover(slug_or_num: str) -> bool:
@@ -458,15 +490,29 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
     text = re.sub(r'\bi\'ll\b', "I'll", text, flags=re.IGNORECASE)
     text = re.sub(r'\bi\'d\b', "I'd", text, flags=re.IGNORECASE)
 
+    # Remove inline tag questions and conversational fillers
+    text = re.sub(r',\s*right\?', '.', text, flags=re.IGNORECASE)
+    text = re.sub(r',\s*you\s+know\?', '.', text, flags=re.IGNORECASE)
+    text = re.sub(r',\s*yeah\?', '.', text, flags=re.IGNORECASE)
+    text = re.sub(r'\byou\s+know,\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\boh,\s*yeah,\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\boh\s+yeah,\s*', '', text, flags=re.IGNORECASE)
+
     # Capitalize after sentence terminators
     text = re.sub(r'([.!?]\s+)([a-z])', lambda m: m.group(1) + m.group(2).upper(), text)
     if text:
         text = text[0].upper() + text[1:]
 
-    # Promotional detection regex pattern
+    # Promotional detection regex pattern (ruthlessly discard)
     promo_patterns = [
         r'\b(?:sponsor(?:ed|s)?|patreon|subscribe|follow us on|discount code|promo code|rate and review|check out the link|link in the description|leave a five star|support (?:us|the show|the podcast))\b',
-        r'\b(?:supported by|brought to you by|special offer|advertis(?:er|ement)|our partners? at)\b'
+        r'\b(?:supported by|brought to you by|special offer|advertis(?:er|ement)|our partners? at)\b',
+        r'\b(?:welcome\s+(?:back\s+)?to\s+(?:the\s+)?deep\s*dive|in\s+this\s+deep\s*dive|draw(?:ing)?\s+this\s+deep\s*dive\s+to\s+a\s+close)\b',
+        r'\b(?:deep\s*dive\s+website|progressive\s+web\s+app|access\s+all\s+of\s+the\s+research\s+offline|read\s+these\s+massive\s+deep\s+dives)\b',
+        r'\b(?:install|access)\s+it\s+(?:essentially\s+)?as\s+a\s+native\s+app\b',
+        r'\b(?:share\s+this\s+show|if\s+you\s+have\s+expertise\s+in\s+the\s+specific\s+fields|see\s+you\s+on\s+the\s+next\s+deep\s+dive|i\s+am\s+satoshi)\b',
+        r'\b(?:keep\s+searching,\s*keep\s+the\s+quest\s+on|symbiosis\s+of\s+artificial\s+and\s+natural\s+intelligence)\b',
+        r'\b(?:research\s+hub\s+at\s+deepdive|secure\s+enclave\s+of\s+your\s+own\s+to\s+read)\b'
     ]
     promo_regex = re.compile('|'.join(promo_patterns), re.IGNORECASE)
 
@@ -495,7 +541,7 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
 
     # Major thematic section markers
     section_patterns = [
-        (r'\b(Welcome to the deep dive|before we really plunge|setting the tone|intentional slowing down)\b', "Introduction: Setting the Tone"),
+        (r'\b(before we really plunge|setting the tone|intentional slowing down)\b', "Introduction: Setting the Tone"),
         (r'\b(set the context for this journey|causing an absolute earthquake|metas? mues?|meta muse)\b', "The Agentic Shift: From Q&A to Execution"),
         (r'\b(what Metamuse actually is under the hood|Meta Superintelligence Labs|Pareto efficient cost frontier)\b', "Architecture & The Pareto Efficient Frontier"),
         (r'\b(how it navigates the web|headless browser|parsing the DOM|document object model)\b', "Autonomous Navigation: Parsing the DOM"),
@@ -523,17 +569,36 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
     promo_count = 0
     used_section_titles = set()
 
-    # Prepend header if title provided
+    # Prepend header if title provided (clean H1 only, no podcast metadata)
     doc_lines = []
     if title:
-        doc_lines.append(f"# {title}\n")
-    if ep_num:
-        doc_lines.append(f"> 🎙️ **Episode**: #{ep_num} • DeepDive Audio Intelligence  \n> ⚡ **Format**: Nostr Long-Form Publication (NIP-23)\n\n---")
+        doc_lines.append(f"# {title}")
+
+    interjection_set = {
+        'right.', 'right?', 'right!', 'exactly.', 'precisely.', 'correct.', 'yeah.', 'yep.', 'yes.',
+        'sure.', 'totally.', 'definitely.', 'absolutely.', 'indeed.', 'okay.', 'alright.', 'all right.',
+        'wow.', 'fair enough.', 'i see.', 'i follow.', 'i fall.', 'you bet.', 'obviously.', 'obviously not.',
+        'we do.', 'it really is.', 'that makes sense.', 'i think that\'s a great idea.', 'oh, i\'m sure it does.',
+        'okay, i like where this is going.', 'true.', 'agreed.', 'oh yeah.', 'oh, yeah.', 'yeah, right.',
+        'no way.', 'that\'s right.', 'that is right.', 'sounds right.', 'makes sense.', 'got it.', 'i got it.',
+        'is the optimal balance?', 'have a way.', 'we have and it\'s fantastic.', 'also correct.',
+        'a lot of power in a chat app.', 'that\'s a great way to summarize it.', 'it really does.',
+        'it does, but it\'s pure strategic reality.', 'this part is fascinating.'
+    }
 
     for idx, s in enumerate(sentences):
         s_clean = s.strip()
         if not s_clean:
             continue
+
+        # Filter out standalone conversational interjections
+        norm_s = re.sub(r'[*_#`]', '', s_clean).strip().lower()
+        if norm_s in interjection_set or re.match(r'^(?:right|exactly|precisely|yeah|yep|yes|okay|alright|wow|sure|correct)[.!?]$', norm_s):
+            continue
+
+        # Clean leading interjection words in longer sentences
+        s_clean = re.sub(r'^(?:Right|Exactly|Precisely|Yeah|Yep|Yes|Okay|Alright|Well),\s+([a-zA-Z])', lambda m: m.group(1).upper(), s_clean, flags=re.IGNORECASE)
+        s_clean = re.sub(r'^(?:Right|Exactly|Precisely|Yeah|Yep|Yes|Okay|Alright)\.\s+([a-zA-Z])', lambda m: m.group(1).upper(), s_clean, flags=re.IGNORECASE)
 
         # Check for section triggers
         triggered_heading = None
@@ -549,13 +614,9 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
                 current_para = []
             doc_lines.append(f"\n## {triggered_heading}\n")
 
-        # Check for promotional note
+        # Check for promotional note - Ruthlessly drop completely
         is_promo = bool(promo_regex.search(s_clean))
         if is_promo:
-            if current_para:
-                doc_lines.append(' '.join(current_para))
-                current_para = []
-            doc_lines.append(f"> 📢 **Promotional Note**: {s_clean}")
             promo_count += 1
             continue
 
@@ -586,14 +647,6 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
 
     if current_para:
         doc_lines.append(' '.join(current_para))
-
-    # Add Nostr footer
-    target_ln = lightning_addr or "shutosha@primal.net"
-    doc_lines.append("\n---\n")
-    doc_lines.append("### ⚡ Connect & Support")
-    doc_lines.append(f"* **Lightning Tips**: `{target_ln}`")
-    doc_lines.append("* **Publication**: Generated via MD² Ingest Studio & DeepDive Media Automator")
-    doc_lines.append("* **Platform**: Verified Nostr Long-Form Format (NIP-23)")
 
     full_doc = '\n\n'.join(doc_lines)
     full_doc = bold_entities(full_doc)
@@ -872,12 +925,103 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
     return project_id
 
 
+def build_fast_indices():
+    """
+    Rapidly scans filesystem in bulk to index existing markdown files,
+    covers, and video clip counts in a single pass (<10ms).
+    """
+    existing_src_files = set(os.listdir(SRC_DIR)) if SRC_DIR.exists() else set()
+    
+    # Fast bulk cover index
+    existing_covers = set()
+    if IMG_DIR.exists():
+        try:
+            for fname in os.listdir(IMG_DIR):
+                name, ext = os.path.splitext(fname)
+                if ext.lower() in ['.png', '.jpg', '.jpeg', '.webp']:
+                    existing_covers.add(name.lstrip('_'))
+        except Exception:
+            pass
+    
+    for ddma_root in [PROJECT_ROOT / 'ddma', PROJECT_ROOT.parent / 'ddma']:
+        ep_dir = ddma_root / 'docs' / 'episodes'
+        if ep_dir.exists():
+            try:
+                for ep_name in os.listdir(ep_dir):
+                    p = ep_dir / ep_name
+                    if p.is_dir():
+                        if (p / 'cover.png').exists() or (p / 'thumbnail.png').exists():
+                            existing_covers.add(ep_name.lstrip('_'))
+            except Exception:
+                pass
+        assets_dir = ddma_root / 'docs' / 'assets'
+        if assets_dir.exists():
+            try:
+                for fname in os.listdir(assets_dir):
+                    name, ext = os.path.splitext(fname)
+                    if ext.lower() in ['.png', '.jpg']:
+                        existing_covers.add(name.lstrip('_'))
+            except Exception:
+                pass
+
+    # Fast bulk video counts
+    vid_counts = {}
+    def add_vid(ep_id):
+        clean = str(ep_id).lstrip('_')
+        vid_counts[clean] = vid_counts.get(clean, 0) + 1
+
+    # Canonical deepDive clips
+    canonical_eps = SRC_DIR / 'ddma' / 'docs' / 'episodes'
+    if canonical_eps.exists():
+        try:
+            for ep_name in os.listdir(canonical_eps):
+                clips_dir = canonical_eps / ep_name / 'clips'
+                if clips_dir.exists():
+                    for c in os.listdir(clips_dir):
+                        if c.endswith('.mp4') and '-original.mp4' not in c and '-mosaic-' not in c:
+                            add_vid(ep_name)
+        except Exception:
+            pass
+
+    # DDMA projects clips
+    for ddma_root in [PROJECT_ROOT / 'ddma', PROJECT_ROOT.parent / 'ddma']:
+        proj_dir = ddma_root / 'projects'
+        if proj_dir.exists():
+            try:
+                for proj_name in os.listdir(proj_dir):
+                    if proj_name.startswith('episode_'):
+                        ep_id = proj_name.replace('episode_', '')
+                        p_clips = proj_dir / proj_name / 'clips'
+                        if p_clips.exists():
+                            for c in os.listdir(p_clips):
+                                if c.endswith('.mp4') and '-original.mp4' not in c and '-mosaic-' not in c:
+                                    add_vid(ep_id)
+            except Exception:
+                pass
+
+    # Legacy vid dir clips
+    if VID_DIR.exists():
+        try:
+            for fname in os.listdir(VID_DIR):
+                if fname.endswith('.mp4'):
+                    m = re.match(r'^_?(\d+)-', fname)
+                    if m:
+                        add_vid(m.group(1))
+        except Exception:
+            pass
+
+    return existing_src_files, existing_covers, vid_counts
+
+
 def parse_summary_structure():
     """
     Parses SUMMARY.md and discovers Mempool drafts, Template episodes, and Master Chain blocks.
+    Uses bulk-indexed in-memory lookups for sub-10ms response time.
     """
     if not SUMMARY_FILE.exists():
         return [], [], [], 247
+
+    existing_src_files, existing_covers, vid_counts = build_fast_indices()
 
     with open(SUMMARY_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
@@ -914,19 +1058,19 @@ def parse_summary_structure():
             if filename in ["github.md", "mempool.md", "template.md", "chain.md", "cover.md", "block1.md", "block2.md", "genesis.md"]:
                 continue
 
-            file_path = SRC_DIR / filename
             clean_slug = filename.replace(".md", "").lstrip("_")
-            has_img = find_episode_cover(clean_slug)
-            vid_clips = find_episode_videos(clean_slug)
+            has_img = clean_slug in existing_covers
+            v_count = vid_counts.get(clean_slug, 0)
+            file_exists = filename in existing_src_files
 
             item = {
                 "title": title_text,
                 "filename": filename,
                 "slug": clean_slug,
                 "has_image": has_img,
-                "vid_count": len(vid_clips),
-                "is_locked": len(vid_clips) > 0,
-                "exists": file_path.exists()
+                "vid_count": v_count,
+                "is_locked": v_count > 0,
+                "exists": file_exists
             }
 
             # Number detection
@@ -1042,6 +1186,9 @@ def sync_summary_file(mempool_items, template_items):
 class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(INGEST_DIR), **kwargs)
+
+    def do_HEAD(self):
+        return self.do_GET()
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -1164,34 +1311,13 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             fn = params.get("filename", [""])[0]
             clean_id = fn.replace(".md", "").lstrip("_")
             
-            ddma_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
-            clips_dir = ddma_ep_dir / "clips"
-            clips = []
+            ddma_ep_dir = PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id
+            if not ddma_ep_dir.exists():
+                ddma_ep_dir = PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / clean_id
+            if not ddma_ep_dir.exists():
+                ddma_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
             
-            # 1. Discover clips in src/ddma/docs/episodes/<id>/clips
-            if clips_dir.exists():
-                for ext in [".mp4", ".mov", ".webm"]:
-                    for cf in sorted(clips_dir.glob(f"*{ext}")):
-                        clips.append({
-                            "name": cf.name,
-                            "label": cf.name.replace(".mp4", "").replace("_", " "),
-                            "url": f"/media/ddma/docs/episodes/{clean_id}/clips/{cf.name}",
-                            "size_bytes": cf.stat().st_size
-                        })
-            
-            # 2. Discover clips in ddma/projects/episode_<id>/clips
-            for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                proj_clips = ddma_root / "projects" / f"episode_{clean_id}" / "clips"
-                if proj_clips.exists():
-                    for ext in [".mp4", ".mov", ".webm"]:
-                        for cf in sorted(proj_clips.glob(f"*{ext}")):
-                            if not any(c["name"] == cf.name for c in clips):
-                                clips.append({
-                                    "name": cf.name,
-                                    "label": cf.name.replace(".mp4", "").replace("_", " "),
-                                    "url": f"/media/ddma/projects/episode_{clean_id}/clips/{cf.name}",
-                                    "size_bytes": cf.stat().st_size
-                                })
+            clips = find_episode_videos(clean_id)
 
             audio_path = get_episode_audio_path(clean_id)
             transcript_path = get_episode_transcript_path(clean_id)
@@ -1226,6 +1352,8 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 PROJECT_ROOT.parent / clean_path,
                 SRC_DIR / "ddma" / "docs" / "episodes" / clean_path,
                 PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_path,
+                PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / clean_path,
+                PROJECT_ROOT / "ddma" / clean_path,
                 PROJECT_ROOT.parent / "ddma" / clean_path,
                 SRC_DIR / "vid" / Path(clean_path).name,
                 SRC_DIR / "img" / Path(clean_path).name,
@@ -1240,12 +1368,19 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 ep_match = re.search(r'(\d+)', fname)
                 ep_num = ep_match.group(1) if ep_match else ""
                 if ep_num:
-                    p1 = SRC_DIR / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
-                    p2 = PROJECT_ROOT / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname
-                    p3 = PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname
-                    if p1.exists(): target_file = p1
-                    elif p2.exists(): target_file = p2
-                    elif p3.exists(): target_file = p3
+                    for cand in [
+                        PROJECT_ROOT / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
+                        PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
+                        SRC_DIR / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
+                        PROJECT_ROOT / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname,
+                        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname,
+                        PROJECT_ROOT / "ddma" / "clips" / fname,
+                        PROJECT_ROOT.parent / "ddma" / "clips" / fname,
+                        VID_DIR / fname,
+                    ]:
+                        if cand.exists():
+                            target_file = cand
+                            break
 
             if target_file and target_file.exists():
                 self.serve_media_file(target_file)
@@ -1280,6 +1415,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
 
+                if self.command == "HEAD":
+                    return
+
                 with open(file_path, 'rb') as f:
                     f.seek(start)
                     bytes_remaining = length
@@ -1297,6 +1435,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Accept-Ranges', 'bytes')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
+
+                if self.command == "HEAD":
+                    return
 
                 with open(file_path, 'rb') as f:
                     shutil.copyfileobj(f, self.wfile)
@@ -1702,6 +1843,15 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                             pass
 
             if not custom_text:
+                n_path = get_episode_narrative_path(clean_id)
+                if n_path.exists():
+                    try:
+                        with open(n_path, "r", encoding="utf-8") as f:
+                            custom_text = f.read()
+                    except Exception:
+                        pass
+
+            if not custom_text:
                 t_path = get_episode_transcript_path(clean_id)
                 if t_path.exists():
                     try:
@@ -1709,6 +1859,22 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                             custom_text = f.read()
                     except Exception:
                         pass
+
+            if not custom_text:
+                for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+                    if possible_file.exists():
+                        try:
+                            with open(possible_file, "r", encoding="utf-8") as pf:
+                                md_body = pf.read()
+                                prose = re.sub(r'<!--[\s\S]*?-->', '', md_body)
+                                prose = re.sub(r'```[\s\S]*?```', '', prose)
+                                prose = re.sub(r'\$\$[\s\S]*?\$\$', '', prose)
+                                prose = prose.strip()
+                                if prose:
+                                    custom_text = prose
+                                    break
+                        except Exception:
+                            pass
 
             settings = load_settings()
             ln_addr = settings.get("lightning_address", "shutosha@primal.net")
@@ -1945,13 +2111,43 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
+class DualStackThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    """
+    Multithreaded HTTP Server with Dual-Stack (IPv4 + IPv6) support.
+    Eliminates Windows localhost 2-second IPv6 timeout and handles concurrent requests.
+    """
+    daemon_threads = True
+
+    def __init__(self, server_address, RequestHandlerClass):
+        try:
+            self.address_family = socket.AF_INET6
+            super().__init__(server_address, RequestHandlerClass)
+        except Exception:
+            self.address_family = socket.AF_INET
+            super().__init__(server_address, RequestHandlerClass)
+
+    def server_bind(self):
+        if self.address_family == socket.AF_INET6:
+            try:
+                self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            except Exception:
+                pass
+        super().server_bind()
+
 def run_server():
     settings = load_settings()
     port = settings.get("port", 8088)
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", port), IngestRequestHandler) as httpd:
+    DualStackThreadingHTTPServer.allow_reuse_address = True
+    bind_addr = ("::", port) if socket.has_ipv6 else ("", port)
+    try:
+        httpd = DualStackThreadingHTTPServer(bind_addr, IngestRequestHandler)
+    except Exception:
+        DualStackThreadingHTTPServer.address_family = socket.AF_INET
+        httpd = DualStackThreadingHTTPServer(("", port), IngestRequestHandler)
+
+    with httpd:
         print(f"\n==================================================")
-        print(f"       md² Ingest Publishing Cockpit")
+        print(f"       md² Ingest Publishing Cockpit (Fast Dual-Stack)")
         print(f"==================================================")
         print(f"  URL: http://localhost:{port}")
         print(f"  Root: {PROJECT_ROOT}")

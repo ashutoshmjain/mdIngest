@@ -1359,19 +1359,48 @@
                         </div>
                     </div>
 
-                    <!-- 740x740 Infographic Video Carousel container -->
-                    <div id="narrative-video-carousel-wrap"></div>
-
                     <!-- H1 Header -->
                     <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
+
+                    <!-- 740x740 Square Infographics Video Carousel container -->
+                    <div id="narrative-video-carousel-wrap"></div>
 
                     <!-- Read-Only Rendered Narrative Body -->
                     <div class="rendered-body" id="narrative-rendered-body">
                         <p style="color: var(--text-dark-muted); font-style: italic;">No narrative transcript loaded for this episode. Upload audio and run Whisper, or paste content in the Audio Studio deck.</p>
                     </div>
 
-                    <!-- Bottom Sats Wallet & Audio Syndication Strip -->
-                    <div id="narrative-bottom-syndication"></div>
+                    <!-- Bottom Syndication and Sats Wallet -->
+                    <div id="narrative-bottom-syndication">
+                        <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
+                            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; font-family: var(--font-sans);">Tips and Donations</h3>
+                            <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
+                                If you enjoyed this research, consider supporting the project with a tip in <strong>Sats</strong>. It's a simple, global way to support independent research.
+                            </p>
+                            <div style="display: flex; justify-content: center; margin: 1rem 0;">
+                                <lightning-widget
+                                  name="Thanks for supporting the publication"
+                                  accent="#f9ce00"
+                                  to="shutosha@primal.net"
+                                  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+                                ></lightning-widget>
+                            </div>
+                            <div style="display: flex; gap: 0.6rem; justify-content: center; margin: 1.25rem 0; flex-wrap: wrap;">
+                                <a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">▶ Spotify</a>
+                                <a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">◈ Apple Podcasts</a>
+                                <a href="https://music.youtube.com" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⫸ YouTube Music</a>
+                                <a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⚡ Fountain.fm</a>
+                            </div>
+                            <p style="font-size: 0.75rem; color: var(--text-dark-muted); margin-top: 0.5rem;">
+                                To send Sats, you'll need a <a href="https://lightningaddress.com/" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline;">lightning wallet</a>.
+                            </p>
+                            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed var(--border-light); font-size: 0.8rem; color: var(--text-dark-secondary);">
+                                🔬 Explore the full peer-reviewed research paper with mathematical proofs &amp; interactive models on:
+                                <br>
+                                <a href="https://deepdive.shutri.com/index.html" target="_blank" id="narrative-canonical-preview" style="color: var(--accent-amber-dark); font-weight: 600; text-decoration: underline; font-family: var(--font-mono); font-size: 0.75rem;">https://deepdive.shutri.com/index.html</a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1388,6 +1417,9 @@
                             🚀 Open DDMA Studio
                         </button>
                     </div>
+
+                    <!-- 740x740 Infographic Video Carousel container in Media Tab -->
+                    <div id="media-video-carousel-wrap" style="margin-bottom: 1.5rem;"></div>
 
                     <div id="media-clips-grid-deck" class="media-grid-container">
                         <!-- Populated by JS -->
@@ -2124,7 +2156,8 @@ if __name__ == '__main__':
             const appleUrl = settings.apple_podcasts_url || 'https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251';
             const ytMusicUrl = settings.youtube_music_url || 'https://music.youtube.com';
             const fountainUrl = settings.fountain_url || 'https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF';
-            const canonicalLink = `https://deepdive.shutri.com/${cleanId}.html`;
+            const id = cleanId || (selectedEpisode ? selectedEpisode.filename.replace('.md', '').replace(/^_/, '') : 'index');
+            const canonicalLink = `https://deepdive.shutri.com/${id}.html`;
 
             return `
                 <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
@@ -2291,17 +2324,21 @@ if __name__ == '__main__':
             renderNarrativeContent();
         }
 
+        function syncNarrativeEditorViews() {
+            renderNarrativeTab(selectedEpisode, currentAudioData);
+        }
+
         function renderNarrativeTab(epData, audioData) {
-            if (!epData) return;
-            const cleanId = epData.filename.replace('.md', '').replace(/^_/, '');
-            const title = epData.title || "Episode Narrative";
+            const ep = epData || selectedEpisode;
+            const cleanId = ep?.filename ? ep.filename.replace('.md', '').replace(/^_/, '') : 'index';
+            const title = ep?.title || "Episode Narrative";
             
             const h1El = document.getElementById('narrative-h1');
             if (h1El) h1El.innerText = title;
 
             const carouselWrap = document.getElementById('narrative-video-carousel-wrap');
             if (carouselWrap) {
-                carouselWrap.innerHTML = buildInfographicCarouselHtml(epData.videos, cleanId);
+                carouselWrap.innerHTML = buildInfographicCarouselHtml(ep?.videos, cleanId);
             }
 
             renderNarrativeContent();
@@ -2324,7 +2361,9 @@ if __name__ == '__main__':
             }
 
             if (targetText) {
-                renderedBodyEl.innerHTML = marked.parse(targetText);
+                // Strip leading duplicate H1 heading from markdown if present since narrative-h1 already renders it
+                const cleanedText = targetText.replace(/^#\s+.*$/m, '').trim();
+                renderedBodyEl.innerHTML = marked.parse(cleanedText);
             } else {
                 renderedBodyEl.innerHTML = `
                     <div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
@@ -2559,7 +2598,7 @@ if __name__ == '__main__':
         }
 
         function escapeId(str) {
-            return (str || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+            return (str || '').replace(/[^a-zA-Z0-9_-]/g, '-');
         }
 
         document.getElementById('new-draft-slug').addEventListener('input', (e) => {
@@ -2889,36 +2928,44 @@ if __name__ == '__main__':
                     transBadge.style.color = data.has_transcript ? 'var(--accent-emerald)' : 'var(--text-dark-muted)';
                 }
 
-                // Render Media Tab Grid Deck
+                // Render Media Tab Carousel & Grid Deck
+                const carouselContainer = document.getElementById('media-video-carousel-wrap');
                 const container = document.getElementById('media-clips-grid-deck');
-                if (!container) return;
 
                 if (data.clips && data.clips.length > 0) {
-                    container.innerHTML = data.clips.map((clip, idx) => `
-                        <div class="infographic-card" style="max-width: 100%;">
-                            <div class="infographic-video-box">
-                                <video src="${clip.url}" playsinline loop preload="metadata" muted autoplay></video>
-                                <button class="infographic-audio-toggle" onclick="toggleInfographicAudio(this)" title="Toggle Sound">🔇</button>
+                    if (carouselContainer) {
+                        carouselContainer.innerHTML = buildInfographicCarouselHtml(data.clips, data.clean_id);
+                    }
+                    if (container) {
+                        container.innerHTML = data.clips.map((clip, idx) => `
+                            <div class="infographic-card" style="max-width: 100%;">
+                                <div class="infographic-video-box">
+                                    <video src="${clip.url}" playsinline loop preload="metadata" muted autoplay></video>
+                                    <button class="infographic-audio-toggle" onclick="toggleInfographicAudio(this)" title="Toggle Sound">🔇</button>
+                                </div>
+                                <div class="infographic-card-footer">
+                                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${escapeHtml(clip.label || clip.name)}</span>
+                                    <span style="color: var(--accent-amber); font-weight: 700;">Clip #${idx + 1}</span>
+                                </div>
                             </div>
-                            <div class="infographic-card-footer">
-                                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${escapeHtml(clip.label || clip.name)}</span>
-                                <span style="color: var(--accent-amber); font-weight: 700;">Clip #${idx + 1}</span>
-                            </div>
-                        </div>
-                    `).join('');
+                        `).join('');
+                    }
                 } else {
-                    container.innerHTML = `
-                        <div style="grid-column: 1 / -1; background: #ffffff; border: 1px dashed var(--border-light); border-radius: 8px; padding: 2.5rem 2rem; text-align: center;">
-                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎬</div>
-                            <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark-primary); margin-bottom: 0.35rem;">No 740×740 Video Clips Found</h3>
-                            <p style="font-size: 0.8rem; color: var(--text-dark-muted); max-width: 480px; margin: 0 auto 1.25rem;">
-                                This episode does not have generated infographic clips in <code style="font-family: var(--font-mono);">src/ddma/docs/episodes/${escapeHtml(data.clean_id)}/clips/</code> yet.
-                            </p>
-                            <button class="btn-cmd primary" style="padding: 0.55rem 1.25rem;" onclick="launchDdmaStudio()">
-                                🚀 Open DDMA Studio to Generate Clips
-                            </button>
-                        </div>
-                    `;
+                    if (carouselContainer) carouselContainer.innerHTML = '';
+                    if (container) {
+                        container.innerHTML = `
+                            <div style="grid-column: 1 / -1; background: #ffffff; border: 1px dashed var(--border-light); border-radius: 8px; padding: 2.5rem 2rem; text-align: center;">
+                                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎬</div>
+                                <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-dark-primary); margin-bottom: 0.35rem;">No 740×740 Video Clips Found</h3>
+                                <p style="font-size: 0.8rem; color: var(--text-dark-muted); max-width: 480px; margin: 0 auto 1.25rem;">
+                                    This episode does not have generated infographic clips in <code style="font-family: var(--font-mono);">ddma/docs/episodes/${escapeHtml(data.clean_id)}/clips/</code> yet.
+                                </p>
+                                <button class="btn-cmd primary" style="padding: 0.55rem 1.25rem;" onclick="launchDdmaStudio()">
+                                    🚀 Open DDMA Studio to Generate Clips
+                                </button>
+                            </div>
+                        `;
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load DDMA status:", err);
