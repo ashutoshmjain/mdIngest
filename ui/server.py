@@ -17,6 +17,7 @@ import base64
 import gzip
 import glob
 import shutil
+import html
 import subprocess
 from urllib.parse import urlparse, parse_qs
 from pathlib import Path
@@ -419,6 +420,161 @@ def find_episode_cover(slug_or_num: str) -> bool:
     if (PROJECT_ROOT / "ddma" / "docs" / "assets" / f"{clean_id}.png").exists():
         return True
     return False
+
+def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
+    """
+    Synchronizes clips and plan.json from sibling ddma repo to deepDive,
+    and automatically regenerates/embeds the <!-- VIDEO_STRIP_START -->
+    video carousel in src/<clean_id>.md.
+    Ensures mdBook (local), mdIngest Research Tab, and GitHub Pages (deepdive.shutri.com)
+    are 100% synchronized with the exact same source of truth.
+    """
+    clean_id = str(slug_or_num).replace('.md', '').lstrip('_')
+    deepdive_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    deepdive_clips_dir = deepdive_ep_dir / "clips"
+    deepdive_clips_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1. Discover sibling ddma directory
+    sibling_ddma = None
+    for d in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+        if d.exists() and (d / "docs" / "episodes" / clean_id).exists():
+            sibling_ddma = d
+            break
+
+    synced_clips = []
+    if sibling_ddma:
+        ddma_clips_dir = sibling_ddma / "docs" / "episodes" / clean_id / "clips"
+        ddma_plan_file = sibling_ddma / "docs" / "episodes" / clean_id / "plan.json"
+
+        # Copy plan.json if newer or missing
+        if ddma_plan_file.exists():
+            dest_plan = deepdive_ep_dir / "plan.json"
+            if not dest_plan.exists() or dest_plan.stat().st_size != ddma_plan_file.stat().st_size:
+                try:
+                    shutil.copy2(ddma_plan_file, dest_plan)
+                except Exception:
+                    pass
+
+        # Copy clips
+        if ddma_clips_dir.exists():
+            for src_clip in ddma_clips_dir.glob("*.mp4"):
+                if "-original.mp4" in src_clip.name or "-mosaic-" in src_clip.name:
+                    continue
+                dest_clip = deepdive_clips_dir / src_clip.name
+                if not dest_clip.exists() or dest_clip.stat().st_size != src_clip.stat().st_size:
+                    try:
+                        shutil.copy2(src_clip, dest_clip)
+                        synced_clips.append(src_clip.name)
+                    except Exception:
+                        pass
+
+    # Invalidate video cache
+    if clean_id in _ep_videos_cache:
+        del _ep_videos_cache[clean_id]
+
+    # 2. Read plan.json for part titles
+    plan_data = {}
+    dest_plan = deepdive_ep_dir / "plan.json"
+    if dest_plan.exists():
+        try:
+            with open(dest_plan, "r", encoding="utf-8") as pf:
+                p_json = json.load(pf)
+                for part in p_json.get("parts", []):
+                    p_num = part.get("num")
+                    p_title = part.get("title", "")
+                    if p_num is not None:
+                        plan_data[str(p_num)] = p_title
+        except Exception:
+            pass
+
+    # 3. Gather all published clips in deepDive
+    all_clips = sorted(
+        list(deepdive_clips_dir.glob("*.mp4")),
+        key=lambda p: [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', p.name)]
+    )
+    if not all_clips:
+        return {"success": True, "synced_clips": synced_clips, "total_clips": 0}
+
+    # 4. Build standard VIDEO_STRIP block for mdBook
+    cards_html = []
+    for clip_path in all_clips:
+        c_name = clip_path.name
+        if "-original.mp4" in c_name or "-mosaic-" in c_name:
+            continue
+        m = re.search(r'-(\d+)\.mp4$', c_name)
+        part_num = m.group(1) if m else ""
+        label = f"{clean_id}-{part_num}"
+        if part_num in plan_data and plan_data[part_num]:
+            label += f" {plan_data[part_num]}"
+        elif "Meta Muse" in c_name:
+            label += " Meta Muse - deepDive"
+
+        card = (
+            f'  <div style="flex: 0 0 60%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; background: #000; aspect-ratio: 1/1; display: flex; flex-direction: column; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">'
+            f'\n    <video src="ddma/docs/episodes/{clean_id}/clips/{c_name}" style="width: 100%; height: 85%; object-fit: contain;" playsinline loop preload="auto" muted autoplay></video>'
+            f'\n    <div style="height: 15%; background: #1a1a1a; color: #ccc; display: flex; align-items: center; justify-content: center; font-family: monospace; font-size: 12px; border-top: 1px solid #333;">{html.escape(label)}</div>'
+            f'\n    <button class="vid-toggle" onclick="window.oph_play_toggle(this)" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; border: 2px solid white; border-radius: 50%; width: 45px; height: 45px; cursor: pointer; font-size: 22px; z-index: 100;">🔇</button>'
+            f'\n  </div>'
+        )
+        cards_html.append(card)
+
+    cards_joined = "\n".join(cards_html)
+    video_strip = (
+        f'<!-- VIDEO_STRIP_START -->\n'
+        f'<div class="video-carousel-container" style="display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 15px; padding: 20px 0; scroll-behavior: smooth;">\n'
+        f'{cards_joined}\n'
+        f'</div>\n\n'
+        f'<center><a href="https://www.tiktok.com/@shutoshabot" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">▶ TikTok ◀</a><a href="https://www.instagram.com/shutoshabot/" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px; margin-right: 10px;">◈ Instagram ◈</a><a href="https://www.youtube.com/playlist?list=PLIX4sFsmu37q8rU8HKTLhdLPZQadcvx-K" target="_blank" style="background-color: #2E2E2E; color: white; padding: 10px 20px; text-align: center; text-decoration: none; display: inline-block; border-radius: 5px; margin-top: 10px;">⫸ YouTube ⫷</a></center>\n\n'
+        f'<script>\n'
+        f'  window.oph_play_toggle = window.oph_play_toggle || function(btn) {{\n'
+        f'    const parent = btn.parentElement;\n'
+        f'    const vid = parent.querySelector("video");\n'
+        f'    const container = btn.closest(".video-carousel-container");\n'
+        f'    if (vid.paused || vid.muted) {{\n'
+        f'      container.querySelectorAll("video").forEach(v => {{ v.pause(); v.muted = true; v.parentElement.querySelector(".vid-toggle").innerText = "🔇"; }});\n'
+        f'      vid.muted = false; vid.volume = 1.0;\n'
+        f'      vid.play().then(() => {{ btn.innerText = "🔊"; }}).catch(e => console.error(e));\n'
+        f'    }} else {{\n'
+        f'      vid.pause(); vid.muted = true; btn.innerText = "🔇";\n'
+        f'    }}\n'
+        f'  }};\n'
+        f'</script>\n'
+        f'<!-- VIDEO_STRIP_END -->'
+    )
+
+    # 5. Inject/Update in src/<clean_id>.md or src/_<clean_id>.md
+    target_files = [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]
+    updated_files = []
+    for md_file in target_files:
+        if md_file.exists():
+            try:
+                with open(md_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                if "<!-- VIDEO_STRIP_START -->" in content:
+                    new_content = re.sub(r'<!-- VIDEO_STRIP_START -->[\s\S]*?<!-- VIDEO_STRIP_END -->', video_strip, content)
+                else:
+                    m_h1 = re.search(r'(?m)^(?:#\s+[^\n]+\n+)(?:<!--\s*SIDEBAR_TITLE:[^\n]+-->\n+)?(?:\s*<center>[\s\S]*?<\/center>\n+)?', content)
+                    if m_h1:
+                        insert_pos = m_h1.end()
+                        new_content = content[:insert_pos] + "\n" + video_strip + "\n\n" + content[insert_pos:]
+                    else:
+                        new_content = video_strip + "\n\n" + content
+
+                if new_content != content:
+                    with open(md_file, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                    updated_files.append(md_file.name)
+            except Exception as e:
+                print(f"Error updating {md_file}: {e}")
+
+    return {
+        "success": True,
+        "clean_id": clean_id,
+        "synced_clips": synced_clips,
+        "total_clips": len(all_clips),
+        "updated_files": updated_files
+    }
 
 # Active transcription jobs: { clean_id: { "status": "idle"|"processing"|"done"|"error", "progress": str, "error": str } }
 transcription_jobs = {}
@@ -1229,6 +1385,14 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             words = len(raw_text.split())
 
             clean_id = fn.replace(".md", "").lstrip("_")
+            try:
+                sync_episode_clips_and_markdown(clean_id)
+            except Exception as se:
+                print(f"Auto-sync warning for {clean_id}: {se}")
+
+            file_path = SRC_DIR / fn
+            with open(file_path, "r", encoding="utf-8") as f:
+                raw_text = f.read()
             has_cover = find_episode_cover(clean_id)
             vids = find_episode_videos(clean_id)
 
@@ -2091,8 +2255,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        if path == "/api/episode/sync_clips":
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_")
+            result = sync_episode_clips_and_markdown(clean_id)
+            self.send_json(result)
+            return
+
         if path == "/api/git/push":
             ep_num = data.get("number", "update")
+            if ep_num and ep_num != "update":
+                try:
+                    sync_episode_clips_and_markdown(ep_num)
+                except Exception as se:
+                    print(f"Auto-sync before push warning for {ep_num}: {se}")
             try:
                 subprocess.run(["git", "add", "src/", "book.toml", "ingest/settings.json"], cwd=str(PROJECT_ROOT), check=True)
                 subprocess.run(["git", "commit", "-m", f"publish: episode {ep_num} via md² cockpit"], cwd=str(PROJECT_ROOT), check=True)
