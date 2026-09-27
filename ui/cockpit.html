@@ -1381,9 +1381,6 @@
                     <!-- H1 Header -->
                     <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
 
-                    <!-- 740x740 Square Infographics Video Carousel container -->
-                    <div id="narrative-video-carousel-wrap"></div>
-
                     <!-- Read-Only Rendered Narrative Body -->
                     <div class="rendered-body" id="narrative-rendered-body">
                         <p style="color: var(--text-dark-muted); font-style: italic;">No narrative transcript loaded for this episode. Upload audio and run Whisper, or paste content in the Audio Studio deck.</p>
@@ -2356,11 +2353,6 @@ if __name__ == '__main__':
             
             const h1El = document.getElementById('narrative-h1');
             if (h1El) h1El.innerText = title;
-
-            const carouselWrap = document.getElementById('narrative-video-carousel-wrap');
-            if (carouselWrap) {
-                carouselWrap.innerHTML = buildInfographicCarouselHtml(ep?.videos, cleanId);
-            }
 
             renderNarrativeContent();
 

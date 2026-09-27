@@ -169,7 +169,7 @@ async function runE2ETests() {
         // -------------------------------------------------------------
         // Test 5: Narrative Tab: Read-Only Paper Sheet & Parity
         // -------------------------------------------------------------
-        await runTest('Narrative Tab: Read-Only Paper Sheet, Video Carousel & Wallet Parity', async (p) => {
+        await runTest('Narrative Tab: Read-Only Paper Sheet, Sats Wallet & Audio Syndication Parity', async (p) => {
             await p.click('#tab-btn-narrative');
             await p.waitForSelector('#narrative-paper-sheet', { timeout: 3000 });
 
@@ -215,28 +215,43 @@ async function runE2ETests() {
         });
 
         // -------------------------------------------------------------
-        // Test 7: Vim .md Editing, Source Toggle & 1-Click Social Copy
+        // Test 7: Nostr Article Mode, Spoken Transcript Toggle & Vim Bridge
         // -------------------------------------------------------------
-        await runTest('Vim .md Editing, Source Toggle & 1-Click Social Copy', async (p) => {
+        await runTest('Nostr Article Mode, Spoken Transcript Toggle & Vim Bridge', async (p) => {
             await p.click('#tab-btn-narrative');
 
-            // 1. Test Source Toggle button (Collapsible raw editor)
-            const toggleSourceBtn = await p.$('#btn-toggle-source');
-            if (!toggleSourceBtn) throw new Error('Toggle Source button (#btn-toggle-source) missing');
+            // 1. Test Mode Segmented Switch: Nostr Article vs Spoken Transcript
+            const btnNostr = await p.$('#btn-mode-nostr');
+            if (!btnNostr) throw new Error('Nostr mode button (#btn-mode-nostr) missing');
+            const btnTranscript = await p.$('#btn-mode-transcript');
+            if (!btnTranscript) throw new Error('Transcript mode button (#btn-mode-transcript) missing');
 
-            await p.click('#btn-toggle-source');
-            const isRawEditorVisible = await p.$eval('#narrative-raw-editor-wrap', el => window.getComputedStyle(el).display !== 'none');
-            if (!isRawEditorVisible) throw new Error('Raw editor wrapper did not expand on toggle');
+            // Switch to Spoken Transcript mode
+            await p.click('#btn-mode-transcript');
+            const isTranscriptActive = await p.$eval('#btn-mode-transcript', el => el.classList.contains('active'));
+            if (!isTranscriptActive) throw new Error('#btn-mode-transcript is not active after click');
 
-            // Toggle back to clean reader mode
-            await p.click('#btn-toggle-source');
-            const isRawEditorHidden = await p.$eval('#narrative-raw-editor-wrap', el => window.getComputedStyle(el).display === 'none');
-            if (!isRawEditorHidden) throw new Error('Raw editor wrapper did not collapse on second toggle');
+            // Switch back to Nostr Article mode
+            await p.click('#btn-mode-nostr');
+            const isNostrActive = await p.$eval('#btn-mode-nostr', el => el.classList.contains('active'));
+            if (!isNostrActive) throw new Error('#btn-mode-nostr is not active after click');
 
-            // 2. Test 1-Click Social Narrative copy with backlink
+            // Verify rendered Nostr body has headings or formatted paragraphs
+            const renderedHtml = await p.$eval('#narrative-rendered-body', el => el.innerHTML);
+            if (!renderedHtml || renderedHtml.length < 50) {
+                throw new Error('Narrative rendered body is empty in Nostr mode');
+            }
+
+            // 2. Test Canonical backlink preview
             const canonicalPreview = await p.$eval('#narrative-canonical-preview', el => el.innerText);
             if (!canonicalPreview.includes('https://deepdive.shutri.com/')) {
                 throw new Error(`Canonical backlink preview invalid: ${canonicalPreview}`);
+            }
+
+            // 3. Verify Copy for Nostr button exists and has correct label
+            const copyBtnText = await p.$eval('#btn-copy-social', el => (el.textContent || el.innerText || ''));
+            if (!copyBtnText.toLowerCase().includes('copy for nostr') && !copyBtnText.toLowerCase().includes('copy narrative')) {
+                throw new Error(`Copy button unexpected text: ${copyBtnText}`);
             }
         });
 

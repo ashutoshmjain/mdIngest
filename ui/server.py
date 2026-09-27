@@ -635,6 +635,8 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
     text = re.sub(r'>\s*🎙️[^\n]+\n*(?:>\s*⚡[^\n]+\n*)?(?:---\s*\n*)?', '', text)
     # Strip existing footer if present
     text = re.sub(r'---\s*\n+###\s*⚡ Connect & Support[\s\S]*$', '', text)
+    # Strip existing markdown headings (H1-H6) to ensure idempotency if re-streamlining
+    text = re.sub(r'(?m)^#{1,6}\s+[^\n]+\n*', '', text)
 
     # Normalize whitespace & punctuation
     text = re.sub(r'[ \t]+', ' ', text)
