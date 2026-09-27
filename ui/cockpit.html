@@ -570,30 +570,31 @@
             text-overflow: ellipsis;
         }
 
-        /* 3-Tab Segmented Switcher */
+        /* Global Workflow Pillars Switcher (Research to Reels) */
         .middle-tab-switcher {
             display: flex;
             align-items: center;
             background: #f5f5f4;
             padding: 3px;
-            border-radius: 7px;
-            gap: 3px;
+            border-radius: 8px;
+            gap: 4px;
             border: 1px solid var(--border-light);
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
         }
 
         .btn-middle-tab {
             font-family: var(--font-sans);
-            font-size: 0.76rem;
+            font-size: 0.8rem;
             font-weight: 600;
-            padding: 0.32rem 0.85rem;
-            border-radius: 5px;
+            padding: 0.38rem 0.95rem;
+            border-radius: 6px;
             border: 1px solid transparent;
             background: transparent;
             color: var(--text-dark-secondary);
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 0.35rem;
+            gap: 0.4rem;
             transition: all 0.15s ease;
             user-select: none;
         }
@@ -608,7 +609,26 @@
             color: var(--text-dark-primary);
             font-weight: 700;
             border-color: var(--border-light);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .channel-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .channel-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         /* Generic Tab View Container */
@@ -1231,10 +1251,17 @@
 </head>
 <body>
 
-    <!-- 1. TOP COMMAND BAR -->
+    <!-- 1. TOP COMMAND BAR (GLOBAL PUBLISHING & WORKFLOW PILLARS) -->
     <header class="top-command-bar">
         <div class="brand-section">
             <a href="https://deepdive.shutri.com" target="_blank" class="brand-wordmark">S H U T R I &nbsp;md²</a>
+        </div>
+
+        <!-- LEVEL 1: GLOBAL WORKFLOW PILLARS (RESEARCH TO REELS) -->
+        <div class="middle-tab-switcher">
+            <button class="btn-middle-tab active" id="tab-btn-research" onclick="switchMiddleTab('research')"><span>🔬</span> Research</button>
+            <button class="btn-middle-tab" id="tab-btn-narrative" onclick="switchMiddleTab('narrative')"><span>🎙️</span> Narrative</button>
+            <button class="btn-middle-tab" id="tab-btn-media" onclick="switchMiddleTab('media')"><span>🎬</span> Reels</button>
         </div>
 
         <div class="command-center">
@@ -1247,16 +1274,6 @@
             <!-- Ingest & Lock Action -->
             <button class="btn-cmd primary" onclick="triggerMineLock()" id="btn-lock">
                 <span>⚡</span> Mine &amp; Lock
-            </button>
-
-            <!-- Local mdbook serve -->
-            <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve">
-                <span>📖</span> mdserve (Local)
-            </button>
-
-            <!-- Remote Git Push -->
-            <button class="btn-cmd emerald" onclick="triggerPush()">
-                <span>🚀</span> Push (Remote)
             </button>
 
             <!-- Master Prompt Drawer -->
@@ -1308,16 +1325,39 @@
                     <span>Words: <strong id="preview-words">0</strong></span>
                 </div>
 
-                <!-- 3-TAB SEGMENTED SWITCHER -->
-                <div class="middle-tab-switcher">
-                    <button class="btn-middle-tab active" id="tab-btn-research" onclick="switchMiddleTab('research')">🔬 Research</button>
-                    <button class="btn-middle-tab" id="tab-btn-narrative" onclick="switchMiddleTab('narrative')">🎙️ Narrative</button>
-                    <button class="btn-middle-tab" id="tab-btn-media" onclick="switchMiddleTab('media')">🎬 Media</button>
+                <!-- LEVEL 2 SUB-TOOLBAR: RESEARCH (WEB CHANNEL: MDBOOK · KATEX) -->
+                <div class="channel-actions" id="channel-actions-research" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="channel-badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                        🌐 Web Channel (mdBook &middot; KaTeX)
+                    </span>
+                    <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve">
+                        <span>📖</span> mdserve (Local)
+                    </button>
+                    <button class="btn-cmd emerald" onclick="triggerPush()" id="btn-push">
+                        <span>🚀</span> Push (Remote)
+                    </button>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
 
-                <div style="display: flex; gap: 0.5rem;">
-                    <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
-                    <button class="btn-cmd" style="padding: 0.25rem 0.6rem; font-size: 0.72rem;" onclick="refreshCurrentEpisode()">Refresh</button>
+                <!-- LEVEL 2 SUB-TOOLBAR: NARRATIVE (SOCIAL CHANNEL: NOSTR NIP-23 · PROSE) -->
+                <div class="channel-actions" id="channel-actions-narrative" style="display: none; align-items: center; gap: 0.5rem;">
+                    <span class="channel-badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                        ⚡ Social Channel (Nostr &middot; NIP-23)
+                    </span>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
+                </div>
+
+                <!-- LEVEL 2 SUB-TOOLBAR: REELS (VIDEO CHANNEL: DDMA 740x740 CLIPS) -->
+                <div class="channel-actions" id="channel-actions-media" style="display: none; align-items: center; gap: 0.5rem;">
+                    <span class="channel-badge" style="background: #fae8ff; color: #86198f; border: 1px solid #f5d0fe; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                        🎬 Video Channel (DDMA 740&times;740)
+                    </span>
+                    <button class="btn-cmd primary" style="padding: 0.35rem 0.75rem; font-size: 0.74rem;" onclick="launchDdmaStudio()">
+                        🚀 Open DDMA Studio
+                    </button>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
             </div>
 
@@ -2013,7 +2053,7 @@ if __name__ == '__main__':
         function switchMiddleTab(tabName) {
             activeMiddleTab = tabName;
 
-            // Update Tab Switcher Buttons
+            // Update Tab Switcher Buttons & Level-2 Channel Toolbars
             ['research', 'narrative', 'media'].forEach(t => {
                 const btn = document.getElementById(`tab-btn-${t}`);
                 if (btn) {
@@ -2031,6 +2071,11 @@ if __name__ == '__main__':
                 if (deck) {
                     if (t === tabName) deck.classList.add('active');
                     else deck.classList.remove('active');
+                }
+
+                const act = document.getElementById(`channel-actions-${t}`);
+                if (act) {
+                    act.style.display = (t === tabName) ? 'flex' : 'none';
                 }
             });
 
