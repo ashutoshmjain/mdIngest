@@ -1398,6 +1398,51 @@
                         </div>
                     </div>
 
+                    <!-- NIP-23 Nostr Long-Form Publication Metadata Preview Card -->
+                    <div id="narrative-nostr-preview" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.15rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; background: #e0e7ff; color: #3730a3; padding: 0.2rem 0.55rem; border-radius: 4px;">
+                                    ⚡ Nostr NIP-23 Preview
+                                </span>
+                                <span style="font-size: 0.74rem; color: var(--text-dark-muted);" id="nostr-card-stats">
+                                    • Kind 30023
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 0.35rem; align-items: center;">
+                                <button type="button" class="btn-sub" onclick="copyNostrCardSummary()" title="Copy description hook to clipboard" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">
+                                    📝 Copy Hook
+                                </button>
+                                <button type="button" class="btn-sub" onclick="copyNostrCardImageUrl()" title="Copy cover image URL to clipboard" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">
+                                    🖼️ Copy Image URL
+                                </button>
+                                <button type="button" class="btn-sub" onclick="copyNakCommand()" title="Copy complete NAK event publishing command" style="font-size: 0.72rem; padding: 0.2rem 0.5rem; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer;">
+                                    📟 Copy NAK Cmd
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap;">
+                            <div id="nostr-card-img-wrap" style="flex: 0 0 115px; width: 115px; height: 85px; border-radius: 6px; overflow: hidden; background: #e2e8f0; border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <img id="nostr-card-img" src="" alt="Cover" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                                <span id="nostr-card-img-placeholder" style="font-size: 1.6rem; color: #94a3b8;">🖼️</span>
+                            </div>
+
+                            <div style="flex: 1; min-width: 250px;">
+                                <div style="font-size: 0.76rem; font-weight: 700; color: var(--text-dark-secondary); margin-bottom: 0.25rem;">
+                                    Description / Summary Hook:
+                                </div>
+                                <p id="nostr-card-summary" style="font-size: 0.82rem; color: var(--text-dark-primary); margin: 0 0 0.5rem 0; line-height: 1.4; font-style: italic; background: #ffffff; padding: 0.4rem 0.65rem; border-radius: 4px; border: 1px solid #e2e8f0; border-left: 3px solid #6366f1;">
+                                    Loading summary hook...
+                                </p>
+                                
+                                <div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;" id="nostr-card-tags">
+                                    <!-- Tag pills injected dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- H1 Header -->
                     <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
 
@@ -2367,6 +2412,8 @@ if __name__ == '__main__':
 
             renderNarrativeContent();
 
+            renderNostrMetadataCard(audioData?.nostr_meta || currentAudioData?.nostr_meta);
+
             const syndicationWrap = document.getElementById('narrative-bottom-syndication');
             if (syndicationWrap) {
                 syndicationWrap.innerHTML = buildSyndicationAndWalletHtml(cleanId, true);
@@ -2392,6 +2439,87 @@ if __name__ == '__main__':
                     </div>
                 `;
             }
+        }
+
+        function renderNostrMetadataCard(meta) {
+            const previewEl = document.getElementById('narrative-nostr-preview');
+            if (!previewEl) return;
+
+            if (!meta || !meta.summary) {
+                previewEl.style.display = 'none';
+                return;
+            }
+
+            previewEl.style.display = 'block';
+
+            const statsEl = document.getElementById('nostr-card-stats');
+            if (statsEl) {
+                statsEl.innerText = `• Kind 30023 • ⏱️ ${meta.reading_time_min} min read • ${(meta.word_count || 0).toLocaleString()} words • d: "${meta.d_tag}"`;
+            }
+
+            const imgEl = document.getElementById('nostr-card-img');
+            const placeholderEl = document.getElementById('nostr-card-img-placeholder');
+            if (imgEl && meta.image) {
+                imgEl.src = meta.image;
+                imgEl.style.display = 'block';
+                if (placeholderEl) placeholderEl.style.display = 'none';
+                imgEl.onerror = () => {
+                    imgEl.style.display = 'none';
+                    if (placeholderEl) placeholderEl.style.display = 'block';
+                };
+            } else if (placeholderEl) {
+                placeholderEl.style.display = 'block';
+                if (imgEl) imgEl.style.display = 'none';
+            }
+
+            const summaryEl = document.getElementById('nostr-card-summary');
+            if (summaryEl) {
+                summaryEl.innerText = meta.summary || "No summary hook available.";
+            }
+
+            const tagsEl = document.getElementById('nostr-card-tags');
+            if (tagsEl) {
+                if (meta.tags && meta.tags.length > 0) {
+                    tagsEl.innerHTML = meta.tags.map(t => 
+                        `<span style="font-size: 0.72rem; background: #e2e8f0; color: #334155; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;">#${t}</span>`
+                    ).join('');
+                } else {
+                    tagsEl.innerHTML = '<span style="font-size: 0.72rem; color: #94a3b8;">No tags detected</span>';
+                }
+            }
+        }
+
+        function copyNostrCardSummary() {
+            const meta = currentAudioData?.nostr_meta;
+            if (!meta?.summary) {
+                showToast('No summary hook available to copy');
+                return;
+            }
+            navigator.clipboard.writeText(meta.summary).then(() => {
+                showToast('📋 Description hook copied to clipboard!');
+            });
+        }
+
+        function copyNostrCardImageUrl() {
+            const meta = currentAudioData?.nostr_meta;
+            if (!meta?.image) {
+                showToast('No image URL available to copy');
+                return;
+            }
+            navigator.clipboard.writeText(meta.image).then(() => {
+                showToast('🖼️ Cover image URL copied to clipboard!');
+            });
+        }
+
+        function copyNakCommand() {
+            const meta = currentAudioData?.nostr_meta;
+            if (!meta?.nak_command) {
+                showToast('No NAK command available');
+                return;
+            }
+            navigator.clipboard.writeText(meta.nak_command).then(() => {
+                showToast('📟 NAK command copied to clipboard!');
+            });
         }
 
         window.toggleInfographicAudio = function(btn) {
@@ -2827,7 +2955,8 @@ if __name__ == '__main__':
                 if (data.success) {
                     if (!currentAudioData) currentAudioData = {};
                     currentAudioData.narrative_md = data.streamlined;
-                    renderNarrativeContent();
+                    if (data.nostr_meta) currentAudioData.nostr_meta = data.nostr_meta;
+                    renderNarrativeTab(selectedEpisode, currentAudioData);
                     showToast(`⚡ Formatted Nostr Article (${data.promo_count} promo blocks isolated)!`);
                 } else {
                     showToast(`Formatting error: ${data.error || 'Failed'}`);

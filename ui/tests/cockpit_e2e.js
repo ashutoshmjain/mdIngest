@@ -245,6 +245,15 @@ async function runE2ETests() {
             if (!copyBtnText.toLowerCase().includes('copy for nostr') && !copyBtnText.toLowerCase().includes('copy narrative')) {
                 throw new Error(`Copy button unexpected text: ${copyBtnText}`);
             }
+
+            // 4. Verify NIP-23 Nostr Preview Card displays metadata
+            const nostrPreview = await p.$('#narrative-nostr-preview');
+            if (nostrPreview) {
+                const summaryText = await p.$eval('#nostr-card-summary', el => el.innerText);
+                if (!summaryText || summaryText.includes('Loading summary')) {
+                    throw new Error('Nostr card summary was not properly populated');
+                }
+            }
         });
 
         // -------------------------------------------------------------
