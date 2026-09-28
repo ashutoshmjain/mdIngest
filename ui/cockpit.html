@@ -732,6 +732,38 @@
             display: flex;
         }
 
+        /* Pillar Purpose / Mission Cards */
+        .deck-mission-card {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-left: 3px solid var(--accent-amber);
+            border-radius: 6px;
+            padding: 0.75rem 0.85rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+
+        .deck-mission-title {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-amber-dark);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .deck-mission-desc {
+            font-size: 0.73rem;
+            line-height: 1.45;
+            color: var(--text-dark-secondary);
+            margin: 0;
+        }
+
         .paper-sheet {
             max-width: 820px;
             margin: 0 auto;
@@ -1265,11 +1297,6 @@
                 <span>⚡</span> Mine &amp; Lock
             </button>
 
-            <!-- Master Prompt Drawer -->
-            <button class="btn-cmd" onclick="openModal('prompt-modal')">
-                <span>📋</span> Prompt
-            </button>
-
             <!-- Settings -->
             <button class="btn-cmd" onclick="openModal('settings-modal')">
                 <span>⚙️</span> Settings
@@ -1319,7 +1346,10 @@
                         <span>📖</span> mdserve (Local)
                     </button>
                     <button class="btn-cmd emerald" onclick="triggerPush()" id="btn-push">
-                        <span>🚀</span> Push (Remote)
+                        <span>🚀</span> Push
+                    </button>
+                    <button class="btn-cmd" onclick="openModal('prompt-modal')" title="Master Research Payload Prompt Template">
+                        <span>📋</span> Prompt
                     </button>
                     <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
                     <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
@@ -1456,6 +1486,16 @@
 
             <!-- SECTION 1: RESEARCH DECK (AST, PAYLOAD EXTRACTOR, KATEX VALIDATION) -->
             <div class="right-deck-section active" id="right-deck-research">
+                <!-- Pillar Purpose: Research -->
+                <div class="deck-mission-card">
+                    <div class="deck-mission-title">
+                        <span>🔬</span> Research &amp; Reference Ledger
+                    </div>
+                    <p class="deck-mission-desc">
+                        Research needs <strong>KaTeX</strong> to present mathematical equations which most platforms don't support, so we use <strong>mdBook</strong> to publish to the web—<a href="https://deepdive.shutri.com" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline; font-weight: 600;">deepDive</a> serves as the reference ledger.
+                    </p>
+                </div>
+
                 <!-- Python Payload Dropzone -->
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.4rem;">
@@ -1514,6 +1554,16 @@
 
             <!-- SECTION 2: NARRATIVE DECK (AUDIO DROPZONE, PLAYER, WHISPER STT) -->
             <div class="right-deck-section" id="right-deck-narrative">
+                <!-- Pillar Purpose: Narrative -->
+                <div class="deck-mission-card" style="border-left-color: #3b82f6;">
+                    <div class="deck-mission-title" style="color: #1d4ed8;">
+                        <span>🎙️</span> Editorial Long-Form Publishing
+                    </div>
+                    <p class="deck-mission-desc">
+                        A narrative, accessible version of the research for long-form publishing on <strong>Nostr (NIP-23)</strong>, <strong>Substack</strong>, <strong>Medium</strong>, and <strong>LinkedIn Articles</strong> (integrations planned).
+                    </p>
+                </div>
+
                 <!-- 1. Audio Track Section -->
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.5rem;">
@@ -1565,6 +1615,16 @@
 
             <!-- SECTION 3: MEDIA DECK (DDMA BRIDGE, CLIPS STATUS, LAUNCHER) -->
             <div class="right-deck-section" id="right-deck-media">
+                <!-- Pillar Purpose: Reels -->
+                <div class="deck-mission-card" style="border-left-color: #8b5cf6;">
+                    <div class="deck-mission-title" style="color: #6d28d9;">
+                        <span>🎬</span> Short-Form Media &amp; Reels
+                    </div>
+                    <p class="deck-mission-desc">
+                        Short-form video for popular consumption in <strong>2–3 minute bite-sized clips</strong> (740×740 / 9:16) for the masses across social video feeds.
+                    </p>
+                </div>
+
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.4rem;">
                         <span>🎬 DDMA Episode Bridge</span>
