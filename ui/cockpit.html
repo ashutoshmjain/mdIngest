@@ -1383,8 +1383,14 @@
                 <div class="paper-sheet" id="narrative-paper-sheet">
                     <!-- Narrative Action Toolbar -->
                     <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.6rem;">
-                        <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="Intelligently format into publication-ready Nostr Markdown with semantic headings & entity bolding">
-                            <span>⚡</span> Format for Nostr (AI)
+                        <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="AI Editorial Formatting Rules:
+• Clean Grammar: Strips spoken conversational fillers (&quot;you know&quot;, &quot;right?&quot;), normalizes punctuation &amp; casing.
+• Semantic Structure: Injects thematic H2 section headings.
+• Bullet Lists: Converts verbal enumeration (&quot;First...&quot;, &quot;Second...&quot;) into clean bullet points.
+• Entity Bolding: Highlights core architectural entities &amp; concepts.
+• Promo Isolation: Quarantines sponsor/channel notes into callout blocks.
+• Multi-Platform Ready: Formats for Nostr, Substack, Medium, and LinkedIn.">
+                            <span>⚡</span> Format with AI
                         </button>
                         <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / gVim">
                             <span>📟</span> Edit in Vim (.md)
@@ -2444,7 +2450,7 @@ if __name__ == '__main__':
                     <div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
                         <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎙️</div>
                         <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark-secondary);">No transcript loaded for this episode.</p>
-                        <p style="font-size: 0.82rem;">Upload an audio file in the Audio Studio deck and run Whisper, or click <strong>⚡ Format for Nostr (AI)</strong>.</p>
+                        <p style="font-size: 0.82rem;">Upload an audio file in the Audio Studio deck and run Whisper, or click <strong>⚡ Format with AI</strong>.</p>
                     </div>
                 `;
             }
@@ -2971,7 +2977,7 @@ if __name__ == '__main__':
                     currentAudioData.narrative_md = data.streamlined;
                     if (data.nostr_meta) currentAudioData.nostr_meta = data.nostr_meta;
                     renderNarrativeTab(selectedEpisode, currentAudioData);
-                    showToast(`⚡ Formatted Nostr Article (${data.promo_count} promo blocks isolated)!`);
+                    showToast(`⚡ Formatted with AI (${data.promo_count} promo blocks isolated)!`);
                 } else {
                     showToast(`Formatting error: ${data.error || 'Failed'}`);
                 }
@@ -2979,7 +2985,7 @@ if __name__ == '__main__':
                 console.error("Formatting failed:", err);
                 showToast('Formatting request failed');
             } finally {
-                if (btn) btn.innerHTML = '<span>⚡</span> Format for Nostr (AI)';
+                if (btn) btn.innerHTML = '<span>⚡</span> Format with AI';
             }
         }
 

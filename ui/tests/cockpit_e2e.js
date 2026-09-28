@@ -220,9 +220,14 @@ async function runE2ETests() {
         await runTest('Narrative Tab: Clean Paper Sheet, Canonical Preview, Vim Bridge & RHS Nostr Pipeline', async (p) => {
             await p.click('#tab-btn-narrative');
 
-            // 1. Verify Narrative Toolbar buttons in central pane (Format for Nostr, Edit in Vim)
+            // 1. Verify Narrative Toolbar buttons in central pane (Format with AI, Edit in Vim)
             const btnStreamline = await p.$('#btn-streamline-ai');
-            if (!btnStreamline) throw new Error('Format for Nostr button (#btn-streamline-ai) missing');
+            if (!btnStreamline) throw new Error('Format with AI button (#btn-streamline-ai) missing');
+            const streamlineText = await p.$eval('#btn-streamline-ai', el => el.innerText);
+            if (!streamlineText.toUpperCase().includes('FORMAT WITH AI')) throw new Error(`Unexpected button text: ${streamlineText}`);
+            const streamlineTooltip = await p.$eval('#btn-streamline-ai', el => el.getAttribute('title') || '');
+            if (!streamlineTooltip.includes('Formatting Rules')) throw new Error('Formatting rules tooltip missing from button');
+
             const btnVim = await p.$('#btn-open-vim');
             if (!btnVim) throw new Error('Vim bridge button (#btn-open-vim) missing');
 
