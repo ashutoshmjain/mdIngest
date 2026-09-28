@@ -215,18 +215,22 @@ async function runE2ETests() {
         });
 
         // -------------------------------------------------------------
-        // Test 7: Narrative Tab: Publication Format, Canonical Preview, Vim Bridge & Nostr Copy
+        // Test 7: Narrative Tab: Clean Paper Sheet, Canonical Preview, Vim Bridge & RHS Nostr Pipeline
         // -------------------------------------------------------------
-        await runTest('Narrative Tab: Publication Format, Canonical Preview, Vim Bridge & Nostr Copy', async (p) => {
+        await runTest('Narrative Tab: Clean Paper Sheet, Canonical Preview, Vim Bridge & RHS Nostr Pipeline', async (p) => {
             await p.click('#tab-btn-narrative');
 
-            // 1. Verify Narrative Toolbar buttons (Format for Nostr, Edit in Vim, Copy for Nostr)
+            // 1. Verify Narrative Toolbar buttons in central pane (Format for Nostr, Edit in Vim)
             const btnStreamline = await p.$('#btn-streamline-ai');
             if (!btnStreamline) throw new Error('Format for Nostr button (#btn-streamline-ai) missing');
             const btnVim = await p.$('#btn-open-vim');
             if (!btnVim) throw new Error('Vim bridge button (#btn-open-vim) missing');
-            const btnCopy = await p.$('#btn-copy-social');
-            if (!btnCopy) throw new Error('Copy for Nostr button (#btn-copy-social) missing');
+
+            // Verify central toolbar does NOT have the old copy button cluttering the reading view
+            const centralToolbarHtml = await p.$eval('#narrative-toolbar', el => el.innerHTML);
+            if (centralToolbarHtml.includes('Copy for Nostr')) {
+                throw new Error('Copy for Nostr button was not removed from central narrative toolbar');
+            }
 
             // Verify rendered Nostr body has headings or formatted paragraphs
             const renderedHtml = await p.$eval('#narrative-rendered-body', el => el.innerHTML);
@@ -240,19 +244,20 @@ async function runE2ETests() {
                 throw new Error(`Canonical backlink preview invalid: ${canonicalPreview}`);
             }
 
-            // 3. Verify Copy for Nostr button exists and has correct label
-            const copyBtnText = await p.$eval('#btn-copy-social', el => (el.textContent || el.innerText || ''));
-            if (!copyBtnText.toLowerCase().includes('copy for nostr') && !copyBtnText.toLowerCase().includes('copy narrative')) {
-                throw new Error(`Copy button unexpected text: ${copyBtnText}`);
+            // 3. Verify NIP-23 Nostr Preview Card displays metadata in RHS deck
+            const nostrPreview = await p.$('#narrative-nostr-preview');
+            if (!nostrPreview) throw new Error('#narrative-nostr-preview missing in RHS deck');
+            const summaryText = await p.$eval('#nostr-card-summary', el => el.innerText);
+            if (!summaryText || summaryText.includes('Loading description')) {
+                throw new Error('Nostr card summary was not properly populated');
             }
 
-            // 4. Verify NIP-23 Nostr Preview Card displays metadata
-            const nostrPreview = await p.$('#narrative-nostr-preview');
-            if (nostrPreview) {
-                const summaryText = await p.$eval('#nostr-card-summary', el => el.innerText);
-                if (!summaryText || summaryText.includes('Loading summary')) {
-                    throw new Error('Nostr card summary was not properly populated');
-                }
+            // 4. Verify Copy Article Markdown button exists in RHS Nostr card
+            const btnCopy = await p.$('#btn-copy-social');
+            if (!btnCopy) throw new Error('Copy Article button (#btn-copy-social) missing from RHS Nostr card');
+            const copyBtnText = await p.$eval('#btn-copy-social', el => (el.textContent || el.innerText || ''));
+            if (!copyBtnText.toLowerCase().includes('copy article') && !copyBtnText.toLowerCase().includes('copy narrative')) {
+                throw new Error(`Copy button unexpected text: ${copyBtnText}`);
             }
         });
 
