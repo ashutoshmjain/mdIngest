@@ -215,31 +215,23 @@ async function runE2ETests() {
         });
 
         // -------------------------------------------------------------
-        // Test 7: Nostr Article Mode, Spoken Transcript Toggle & Vim Bridge
+        // Test 7: Narrative Tab: Publication Format, Canonical Preview, Vim Bridge & Nostr Copy
         // -------------------------------------------------------------
-        await runTest('Nostr Article Mode, Spoken Transcript Toggle & Vim Bridge', async (p) => {
+        await runTest('Narrative Tab: Publication Format, Canonical Preview, Vim Bridge & Nostr Copy', async (p) => {
             await p.click('#tab-btn-narrative');
 
-            // 1. Test Mode Segmented Switch: Nostr Article vs Spoken Transcript
-            const btnNostr = await p.$('#btn-mode-nostr');
-            if (!btnNostr) throw new Error('Nostr mode button (#btn-mode-nostr) missing');
-            const btnTranscript = await p.$('#btn-mode-transcript');
-            if (!btnTranscript) throw new Error('Transcript mode button (#btn-mode-transcript) missing');
-
-            // Switch to Spoken Transcript mode
-            await p.click('#btn-mode-transcript');
-            const isTranscriptActive = await p.$eval('#btn-mode-transcript', el => el.classList.contains('active'));
-            if (!isTranscriptActive) throw new Error('#btn-mode-transcript is not active after click');
-
-            // Switch back to Nostr Article mode
-            await p.click('#btn-mode-nostr');
-            const isNostrActive = await p.$eval('#btn-mode-nostr', el => el.classList.contains('active'));
-            if (!isNostrActive) throw new Error('#btn-mode-nostr is not active after click');
+            // 1. Verify Narrative Toolbar buttons (Format for Nostr, Edit in Vim, Copy for Nostr)
+            const btnStreamline = await p.$('#btn-streamline-ai');
+            if (!btnStreamline) throw new Error('Format for Nostr button (#btn-streamline-ai) missing');
+            const btnVim = await p.$('#btn-open-vim');
+            if (!btnVim) throw new Error('Vim bridge button (#btn-open-vim) missing');
+            const btnCopy = await p.$('#btn-copy-social');
+            if (!btnCopy) throw new Error('Copy for Nostr button (#btn-copy-social) missing');
 
             // Verify rendered Nostr body has headings or formatted paragraphs
             const renderedHtml = await p.$eval('#narrative-rendered-body', el => el.innerHTML);
             if (!renderedHtml || renderedHtml.length < 50) {
-                throw new Error('Narrative rendered body is empty in Nostr mode');
+                throw new Error('Narrative rendered body is empty');
             }
 
             // 2. Test Canonical backlink preview

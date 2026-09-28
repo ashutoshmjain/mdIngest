@@ -1384,16 +1384,6 @@
                     <!-- Narrative Action Toolbar -->
                     <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
                         <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                            <!-- Segmented Mode Switcher: Nostr Article vs Spoken Transcript -->
-                            <div class="narrative-segmented-control" style="display: inline-flex; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; padding: 2px; gap: 2px;">
-                                <button type="button" class="narrative-mode-pill active" id="btn-mode-nostr" onclick="setNarrativeDisplayMode('nostr')" style="border: none; background: #ffffff; color: var(--text-dark-primary); font-size: 0.76rem; font-weight: 700; padding: 0.35rem 0.85rem; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); cursor: pointer; transition: all 0.15s ease;">
-                                    ⚡ Nostr Article
-                                </button>
-                                <button type="button" class="narrative-mode-pill" id="btn-mode-transcript" onclick="setNarrativeDisplayMode('transcript')" style="border: none; background: transparent; color: var(--text-dark-muted); font-size: 0.76rem; font-weight: 600; padding: 0.35rem 0.85rem; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;">
-                                    📄 Spoken Transcript
-                                </button>
-                            </div>
-
                             <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="Intelligently format into publication-ready Nostr Markdown with semantic headings & entity bolding">
                                 <span>⚡</span> Format for Nostr (AI)
                             </button>
@@ -2363,45 +2353,6 @@ if __name__ == '__main__':
             }
         }
 
-        let narrativeDisplayMode = 'nostr'; // 'nostr' | 'transcript'
-
-        function setNarrativeDisplayMode(mode) {
-            narrativeDisplayMode = mode;
-            const btnNostr = document.getElementById('btn-mode-nostr');
-            const btnTrans = document.getElementById('btn-mode-transcript');
-            
-            if (mode === 'nostr') {
-                if (btnNostr) {
-                    btnNostr.classList.add('active');
-                    btnNostr.style.background = '#ffffff';
-                    btnNostr.style.color = 'var(--text-dark-primary)';
-                    btnNostr.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
-                }
-                if (btnTrans) {
-                    btnTrans.classList.remove('active');
-                    btnTrans.style.background = 'transparent';
-                    btnTrans.style.color = 'var(--text-dark-muted)';
-                    btnTrans.style.boxShadow = 'none';
-                }
-                showToast('⚡ Viewing publication-ready Nostr Article');
-            } else {
-                if (btnTrans) {
-                    btnTrans.classList.add('active');
-                    btnTrans.style.background = '#ffffff';
-                    btnTrans.style.color = 'var(--text-dark-primary)';
-                    btnTrans.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
-                }
-                if (btnNostr) {
-                    btnNostr.classList.remove('active');
-                    btnNostr.style.background = 'transparent';
-                    btnNostr.style.color = 'var(--text-dark-muted)';
-                    btnNostr.style.boxShadow = 'none';
-                }
-                showToast('📄 Viewing Spoken Transcript');
-            }
-            renderNarrativeContent();
-        }
-
         function syncNarrativeEditorViews() {
             renderNarrativeTab(selectedEpisode, currentAudioData);
         }
@@ -2426,12 +2377,7 @@ if __name__ == '__main__':
             const renderedBodyEl = document.getElementById('narrative-rendered-body');
             if (!renderedBodyEl) return;
 
-            let targetText = '';
-            if (narrativeDisplayMode === 'nostr') {
-                targetText = (currentAudioData?.narrative_md || currentAudioData?.transcript || '').trim();
-            } else {
-                targetText = (currentAudioData?.transcript || currentAudioData?.narrative_md || '').trim();
-            }
+            const targetText = (currentAudioData?.narrative_md || currentAudioData?.transcript || '').trim();
 
             if (targetText) {
                 // Strip leading duplicate H1 heading from markdown if present since narrative-h1 already renders it
@@ -2881,7 +2827,7 @@ if __name__ == '__main__':
                 if (data.success) {
                     if (!currentAudioData) currentAudioData = {};
                     currentAudioData.narrative_md = data.streamlined;
-                    setNarrativeDisplayMode('nostr');
+                    renderNarrativeContent();
                     showToast(`⚡ Formatted Nostr Article (${data.promo_count} promo blocks isolated)!`);
                 } else {
                     showToast(`Formatting error: ${data.error || 'Failed'}`);
