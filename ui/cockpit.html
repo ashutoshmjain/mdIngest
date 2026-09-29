@@ -1890,9 +1890,60 @@ if __name__ == '__main__':
             }
         }
 
-        // On page load: fetch system status
+        // Track and persist scroll position for active episode across refreshes
+        function setupScrollPersistence() {
+            const saveScrollPositions = () => {
+                if (!selectedEpisode || !selectedEpisode.filename) return;
+                try {
+                    const rView = document.getElementById('tab-view-research');
+                    if (rView) localStorage.setItem('mdingest_scroll_research_' + selectedEpisode.filename, rView.scrollTop);
+                    const nView = document.getElementById('tab-view-narrative');
+                    if (nView) localStorage.setItem('mdingest_scroll_narrative_' + selectedEpisode.filename, nView.scrollTop);
+                } catch (e) {}
+            };
+
+            let scrollTimer = null;
+            const onScroll = () => {
+                if (scrollTimer) clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(saveScrollPositions, 150);
+            };
+
+            const rView = document.getElementById('tab-view-research');
+            if (rView) rView.addEventListener('scroll', onScroll, { passive: true });
+            const nView = document.getElementById('tab-view-narrative');
+            if (nView) nView.addEventListener('scroll', onScroll, { passive: true });
+
+            window.addEventListener('beforeunload', saveScrollPositions);
+        }
+
+        // On page load: restore pillar tab, setup listeners & fetch system status
         window.addEventListener('DOMContentLoaded', () => {
+            try {
+                const savedTab = localStorage.getItem('mdingest_active_tab');
+                if (savedTab && ['research', 'narrative', 'media'].includes(savedTab)) {
+                    switchMiddleTab(savedTab);
+                }
+            } catch (e) {}
+            setupScrollPersistence();
             fetchStatus();
+        });
+
+        // Browser Back/Forward navigation with URL hash
+        window.addEventListener('hashchange', () => {
+            const rawHash = window.location.hash ? decodeURIComponent(window.location.hash.slice(1)).trim() : '';
+            if (rawHash && currentStatus) {
+                const allItems = [...(currentStatus.mempool || []), ...(currentStatus.template || [])];
+                const found = allItems.find(item => 
+                    item.filename === rawHash || 
+                    item.filename === rawHash + '.md' || 
+                    item.slug === rawHash || 
+                    item.slug === rawHash.replace(/^_/, '') ||
+                    String(item.number) === rawHash
+                );
+                if (found && (!selectedEpisode || selectedEpisode.filename !== found.filename)) {
+                    loadEpisode(found.filename, true);
+                }
+            }
         });
 
         async function fetchStatus() {
@@ -1925,12 +1976,51 @@ if __name__ == '__main__':
                     }
                 }
 
-                // Auto-select first mempool or template episode if none selected
+                // Auto-select episode with memory: URL hash -> localStorage -> top item
                 if (!selectedEpisode) {
-                    if (data.mempool && data.mempool.length > 0) {
-                        loadEpisode(data.mempool[0].filename);
-                    } else if (data.template && data.template.length > 0) {
-                        loadEpisode(data.template[0].filename);
+                    const allItems = [...(data.mempool || []), ...(data.template || [])];
+                    let targetFilename = null;
+
+                    // 1. Try URL Hash (e.g. #247 or #_draft_slug)
+                    const rawHash = window.location.hash ? decodeURIComponent(window.location.hash.slice(1)).trim() : '';
+                    if (rawHash) {
+                        const found = allItems.find(item => 
+                            item.filename === rawHash || 
+                            item.filename === rawHash + '.md' || 
+                            item.slug === rawHash || 
+                            item.slug === rawHash.replace(/^_/, '') ||
+                            String(item.number) === rawHash
+                        );
+                        if (found) targetFilename = found.filename;
+                    }
+
+                    // 2. Try LocalStorage saved memory
+                    if (!targetFilename) {
+                        try {
+                            const saved = localStorage.getItem('mdingest_selected_episode');
+                            if (saved) {
+                                const found = allItems.find(item => 
+                                    item.filename === saved || 
+                                    item.filename === saved + '.md' || 
+                                    item.slug === saved || 
+                                    String(item.number) === saved
+                                );
+                                if (found) targetFilename = found.filename;
+                            }
+                        } catch (e) {}
+                    }
+
+                    // 3. Fallback to top of Mempool or top of Block Template
+                    if (!targetFilename) {
+                        if (data.mempool && data.mempool.length > 0) {
+                            targetFilename = data.mempool[0].filename;
+                        } else if (data.template && data.template.length > 0) {
+                            targetFilename = data.template[0].filename;
+                        }
+                    }
+
+                    if (targetFilename) {
+                        loadEpisode(targetFilename, true);
                     }
                 }
             } catch (err) {
@@ -2021,6 +2111,16 @@ if __name__ == '__main__':
             }
 
             container.innerHTML = html;
+
+            // Smoothly keep the active episode card in view within the ledger
+            if (selectedEpisode && selectedEpisode.filename) {
+                requestAnimationFrame(() => {
+                    const activeCard = document.getElementById(`card-${escapeId(selectedEpisode.filename)}`);
+                    if (activeCard) {
+                        activeCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                });
+            }
         }
 
         function renderInlineEditorHtml(filename, prefix, titleText) {
@@ -2122,6 +2222,14 @@ if __name__ == '__main__':
                 if (data.success) {
                     showToast(`🗑️ Deleted draft: ${filename}`);
                     selectedEpisode = null;
+                    try {
+                        localStorage.removeItem('mdingest_selected_episode');
+                        localStorage.removeItem('mdingest_scroll_research_' + filename);
+                        localStorage.removeItem('mdingest_scroll_narrative_' + filename);
+                        if (window.location.hash) {
+                            window.history.replaceState(null, '', window.location.pathname);
+                        }
+                    } catch (e) {}
                     await fetchStatus();
                 }
             } catch(err) {
@@ -2138,6 +2246,9 @@ if __name__ == '__main__':
 
         function switchMiddleTab(tabName) {
             activeMiddleTab = tabName;
+            try {
+                localStorage.setItem('mdingest_active_tab', tabName);
+            } catch (e) {}
 
             // Update Tab Switcher Buttons & Level-2 Channel Toolbars
             ['research', 'narrative', 'media'].forEach(t => {
@@ -2183,7 +2294,7 @@ if __name__ == '__main__':
             }
         }
 
-        async function loadEpisode(filename) {
+        async function loadEpisode(filename, restoreScroll = false) {
             try {
                 const res = await fetch(`/api/episode?filename=${encodeURIComponent(filename)}`);
                 if (!res.ok) {
@@ -2192,6 +2303,15 @@ if __name__ == '__main__':
                 }
                 const data = await res.json();
                 selectedEpisode = data;
+
+                // Save to localStorage & update URL hash for session persistence
+                try {
+                    localStorage.setItem('mdingest_selected_episode', data.filename);
+                    const cleanSlugOrNum = data.filename.replace(/\.md$/, '').replace(/^_/, '');
+                    if (window.location.hash !== '#' + cleanSlugOrNum) {
+                        window.history.replaceState(null, '', '#' + cleanSlugOrNum);
+                    }
+                } catch (e) {}
 
                 const currFileEl = document.getElementById('current-preview-file');
                 if (currFileEl) currFileEl.innerText = `src/${data.filename}`;
@@ -2232,6 +2352,26 @@ if __name__ == '__main__':
                 renderMarkdownInPreview(data.content);
                 renderNarrativeTab(data, currentAudioData);
                 renderLedgerTree(currentStatus);
+
+                // Handle scroll restoration
+                const viewResearch = document.getElementById('tab-view-research');
+                const viewNarrative = document.getElementById('tab-view-narrative');
+                if (restoreScroll) {
+                    try {
+                        const savedResearch = localStorage.getItem('mdingest_scroll_research_' + data.filename);
+                        const savedNarrative = localStorage.getItem('mdingest_scroll_narrative_' + data.filename);
+                        const applyScroll = () => {
+                            if (savedResearch && viewResearch) viewResearch.scrollTop = parseInt(savedResearch, 10);
+                            if (savedNarrative && viewNarrative) viewNarrative.scrollTop = parseInt(savedNarrative, 10);
+                        };
+                        applyScroll();
+                        setTimeout(applyScroll, 80);
+                        setTimeout(applyScroll, 250);
+                    } catch (e) {}
+                } else {
+                    if (viewResearch) viewResearch.scrollTop = 0;
+                    if (viewNarrative) viewNarrative.scrollTop = 0;
+                }
             } catch (err) {
                 console.error("Failed to load episode:", err);
                 showToast("Failed to load episode: " + err.message);
@@ -2705,7 +2845,7 @@ if __name__ == '__main__':
 
         function refreshCurrentEpisode() {
             if (selectedEpisode) {
-                loadEpisode(selectedEpisode.filename);
+                loadEpisode(selectedEpisode.filename, true);
                 showToast('Refreshed episode view');
             }
         }
