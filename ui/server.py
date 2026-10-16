@@ -29,7 +29,12 @@ import time
 # Working directories
 INGEST_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = INGEST_DIR.parent
-SRC_DIR = PROJECT_ROOT / "src"
+
+# Auto-discover canonical deepDive production workspace if running in sibling mdIngest
+candidate_roots = [PROJECT_ROOT, PROJECT_ROOT.parent / "deepDive"]
+PROD_ROOT = next((r for r in candidate_roots if (r / "src" / "SUMMARY.md").exists() and (r / "src" / "SUMMARY.md").stat().st_size > 1000), PROJECT_ROOT)
+
+SRC_DIR = PROD_ROOT / "src"
 IMG_DIR = SRC_DIR / "img"
 VID_DIR = SRC_DIR / "vid"
 SUMMARY_FILE = SRC_DIR / "SUMMARY.md"
@@ -812,6 +817,145 @@ def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "",
     return full_doc, promo_count
 
 
+def extract_nostr_metadata(markdown_text: str, title: str = "", clean_id: str = "") -> dict:
+    """
+    Extracts and prepares NIP-23 long-form metadata for Nostr clients (Habla, Primal, NAK):
+    - title: Document title
+    - summary: Concise 1-2 sentence hook (150-250 characters)
+    - image: Canonical image URL (from src/img/{clean_id}.png or ddma cover or fallback)
+    - tags: Extracted list of topic tags
+    - d_tag: Episode slug
+    - published_at: Unix timestamp
+    - canonical_url: Web reference ledger
+    - word_count: Total words
+    - reading_time_min: Estimated reading minutes
+    - nak_command: Pre-formatted CLI command for nak event 30023
+    """
+    if not clean_id:
+        clean_id = "index"
+
+    # 1. Clean title
+    doc_title = (title or "").strip()
+    if not doc_title:
+        m = re.search(r"^#\s+(.*)$", markdown_text, re.MULTILINE)
+        if m:
+            doc_title = m.group(1).strip()
+        else:
+            doc_title = f"Episode {clean_id}"
+
+    # 2. Extract summary hook (first substantive paragraph, 1-2 sentences)
+    clean_text = re.sub(r'(?m)^#{1,6}\s+.*$', '', markdown_text)
+    clean_text = re.sub(r'(?m)^>.*$', '', clean_text)
+    clean_text = re.sub(r'(?m)^\s*[\*\-]\s+.*$', '', clean_text)
+    clean_text = re.sub(r'[\*_`]', '', clean_text)
+
+    paras = [p.strip() for p in clean_text.split('\n\n') if len(p.strip()) > 50]
+    first_para = paras[0] if paras else ''
+    sentences = re.findall(r'[^.!?]+[.!?]+', first_para)
+    summary = ''
+    if sentences:
+        summary = sentences[0].strip()
+        if len(summary) < 120 and len(sentences) > 1:
+            summary += ' ' + sentences[1].strip()
+    if len(summary) > 240:
+        summary = summary[:237].rsplit(' ', 1)[0] + '...'
+    if not summary:
+        summary = f"Research deep dive on {doc_title}."
+
+    # 3. Resolve cover picture
+    image_url = ""
+    # Check src/img/{clean_id}.png / .webp / .jpg
+    for ext in [".png", ".webp", ".jpg", ".jpeg"]:
+        img_candidate = SRC_DIR / "img" / f"{clean_id}{ext}"
+        if img_candidate.exists():
+            image_url = f"https://deepdive.shutri.com/img/{clean_id}{ext}"
+            break
+
+    if not image_url:
+        # Check src/ddma/docs/episodes/{clean_id}/cover.*
+        for ext in [".webp", ".png", ".jpg"]:
+            cover_candidate = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / f"cover{ext}"
+            if cover_candidate.exists():
+                image_url = f"https://deepdive.shutri.com/ddma/docs/episodes/{clean_id}/cover{ext}"
+                break
+
+    if not image_url:
+        # Check first DDMA clip and auto-extract cover.webp keyframe if possible
+        clip_candidate = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "clips" / f"{clean_id}-1.mp4"
+        if clip_candidate.exists():
+            target_cover = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "cover.webp"
+            try:
+                import subprocess
+                subprocess.run(
+                    ["ffmpeg", "-y", "-ss", "00:00:01", "-i", str(clip_candidate), "-vframes", "1", "-q:v", "2", str(target_cover)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5
+                )
+                if target_cover.exists():
+                    image_url = f"https://deepdive.shutri.com/ddma/docs/episodes/{clean_id}/cover.webp"
+            except Exception:
+                pass
+            if not image_url:
+                image_url = f"https://deepdive.shutri.com/ddma/docs/episodes/{clean_id}/clips/{clean_id}-1.mp4"
+
+    if not image_url:
+        image_url = "https://deepdive.shutri.com/img/shutoshaBuffalo.png"
+
+    # 4. Extract topic tags
+    entity_tags = [
+        (r'\bMeta ?Muse\b', 'meta-muse'),
+        (r'\bApple\b|\bPCC\b|\bPrivate Cloud Compute\b', 'apple-pcc'),
+        (r'\bPerplexity\b', 'perplexity'),
+        (r'\bAgents?\b|\bAgentic\b', 'ai-agents'),
+        (r'\bPrivacy\b', 'privacy'),
+        (r'\bSecurity\b|\beBPF\b|\bSentinel\b', 'cybersecurity'),
+        (r'\bAutonomous\b', 'autonomous-systems'),
+        (r'\bBitcoin\b|\bLightning\b|\bSats\b', 'bitcoin'),
+        (r'\bNostr\b', 'nostr'),
+        (r'\bLLMs?\b|\bAI\b|\bArtificial Intelligence\b', 'artificial-intelligence'),
+        (r'\bStripe\b|\bPayments?\b', 'fintech'),
+        (r'\bResearch\b|\bPaper\b', 'research')
+    ]
+    tags = []
+    for pat, tag in entity_tags:
+        if re.search(pat, markdown_text, re.IGNORECASE) and tag not in tags:
+            tags.append(tag)
+    if not tags:
+        tags = ["research", "deepdive", "technology"]
+    tags = tags[:6]
+
+    # 5. Metadata stats
+    word_count = len(re.findall(r'\b\w+\b', markdown_text))
+    reading_time_min = max(1, round(word_count / 200)) if word_count else 1
+    canonical_url = f"https://deepdive.shutri.com/{clean_id}.html"
+    published_at = int(time.time())
+
+    # 6. Pre-generate NAK command
+    nak_flags = [
+        f"-t d=\"{clean_id}\"",
+        f"-t title=\"{doc_title}\"",
+        f"-t summary=\"{summary}\"",
+        f"-t image=\"{image_url}\"",
+        f"-t published_at=\"{published_at}\"",
+    ]
+    for t in tags:
+        nak_flags.append(f"-t t=\"{t}\"")
+    nak_flags.append("-t client=\"mdIngest Cockpit\"")
+    flag_str = " \\\n  ".join(nak_flags)
+    nak_command = f"nak event -k 30023 \\\n  {flag_str} \\\n  --sec \"$NOSTR_NSEC\" \\\n  wss://relay.damus.io wss://nos.lol wss://relay.primal.net < narrative.md"
+
+    return {
+        "d_tag": clean_id,
+        "title": doc_title,
+        "summary": summary,
+        "image": image_url,
+        "tags": tags,
+        "canonical_url": canonical_url,
+        "word_count": word_count,
+        "reading_time_min": reading_time_min,
+        "published_at": published_at,
+        "nak_command": nak_command
+    }
+
 
 def seed_ddma_project_if_missing(clean_id: str) -> str:
     """
@@ -1425,6 +1569,18 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     pass
 
+            ep_title = ""
+            for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+                if possible_file.exists():
+                    try:
+                        with open(possible_file, "r", encoding="utf-8") as pf:
+                            m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                            if m:
+                                ep_title = m.group(1).strip()
+                                break
+                    except Exception:
+                        pass
+
             narrative_text = ""
             if narrative_path.exists():
                 try:
@@ -1433,17 +1589,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception:
                     pass
             elif transcript_text:
-                ep_title = ""
-                for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
-                    if possible_file.exists():
-                        try:
-                            with open(possible_file, "r", encoding="utf-8") as pf:
-                                m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
-                                if m:
-                                    ep_title = m.group(1).strip()
-                                    break
-                        except Exception:
-                            pass
                 settings = load_settings()
                 ln_addr = settings.get("lightning_address", "shutosha@primal.net")
                 narrative_text, _ = smart_streamline_narrative(transcript_text, title=ep_title, ep_num=clean_id, lightning_addr=ln_addr)
@@ -1458,6 +1603,8 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except ValueError:
                     audio_rel_url = f"/media/{audio_path.name}"
 
+            nostr_meta = extract_nostr_metadata(narrative_text or transcript_text, ep_title, clean_id)
+
             self.send_json({
                 "clean_id": clean_id,
                 "has_audio": audio_path is not None,
@@ -1466,6 +1613,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "has_transcript": len(transcript_text.strip()) > 0,
                 "transcript": transcript_text,
                 "narrative_md": narrative_text,
+                "nostr_meta": nostr_meta,
                 "job_status": job.get("status", "idle"),
                 "job_progress": job.get("progress", ""),
                 "job_error": job.get("error", "")
@@ -1790,7 +1938,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             # Trigger background mdbook build to ensure compiled HTML is instantly fresh
             def bg_build():
                 try:
-                    subprocess.run(["mdbook", "build"], cwd=str(PROJECT_ROOT), capture_output=True)
+                    subprocess.run(["mdbook", "build"], cwd=str(PROD_ROOT), capture_output=True)
                 except Exception:
                     pass
             threading.Thread(target=bg_build, daemon=True).start()
@@ -1883,7 +2031,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                     kill_mdserve()
                     mdserve_process = subprocess.Popen(
                         ["mdbook", "serve", "--hostname", "0.0.0.0", "-p", "3000"],
-                        cwd=str(PROJECT_ROOT),
+                        cwd=str(PROD_ROOT),
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
@@ -2050,11 +2198,14 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(n_path, "w", encoding="utf-8") as f:
                 f.write(streamlined)
 
+            nostr_meta = extract_nostr_metadata(streamlined, title, clean_id)
+
             self.send_json({
                 "success": True,
                 "clean_id": clean_id,
                 "streamlined": streamlined,
-                "promo_count": promo_count
+                "promo_count": promo_count,
+                "nostr_meta": nostr_meta
             })
             return
 
@@ -2272,9 +2423,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as se:
                     print(f"Auto-sync before push warning for {ep_num}: {se}")
             try:
-                subprocess.run(["git", "add", "src/", "book.toml", "ingest/settings.json"], cwd=str(PROJECT_ROOT), check=True)
-                subprocess.run(["git", "commit", "-m", f"publish: episode {ep_num} via md² cockpit"], cwd=str(PROJECT_ROOT), check=True)
-                subprocess.run(["git", "push"], cwd=str(PROJECT_ROOT), check=True)
+                subprocess.run(["git", "add", "src/", "book.toml", "ingest/settings.json"], cwd=str(PROD_ROOT), check=True)
+                subprocess.run(["git", "commit", "-m", f"publish: episode {ep_num} via md² cockpit"], cwd=str(PROD_ROOT), check=True)
+                subprocess.run(["git", "push"], cwd=str(PROD_ROOT), check=True)
                 self.send_json({"success": True, "message": "Pushed to remote repository successfully!"})
             except subprocess.CalledProcessError as e:
                 self.send_json({"success": False, "error": f"Git command failed: {e}"})
