@@ -463,10 +463,10 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
         # Copy clips
         if ddma_clips_dir.exists():
             for src_clip in ddma_clips_dir.glob("*.mp4"):
-                if "-original.mp4" in src_clip.name or "-mosaic-" in src_clip.name:
+                if "-original.mp4" in src_clip.name or "-mosaic-" in src_clip.name or "-infographic.mp4" in src_clip.name or "-draft.mp4" in src_clip.name:
                     continue
                 dest_clip = deepdive_clips_dir / src_clip.name
-                if not dest_clip.exists() or dest_clip.stat().st_size != src_clip.stat().st_size:
+                if not dest_clip.exists() or dest_clip.stat().st_size != src_clip.stat().st_size or src_clip.stat().st_mtime > dest_clip.stat().st_mtime:
                     try:
                         shutil.copy2(src_clip, dest_clip)
                         synced_clips.append(src_clip.name)
@@ -504,7 +504,7 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
     cards_html = []
     for clip_path in all_clips:
         c_name = clip_path.name
-        if "-original.mp4" in c_name or "-mosaic-" in c_name:
+        if "-original.mp4" in c_name or "-mosaic-" in c_name or "-infographic.mp4" in c_name or "-draft.mp4" in c_name:
             continue
         m = re.search(r'-(\d+)\.mp4$', c_name)
         part_num = m.group(1) if m else ""
