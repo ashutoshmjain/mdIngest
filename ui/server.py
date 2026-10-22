@@ -1589,12 +1589,34 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
     except Exception:
         shutil.copy2(mp3_path, target_mp3)
 
+    # 6.5 Export standalone square cover image for distribution agent (Spotify for Creators requires separate file)
+    target_cover_path = dest_dir / f"podcast_{clean_id}_cover.jpg"
+    has_cover_exported = False
+    if cover_image_path and cover_image_path.exists():
+        try:
+            cmd_cover = [
+                "ffmpeg", "-y",
+                "-i", str(cover_image_path),
+                "-vf", "scale=1600:1600:force_original_aspect_ratio=decrease,pad=1600:1600:(ow-iw)/2:(oh-ih)/2:color=black",
+                "-q:v", "2",
+                str(target_cover_path)
+            ]
+            res_c = subprocess.run(cmd_cover, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res_c.returncode == 0 and target_cover_path.exists():
+                has_cover_exported = True
+            else:
+                shutil.copy2(cover_image_path, target_cover_path)
+                has_cover_exported = True
+        except Exception as ex_cov:
+            print(f"[EXPORT] Warning exporting cover image: {ex_cov}")
+
     # 7. Write companion meta-muse distribution manifest
     meta = {
         "episode": clean_id,
         "title": formatted_title,
         "clean_title": clean_title_only,
         "audio_file": target_mp3.name,
+        "cover_file": target_cover_path.name if has_cover_exported else None,
         "local_pickup_path": str(target_mp3.resolve()),
         "canonical_url": canonical_url,
         "spotify_show": spotify_url,
@@ -1602,7 +1624,7 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
         "youtube_music": yt_music_url,
         "fountain_show": fountain_url,
         "lightning_tips": lightning_addr,
-        "has_cover": cover_image_path is not None,
+        "has_cover": has_cover_exported,
         "exported_at": datetime.now().isoformat(),
         "status": "ready_for_meta_muse",
         "instructions": "Pickup audio and upload to Spotify for Creators episode draft."
