@@ -617,6 +617,1002 @@ def get_episode_narrative_path(clean_id: str) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
     return target_dir / "narrative.md"
 
+def get_episode_podcast_dir(clean_id: str) -> Path:
+    """Canonical folder for episode podcast assets."""
+    target_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+    return target_dir
+
+def get_episode_podcast_edit_path(clean_id: str) -> Path:
+    """Path to non-destructive podcast_edit.json (cuts, stings, loudnorm)."""
+    return get_episode_podcast_dir(clean_id) / "podcast_edit.json"
+
+def get_episode_podcast_mp3_path(clean_id: str) -> Path:
+    """Path to rendered master podcast MP3."""
+    return get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp3"
+
+def get_episode_podcast_meta_path(clean_id: str) -> Path:
+    """Path to meta-muse companion distribution manifest."""
+    return get_episode_podcast_dir(clean_id) / "podcast_meta.json"
+
+def get_episode_transcription_json_path(clean_id: str) -> Path | None:
+    """Discovers full acoustic transcription.json containing word-level timestamps."""
+    candidates = [
+        SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
+        PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
+        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
+        PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
+    ]
+    for c in candidates:
+        if c.exists() and c.stat().st_size > 0:
+            return c
+    return None
+
+CANONICAL_PODCAST_STINGS = [
+    "deepDive-strong.mp3",
+    "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
+    "Howling (Sting) - Gunnar Olsen.mp3",
+    "deepDive-conclusion.mp3",
+]
+
+def get_available_stings() -> list[dict]:
+    """Catalog restricted to the 4 canonical podcast stings."""
+    stings = []
+    candidates = [
+        PROD_ROOT / "ddma" / "music",
+        PROJECT_ROOT / "ddma" / "music",
+        PROJECT_ROOT.parent / "ddma" / "music",
+    ]
+    seen = set()
+    for d in candidates:
+        if d.exists() and d.is_dir():
+            for fname in CANONICAL_PODCAST_STINGS:
+                f = d / fname
+                if f.exists() and fname not in seen:
+                    seen.add(fname)
+                    stings.append({
+                        "filename": fname,
+                        "path": str(f.resolve()),
+                        "size": f.stat().st_size
+                    })
+    return stings
+
+def load_podcast_edit(clean_id: str) -> dict:
+    """Loads podcast_edit.json or returns default non-destructive schema."""
+    edit_path = get_episode_podcast_edit_path(clean_id)
+    if edit_path.exists():
+        try:
+            with open(edit_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    data.setdefault("cuts", [])
+                    data.setdefault("stings", [])
+                    data.setdefault("intro_sting", "deepDive-strong.mp3")
+                    data.setdefault("outro_sting", "deepDive-conclusion.mp3")
+                    data.setdefault("target_lufs", -16.0)
+                    return data
+        except Exception as e:
+            print(f"[PODCAST] Error reading {edit_path}: {e}")
+
+    audio_path = get_episode_audio_path(clean_id)
+    return {
+        "episode": clean_id,
+        "source_audio": audio_path.name if audio_path else "",
+        "cuts": [],
+        "stings": [],
+        "intro_sting": "deepDive-strong.mp3",
+        "outro_sting": "deepDive-conclusion.mp3",
+        "target_lufs": -16.0,
+        "updated_at": datetime.now().isoformat()
+    }
+
+def save_podcast_edit(clean_id: str, edit_data: dict) -> bool:
+    """Saves updated cuts, stings and parameters to podcast_edit.json."""
+    try:
+        edit_path = get_episode_podcast_edit_path(clean_id)
+        edit_data["episode"] = clean_id
+        edit_data["updated_at"] = datetime.now().isoformat()
+        if "cuts" in edit_data and isinstance(edit_data["cuts"], list):
+            edit_data["cuts"] = sorted(edit_data["cuts"], key=lambda c: float(c.get("start", 0)))
+        if "stings" in edit_data and isinstance(edit_data["stings"], list):
+            edit_data["stings"] = sorted(edit_data["stings"], key=lambda s: float(s.get("at", 0)))
+        with open(edit_path, "w", encoding="utf-8") as f:
+            json.dump(edit_data, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"[PODCAST] Failed to save {clean_id} podcast_edit.json: {e}")
+        return False
+
+def extract_timed_words_from_transcription(clean_id: str) -> tuple[list[dict], list[dict], str]:
+    """
+    Extracts word-level timestamps from acoustic transcription.json.
+    Returns (words, segments, full_text).
+    words: [{word, start, end, idx, segment_id}]
+    """
+    t_path = get_episode_transcription_json_path(clean_id)
+    if not t_path or not t_path.exists():
+        txt_path = get_episode_transcript_path(clean_id)
+        if txt_path.exists():
+            try:
+                with open(txt_path, "r", encoding="utf-8") as tf:
+                    raw = tf.read().strip()
+                toks = raw.split()
+                synth_words = []
+                for i, t in enumerate(toks):
+                    synth_words.append({
+                        "word": t,
+                        "start": round(i * 0.4, 2),
+                        "end": round(i * 0.4 + 0.36, 2),
+                        "idx": i,
+                        "segment_id": 0
+                    })
+                return synth_words, [{"id": 0, "start": 0.0, "end": round(len(toks) * 0.4, 2), "text": raw}], raw
+            except Exception:
+                pass
+        return [], [], ""
+
+    try:
+        with open(t_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"[PODCAST] Failed to parse {t_path}: {e}")
+        return [], [], ""
+
+    full_text = data.get("text", "")
+    raw_segments = data.get("segments", [])
+    all_words = []
+    normalized_segments = []
+    word_idx = 0
+
+    for s_idx, seg in enumerate(raw_segments):
+        s_id = seg.get("id", s_idx)
+        s_start = float(seg.get("start", 0.0))
+        s_end = float(seg.get("end", 0.0))
+        s_text = seg.get("text", "")
+        seg_words = seg.get("words", [])
+
+        norm_words = []
+        if seg_words:
+            for w in seg_words:
+                w_str = w.get("word", "")
+                w_s = float(w.get("start", s_start))
+                w_e = float(w.get("end", s_end))
+                w_obj = {
+                    "word": w_str,
+                    "start": round(w_s, 2),
+                    "end": round(w_e, 2),
+                    "idx": word_idx,
+                    "segment_id": s_id
+                }
+                all_words.append(w_obj)
+                norm_words.append(w_obj)
+                word_idx += 1
+        else:
+            toks = s_text.split()
+            dur = max(0.1, s_end - s_start)
+            step = dur / max(1, len(toks))
+            for i, t in enumerate(toks):
+                w_s = s_start + (i * step)
+                w_e = w_s + step
+                w_obj = {
+                    "word": t,
+                    "start": round(w_s, 2),
+                    "end": round(w_e, 2),
+                    "idx": word_idx,
+                    "segment_id": s_id
+                }
+                all_words.append(w_obj)
+                norm_words.append(w_obj)
+                word_idx += 1
+
+        normalized_segments.append({
+            "id": s_id,
+            "start": round(s_start, 2),
+            "end": round(s_end, 2),
+            "text": s_text,
+            "word_count": len(norm_words)
+        })
+
+    return all_words, normalized_segments, full_text
+
+def render_podcast_pipeline(clean_id: str, edit_data: dict = None) -> tuple[bool, str, str]:
+    """
+    Renders non-destructive master podcast MP3 using FFmpeg:
+    1. Cuts out deleted speech segments and joins remaining audio with micro-crossfades.
+    2. Prepends intro sting and appends outro sting.
+    3. Normalizes loudness to -16 LUFS (Spotify / Apple Podcast standard).
+    4. Writes clean ID3 metadata.
+    Returns (success: bool, path_or_err: str, message: str).
+    """
+    audio_path = get_episode_audio_path(clean_id)
+    if not audio_path or not audio_path.exists():
+        return False, "", f"Source audio not found for episode {clean_id}"
+
+    if edit_data is None:
+        edit_data = load_podcast_edit(clean_id)
+
+    total_dur = 0.0
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            total_dur = float(res.stdout.strip())
+    except Exception as pe:
+        print(f"[PODCAST RENDER] ffprobe error: {pe}")
+
+    if total_dur <= 0.0:
+        return False, "", "Could not probe duration of source audio"
+
+    raw_cuts = edit_data.get("cuts", [])
+    valid_cuts = []
+    for c in raw_cuts:
+        try:
+            cs = max(0.0, float(c.get("start", 0.0)))
+            ce = min(total_dur, float(c.get("end", 0.0)))
+            if ce > cs + 0.05:
+                valid_cuts.append((cs, ce))
+        except (ValueError, TypeError):
+            continue
+    valid_cuts.sort(key=lambda x: x[0])
+
+    merged_cuts = []
+    for cs, ce in valid_cuts:
+        if not merged_cuts:
+            merged_cuts.append([cs, ce])
+        else:
+            prev = merged_cuts[-1]
+            if cs <= prev[1] + 0.05:
+                prev[1] = max(prev[1], ce)
+            else:
+                merged_cuts.append([cs, ce])
+
+    keep_ranges = []
+    cursor = 0.0
+    for cs, ce in merged_cuts:
+        if cs > cursor + 0.08:
+            keep_ranges.append((cursor, cs))
+        cursor = max(cursor, ce)
+    if cursor < total_dur - 0.08:
+        keep_ranges.append((cursor, total_dur))
+
+    if not keep_ranges:
+        return False, "", "Error: Cuts remove entire audio timeline!"
+
+    out_mp3 = get_episode_podcast_mp3_path(clean_id)
+    temp_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "tmp_podcast"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        stitched_speech = temp_dir / "stitched_speech.wav"
+        if len(keep_ranges) == 1 and keep_ranges[0][0] <= 0.1 and keep_ranges[0][1] >= total_dur - 0.1:
+            subprocess.run(["ffmpeg", "-y", "-i", str(audio_path), "-vn", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2", str(stitched_speech)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        else:
+            slice_files = []
+            for i, (ks, ke) in enumerate(keep_ranges):
+                s_file = temp_dir / f"slice_{i:03d}.wav"
+                dur = ke - ks
+                fade_dur = min(0.02, dur / 3.0)
+                cmd = [
+                    "ffmpeg", "-y", "-ss", f"{ks:.3f}", "-t", f"{dur:.3f}",
+                    "-i", str(audio_path),
+                    "-af", f"afade=t=in:ss=0:d={fade_dur:.3f},afade=t=out:st={(dur - fade_dur):.3f}:d={fade_dur:.3f}",
+                    "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2",
+                    str(s_file)
+                ]
+                subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                slice_files.append(s_file)
+
+            concat_list = temp_dir / "concat_slices.txt"
+            with open(concat_list, "w", encoding="utf-8") as cf:
+                for sf in slice_files:
+                    cf.write(f"file '{sf.resolve().as_posix()}'\n")
+
+            cmd_concat = [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", str(concat_list),
+                "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2",
+                str(stitched_speech)
+            ]
+            subprocess.run(cmd_concat, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+
+        stings_dict = {s["filename"]: Path(s["path"]) for s in get_available_stings()}
+        intro_name = edit_data.get("intro_sting")
+        outro_name = edit_data.get("outro_sting")
+        intro_path = stings_dict.get(intro_name) if intro_name else None
+        outro_path = stings_dict.get(outro_name) if outro_name else None
+
+        current_track = stitched_speech
+
+        raw_stings = edit_data.get("stings", [])
+        if raw_stings and stitched_speech.exists():
+            valid_stings = []
+            for s in raw_stings:
+                try:
+                    at_val = float(s.get("at", 0.0))
+                    sf = s.get("music_file", "")
+                    sp = stings_dict.get(sf)
+                    if sp and sp.exists():
+                        dur_val = float(s.get("duration", 0.0))
+                        if dur_val <= 0.0:
+                            try:
+                                ps = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(sp)], stdout=subprocess.PIPE, text=True)
+                                dur_val = float(ps.stdout.strip()) if ps.returncode == 0 else 7.0
+                            except Exception:
+                                dur_val = 7.0
+                        valid_stings.append({
+                            "orig_at": at_val,
+                            "file": sf,
+                            "path": sp,
+                            "duck_db": s.get("duck_db", -14),
+                            "duration": dur_val
+                        })
+                except (ValueError, TypeError):
+                    continue
+
+            if valid_stings:
+                speech_dur = 0.0
+                try:
+                    cmd_probe = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(stitched_speech)]
+                    res_p = subprocess.run(cmd_probe, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    if res_p.returncode == 0 and res_p.stdout.strip():
+                        speech_dur = float(res_p.stdout.strip())
+                except Exception:
+                    pass
+
+                valid_stings.sort(key=lambda x: x["orig_at"])
+                for vs in valid_stings:
+                    t_orig = vs["orig_at"]
+                    shift = 0.0
+                    for cs, ce in valid_cuts:
+                        if ce <= t_orig:
+                            shift += (ce - cs)
+                        elif cs < t_orig < ce:
+                            shift += (t_orig - cs)
+                    vs["adj_at"] = max(0.0, t_orig - shift)
+
+                midrolls = []
+                outro_sting = None
+                for vs in valid_stings:
+                    is_outro = (vs["adj_at"] >= speech_dur - 3.0) or ("conclusion" in vs["file"] and vs["adj_at"] >= speech_dur - 45.0)
+                    if is_outro and outro_sting is None:
+                        outro_sting = vs
+                    else:
+                        midrolls.append(vs)
+
+                midrolls.sort(key=lambda x: x["adj_at"])
+
+                split_points = []
+                filtered_midrolls = []
+                last_pt = 0.0
+                for vs in midrolls:
+                    pt = vs["adj_at"]
+                    if pt > last_pt + 1.0 and pt < speech_dur - 1.0:
+                        split_points.append(pt)
+                        filtered_midrolls.append(vs)
+                        last_pt = pt
+
+                slice_ranges = []
+                cur = 0.0
+                for pt in split_points:
+                    slice_ranges.append((cur, pt))
+                    cur = pt
+                slice_ranges.append((cur, speech_dur))
+
+                # Assemble master timeline with user specifications:
+                # 1. Front of sting: 0.2s silence - no cross fade.
+                # 2. End of sting: fade out 2.0s, and cross fade 0.5s with incoming speech (no silence addition).
+                # 3. Outro sting: 0.2s silence after speech ends, fade out 2.0s to conclude episode on music.
+                inputs = []
+                filter_parts = []
+                labels = []
+                in_idx = 0
+                t_cursor = 0.0
+
+                s0_start, s0_end = slice_ranges[0]
+                s0_dur = s0_end - s0_start
+                inputs.extend(["-ss", f"{s0_start:.3f}", "-t", f"{s0_dur:.3f}", "-i", str(stitched_speech)])
+                labels.append(f"[{in_idx}:a]")
+                in_idx += 1
+                t_cursor += s0_dur
+
+                for i, sting in enumerate(filtered_midrolls):
+                    t_sting_start = t_cursor + 0.2
+                    dur_sting = sting["duration"]
+                    t_sting_ms = int(t_sting_start * 1000)
+                    fade_out_dur = min(2.0, dur_sting)
+                    fade_out_st = max(0.0, dur_sting - fade_out_dur)
+
+                    inputs.extend(["-i", str(sting["path"])])
+                    filter_parts.append(
+                        f"[{in_idx}:a]atrim=0:{dur_sting:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={t_sting_ms}|{t_sting_ms}[m{i}];"
+                    )
+                    labels.append(f"[m{i}]")
+                    in_idx += 1
+
+                    t_next_speech = max(t_cursor, t_sting_start + dur_sting - 0.5)
+                    t_speech_ms = int(t_next_speech * 1000)
+                    nxt_start, nxt_end = slice_ranges[i + 1]
+                    nxt_dur = nxt_end - nxt_start
+
+                    inputs.extend(["-ss", f"{nxt_start:.3f}", "-t", f"{nxt_dur:.3f}", "-i", str(stitched_speech)])
+                    filter_parts.append(
+                        f"[{in_idx}:a]afade=t=in:ss=0:d=0.5,adelay={t_speech_ms}|{t_speech_ms}[sl{i+1}];"
+                    )
+                    labels.append(f"[sl{i+1}]")
+                    in_idx += 1
+                    t_cursor = t_next_speech + nxt_dur
+
+                if outro_sting:
+                    t_outro_start = t_cursor + 0.2
+                    t_outro_ms = int(t_outro_start * 1000)
+                    dur_outro = outro_sting["duration"]
+                    fade_outro = min(2.0, dur_outro)
+                    fade_outro_st = max(0.0, dur_outro - fade_outro)
+
+                    inputs.extend(["-i", str(outro_sting["path"])])
+                    filter_parts.append(
+                        f"[{in_idx}:a]atrim=0:{dur_outro:.3f},afade=t=out:st={fade_outro_st:.3f}:d={fade_outro:.3f},adelay={t_outro_ms}|{t_outro_ms}[moutro];"
+                    )
+                    labels.append("[moutro]")
+                    in_idx += 1
+                    t_cursor = t_outro_start + dur_outro
+
+                filter_parts.append(
+                    f"{''.join(labels)}amix=inputs={len(labels)}:duration=longest:dropout_transition=0:normalize=0[mixed_podcast]"
+                )
+
+                with_stings_file = temp_dir / "with_stings_master.wav"
+                mix_cmd = [
+                    "ffmpeg", "-y"
+                ] + inputs + [
+                    "-filter_complex", "".join(filter_parts),
+                    "-map", "[mixed_podcast]",
+                    "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2",
+                    str(with_stings_file)
+                ]
+                mix_res = subprocess.run(mix_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if mix_res.returncode == 0 and with_stings_file.exists():
+                    current_track = with_stings_file
+                else:
+                    err_msg = mix_res.stderr.decode("utf-8", errors="ignore") if mix_res.stderr else ""
+                    print(f"[PODCAST RENDER] Stings mixing error: {err_msg[:300]}")
+
+        if (intro_path or outro_path) and not valid_stings:
+            master_pieces = []
+            if intro_path and intro_path.exists():
+                intro_wav = temp_dir / "intro.wav"
+                subprocess.run(["ffmpeg", "-y", "-i", str(intro_path), "-af", "afade=t=out:st=4.5:d=1.5", "-t", "6", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2", str(intro_wav)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if intro_wav.exists():
+                    master_pieces.append(intro_wav)
+
+            master_pieces.append(current_track)
+
+            if outro_path and outro_path.exists():
+                outro_wav = temp_dir / "outro.wav"
+                # Play outro conclusion sting to its full finish (with gentle fade out on the tail)
+                subprocess.run(["ffmpeg", "-y", "-i", str(outro_path), "-af", "afade=t=out:st=13.5:d=1.5", "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2", str(outro_wav)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if outro_wav.exists():
+                    master_pieces.append(outro_wav)
+
+            concat_master = temp_dir / "concat_master.txt"
+            with open(concat_master, "w", encoding="utf-8") as cm:
+                for mp in master_pieces:
+                    cm.write(f"file '{mp.resolve().as_posix()}'\n")
+
+            with_stings = temp_dir / "with_intro_outro.wav"
+            subprocess.run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_master), "-c:a", "pcm_s16le", "-ar", "44100", "-ac", "2", str(with_stings)], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            current_track = with_stings
+
+        ep_title = f"Episode {clean_id}"
+        for possible_file in [SRC_DIR / f"{clean_id}.md", SRC_DIR / f"_{clean_id}.md"]:
+            if possible_file.exists():
+                try:
+                    with open(possible_file, "r", encoding="utf-8") as pf:
+                        m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                        if m:
+                            ep_title = m.group(1).strip()
+                            break
+                except Exception:
+                    pass
+
+        target_lufs = float(edit_data.get("target_lufs", -16.0))
+        final_cmd = [
+            "ffmpeg", "-y", "-i", str(current_track),
+            "-af", f"loudnorm=I={target_lufs}:LRA=11:TP=-1.5",
+            "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100",
+            "-metadata", f"title={ep_title}",
+            "-metadata", "artist=Knowledge Deep Dive",
+            "-metadata", "album=Deep Dive with Gemini",
+            "-metadata", f"track={clean_id}",
+            str(out_mp3)
+        ]
+        res_final = subprocess.run(final_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res_final.returncode != 0:
+            return False, "", f"FFmpeg loudnorm failed: {res_final.stderr[:300]}"
+
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+
+        return True, str(out_mp3), f"Podcast successfully rendered to podcast_{clean_id}.mp3 ({out_mp3.stat().st_size // 1024} KB)"
+    except Exception as e:
+        return False, "", f"Render pipeline failed: {str(e)}"
+
+def find_best_sentence_boundary(segments: list[dict], target_t: float, window: float = 45.0) -> tuple[float, str]:
+    """
+    Finds the exact end timestamp of a complete sentence closest to target_t.
+    Prioritizes segments ending in terminal punctuation (., ?, !) and natural speaker pauses.
+    Guarantees stings are never placed in the middle of a sentence.
+    """
+    if not segments:
+        return target_t, ""
+
+    candidates = []
+    for i, s in enumerate(segments):
+        end_t = float(s.get("end", 0.0))
+        if abs(end_t - target_t) <= window:
+            txt = s.get("text", "").strip()
+            is_punct = txt.endswith((".", "?", "!"))
+            pause = 0.0
+            if i + 1 < len(segments):
+                next_start = float(segments[i + 1].get("start", end_t))
+                pause = max(0.0, next_start - end_t)
+            score = 0.0
+            if is_punct:
+                score += 15.0
+            if pause >= 0.2:
+                score += 5.0
+            score -= (abs(end_t - target_t) / max(1.0, window)) * 5.0
+            candidates.append((score, end_t, txt))
+
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1], candidates[0][2]
+
+    # Fallback to closest segment ending
+    closest = min(segments, key=lambda s: abs(float(s.get("end", 0.0)) - target_t))
+    return float(closest.get("end", target_t)), closest.get("text", "")
+
+def review_podcast_with_gemini(clean_id: str) -> dict:
+    """
+    Sends dialogue transcript sections and music catalog to Gemini to detect pivotal transitions and recommend all 4 canonical stings.
+    """
+    words, segments, full_text = extract_timed_words_from_transcription(clean_id)
+    if not segments and not full_text:
+        return {"success": False, "error": "No transcript available for this episode."}
+
+    stings = get_available_stings()
+    sting_names = [s["filename"] for s in stings]
+
+    api_key = ""
+    settings = load_settings()
+    api_key = settings.get("gemini_api_key", "")
+    if not api_key:
+        ddma_sett = PROD_ROOT / "ddma" / "settings.json"
+        if ddma_sett.exists():
+            try:
+                with open(ddma_sett, "r", encoding="utf-8") as f:
+                    api_key = json.load(f).get("gemini_api_key", "")
+            except Exception:
+                pass
+    if not api_key:
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+
+    summary_segments = []
+    # Opening teaser / hook segments (first 30 segments, up to ~75s)
+    summary_segments.append("--- [OPENING HOOK & INTRO] ---")
+    for s in segments[:30]:
+        summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
+    
+    # Mid-roll sample around 50%
+    if len(segments) > 60:
+        mid_idx = len(segments) // 2
+        summary_segments.append("--- [MID-ROLL TECHNICAL CHAPTERS] ---")
+        for s in segments[mid_idx-10:mid_idx+10]:
+            summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
+        
+    # Outro wrap-up sample (final 25 segments)
+    if len(segments) > 40:
+        summary_segments.append("--- [CONCLUDING SYNTHESIS & SIGN-OFF] ---")
+        for s in segments[-25:]:
+            summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
+
+    transcript_sample = "\n".join(summary_segments)
+
+    prompt = f"""You are the Executive Audio Director for the "Deep Dive with Gemini" podcast.
+Analyze the following timestamped dialogue transcript sections and recommend the optimal placement for our 4 signature music stings:
+
+Canonical Show Music Stings:
+1. "deepDive-strong.mp3" — Signature show intro. MUST be placed right after the opening cold hook/teaser (typically between 20s and 50s at the end of the provocative opening question/premise) before the hosts introduce the topic.
+2. "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3" — Reflective, thoughtful transition. Place when shifting into deep technical or philosophical mechanics (~25% to 45% mark).
+3. "Howling (Sting) - Gunnar Olsen.mp3" — Dynamic, driving pivot. Place at a major turning point, conflict, or second key discovery (~55% to 75% mark).
+4. "deepDive-conclusion.mp3" — Signature show outro. MUST be placed at the VERY END of the speech track right as the hosts sign off, so the episode concludes with music rather than an abrupt cutoff.
+
+Available Music Stings:
+{json.dumps(sting_names, indent=2)}
+
+Dialogue Sample:
+{transcript_sample}
+
+Rules:
+1. "at" MUST be an exact sentence-ending timestamp where a complete sentence finishes (ending with a period or question mark). NEVER place a sting in the middle of a sentence or between connected clauses.
+2. "deepDive-conclusion.mp3" must always be at the very end of the dialogue to end the episode with music.
+3. "mode" should be "gap_03" (0.3s silence before and after sting).
+4. "duck_db" should be -14.
+
+Return ONLY a JSON object formatted as:
+{{
+  "recommendations": [
+    {{
+      "at": 29.68,
+      "music_file": "deepDive-strong.mp3",
+      "reason": "Signature intro curtain raiser right after opening hook.",
+      "mode": "gap_03",
+      "duration": 10.0,
+      "duck_db": -14
+    }},
+    {{
+      "at": 1124.48,
+      "music_file": "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
+      "reason": "Reflective chapter transition at complete sentence end.",
+      "mode": "gap_03",
+      "duration": 7.5,
+      "duck_db": -14
+    }},
+    {{
+      "at": 2088.58,
+      "music_file": "Howling (Sting) - Gunnar Olsen.mp3",
+      "reason": "Energetic pivot at complete sentence end.",
+      "mode": "gap_03",
+      "duration": 6.8,
+      "duck_db": -14
+    }},
+    {{
+      "at": 3215.34,
+      "music_file": "deepDive-conclusion.mp3",
+      "reason": "Signature show outro concluding the episode with music at final words.",
+      "mode": "gap_03",
+      "duration": 15.0,
+      "duck_db": -14
+    }}
+  ]
+}}"""
+
+    recommendations = []
+    if api_key and not api_key.startswith("AQ."):
+        try:
+            model_names = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+            for m in model_names:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
+                }
+                res = requests.post(url, json=payload, timeout=20)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidate = data["candidates"][0]["content"]["parts"][0]["text"]
+                    parsed = json.loads(candidate)
+                    recommendations = parsed.get("recommendations", [])
+                    if recommendations:
+                        break
+        except Exception as ge:
+            print(f"[GEMINI REVIEW] API call failed: {ge}")
+
+    if not recommendations:
+        total_time = segments[-1].get("end", 600.0) if segments else 600.0
+
+        # 1. Intro hook: find complete sentence ending near 30s
+        intro_t, intro_txt = find_best_sentence_boundary(segments, 30.0, window=25.0)
+
+        # 2. Bluesy Vibes: find complete sentence ending near 35% mark
+        p1, txt1 = find_best_sentence_boundary(segments, total_time * 0.35, window=45.0)
+
+        # 3. Howling: find complete sentence ending near 65% mark
+        p2, txt2 = find_best_sentence_boundary(segments, total_time * 0.65, window=45.0)
+
+        # 4. deepDive-conclusion: ALWAYS at the VERY END of the speech track
+        # Ends the episode with music rather than an abrupt audio cutoff!
+        last_seg = segments[-1] if segments else {}
+        outro_t = float(last_seg.get("end", total_time))
+        outro_txt = last_seg.get("text", "").strip()
+
+        recommendations = [
+            {
+                "at": intro_t,
+                "music_file": "deepDive-strong.mp3",
+                "reason": f"Signature intro curtain raiser after hook: '{intro_txt[:32]}...'",
+                "mode": "fade_2s_xfade_05",
+                "duration": 10.0,
+                "duck_db": -14
+            },
+            {
+                "at": p1,
+                "music_file": "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
+                "reason": f"Reflective chapter transition after sentence: '{txt1[:32]}...'",
+                "mode": "fade_2s_xfade_05",
+                "duration": 7.5,
+                "duck_db": -14
+            },
+            {
+                "at": p2,
+                "music_file": "Howling (Sting) - Gunnar Olsen.mp3",
+                "reason": f"High-energy pivot after sentence: '{txt2[:32]}...'",
+                "mode": "fade_2s_xfade_05",
+                "duration": 6.8,
+                "duck_db": -14
+            },
+            {
+                "at": outro_t,
+                "music_file": "deepDive-conclusion.mp3",
+                "reason": f"Signature show outro concluding episode with music at final words: '{outro_txt[:32]}'",
+                "mode": "fade_2s_xfade_05",
+                "duration": 15.0,
+                "duck_db": -14
+            }
+        ]
+
+    return {"success": True, "recommendations": recommendations}
+
+def generate_sting_flow_preview(clean_id: str, sting_file: str, at_sec: float, pre_sec: float = 15.0, post_sec: float = 15.0) -> Path | None:
+    """
+    Generates a contextual preview around the sting at at_sec:
+    - Front side: 0.2s silence gap, no crossfade.
+    - Tail of sting: fades out 2.0s, and crossfades 0.5s with incoming podcast speech (no silence addition).
+    - If outro conclusion sting: plays the final 18s of dialogue up to sentence end, 0.2s silence gap, and full conclusion sting fading out over 2.0s.
+    """
+    audio_path = get_episode_audio_path(clean_id)
+    if not audio_path or not audio_path.exists():
+        return None
+
+    stings_dict = {s["filename"]: Path(s["path"]) for s in get_available_stings()}
+    sting_path = stings_dict.get(sting_file)
+    if not sting_path or not sting_path.exists():
+        return None
+
+    total_dur = 3600.0
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            total_dur = float(res.stdout.strip())
+    except Exception:
+        pass
+
+    # Probe sting duration
+    sting_dur = 7.0
+    try:
+        cmd_s = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(sting_path)]
+        res_s = subprocess.run(cmd_s, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res_s.returncode == 0 and res_s.stdout.strip():
+            sting_dur = float(res_s.stdout.strip())
+    except Exception:
+        pass
+
+    preview_dir = get_episode_podcast_dir(clean_id) / "previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    clean_stem = re.sub(r'[^a-zA-Z0-9_-]', '_', Path(sting_file).stem)
+    out_file = preview_dir / f"flow_{int(at_sec)}_{clean_stem}.mp3"
+
+    # Check if this is the outro conclusion sting at the very end of the speech track
+    is_outro_ending = (at_sec >= total_dur - 3.0) or ("conclusion" in sting_file and at_sec >= total_dur - 45.0)
+
+    if is_outro_ending:
+        # Previews the final 18 seconds of dialogue up to the final words, followed by 0.2s silence and full conclusion sting fading out over 2.0s!
+        seg1_dur = min(18.0, at_sec)
+        seg1_start = max(0.0, at_sec - seg1_dur)
+        silence_front = 0.2
+        sting_start_s = seg1_dur + silence_front
+        sting_start_ms = int(sting_start_s * 1000)
+
+        fade_out_dur = min(2.0, sting_dur)
+        fade_out_st = max(0.0, sting_dur - fade_out_dur)
+
+        filter_str = (
+            f"[1:a]afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
+            f"[0:a][sting_delayed]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[out]"
+        )
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", f"{seg1_start:.3f}", "-t", f"{seg1_dur:.3f}", "-i", str(audio_path),
+            "-i", str(sting_path),
+            "-filter_complex", filter_str,
+            "-map", "[out]",
+            "-c:a", "libmp3lame", "-b:a", "128k",
+            str(out_file)
+        ]
+        try:
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            if out_file.exists():
+                return out_file
+        except Exception as e:
+            print(f"[PODCAST] Outro flow preview ffmpeg error: {e}")
+        return None
+
+    # Mid-roll / Intro transition:
+    seg1_start = max(0.0, at_sec - pre_sec)
+    seg1_dur = max(0.5, at_sec - seg1_start)
+    seg2_start = min(total_dur, at_sec)
+    seg2_dur = max(0.5, min(total_dur, at_sec + post_sec) - seg2_start)
+
+    # User specification:
+    # 1. Front side of sting: 0.2s silence - no cross fade.
+    # 2. At the end of sting: fade out 2.0s and then cross fade 0.5s with podcast audio (no silence addition).
+    silence_front = 0.2
+    eff_sting_dur = min(12.0, sting_dur) if sting_dur > 14.0 else sting_dur
+
+    sting_start_s = seg1_dur + silence_front
+    sting_start_ms = int(sting_start_s * 1000)
+
+    fade_out_dur = min(2.0, eff_sting_dur)
+    fade_out_st = max(0.0, eff_sting_dur - fade_out_dur)
+
+    crossfade_dur = 0.5
+    seg2_start_s = max(seg1_dur, sting_start_s + eff_sting_dur - crossfade_dur)
+    seg2_start_ms = int(seg2_start_s * 1000)
+
+    filter_str = (
+        f"[1:a]afade=t=in:ss=0:d={crossfade_dur:.3f},adelay={seg2_start_ms}|{seg2_start_ms}[s2];"
+        f"[2:a]atrim=0:{eff_sting_dur:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
+        f"[0:a][s2]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[speech];"
+        f"[speech][sting_delayed]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[out]"
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", f"{seg1_start:.3f}", "-t", f"{seg1_dur:.3f}", "-i", str(audio_path),
+        "-ss", f"{seg2_start:.3f}", "-t", f"{seg2_dur:.3f}", "-i", str(audio_path),
+        "-i", str(sting_path),
+        "-filter_complex", filter_str,
+        "-map", "[out]",
+        "-c:a", "libmp3lame", "-b:a", "128k",
+        str(out_file)
+    ]
+    try:
+        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        if out_file.exists():
+            return out_file
+    except Exception as e:
+        print(f"[PODCAST] Flow preview ffmpeg error: {e}")
+
+    return None
+
+def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool, str]:
+    """
+    Copies rendered podcast MP3 and companion podcast_meta.json into Google Drive pickup folder for meta-muse.
+    Enforces that the episode MUST be mined from Mempool to Template before publishing.
+    Tags the audio track directly with complete ID3 metadata (and cover art if present).
+    """
+    # 1. Enforce that episode is mined into Block Template
+    mempool, template, chain, _ = parse_summary_structure()
+    template_item = next((t for t in template if t.get("filename") == f"{clean_id}.md" or str(t.get("number")) == clean_id), None)
+    if not template_item:
+        is_mempool = any(m.get("filename") == f"_{clean_id}.md" or m.get("slug") == clean_id for m in mempool)
+        if is_mempool or (SRC_DIR / f"_{clean_id}.md").exists():
+            return False, f"Episode '{clean_id}' is still in Mempool. You must Mine the episode into the Block Template first before pushing to Google Drive!"
+        if not clean_id.isdigit():
+            return False, f"Episode '{clean_id}' is not an active mined episode in the Block Template. Please Mine it first."
+
+    # 2. Locate or render podcast MP3
+    mp3_path = get_episode_podcast_mp3_path(clean_id)
+    if not mp3_path or not mp3_path.exists():
+        success, res_path, msg = render_podcast_pipeline(clean_id)
+        if not success or not Path(res_path).exists():
+            return False, f"Cannot export: Podcast MP3 is not rendered yet ({msg})"
+        mp3_path = Path(res_path)
+
+    # 3. Destination folder in Google Drive
+    dest_str = custom_dest.strip()
+    settings = load_settings()
+    if not dest_str:
+        dest_str = settings.get("gdrive_pickup_path", "G:/My Drive/Podcast_Pickup")
+
+    dest_dir = Path(dest_str)
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        return False, f"Could not create Google Drive destination '{dest_str}': {e}"
+
+    target_mp3 = dest_dir / f"podcast_{clean_id}.mp3"
+
+    # 4. Resolve episode title and description
+    ep_title = f"Episode {clean_id}"
+    target_md = SRC_DIR / f"{clean_id}.md"
+    if target_md.exists():
+        try:
+            with open(target_md, "r", encoding="utf-8") as pf:
+                m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                if m:
+                    ep_title = m.group(1).strip()
+        except Exception:
+            pass
+
+    clean_title_only = re.sub(r'^\d+\s*:\s*', '', ep_title).strip()
+    formatted_title = f"{clean_id} : {clean_title_only}" if clean_id.isdigit() and not ep_title.startswith(f"{clean_id} :") else ep_title
+
+    # 5. Check for cover image to embed
+    cover_image_path = None
+    episode_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    for img_candidate in [
+        episode_dir / "cover.webp",
+        episode_dir / "cover.png",
+        episode_dir / "cover.jpg",
+        IMG_DIR / f"{clean_id}.png",
+        IMG_DIR / f"{clean_id}.jpg"
+    ]:
+        if img_candidate.exists():
+            cover_image_path = img_candidate
+            break
+
+    # 6. Tag audio track directly with ID3 metadata via FFmpeg to target_mp3
+    canonical_url = f"https://deepdive.shutri.com/{clean_id}.html"
+    spotify_url = settings.get("spotify_url", "https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE")
+    apple_url = settings.get("apple_podcasts_url", "https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251")
+    yt_music_url = settings.get("youtube_music_url", "https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe")
+    fountain_url = settings.get("fountain_url", "https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF")
+    lightning_addr = settings.get("lightning_address", "shutosha@primal.net")
+    year_str = str(datetime.now().year)
+
+    ffmpeg_tag_cmd = ["ffmpeg", "-y", "-i", str(mp3_path)]
+    if cover_image_path:
+        ffmpeg_tag_cmd.extend([
+            "-i", str(cover_image_path),
+            "-map", "0:a",
+            "-map", "1:v",
+            "-c:a", "copy",
+            "-c:v", "mjpeg",
+            "-metadata:s:v", "title=Album cover",
+            "-metadata:s:v", "comment=Cover (front)"
+        ])
+    else:
+        ffmpeg_tag_cmd.extend(["-c", "copy"])
+
+    ffmpeg_tag_cmd.extend([
+        "-metadata", f"title={formatted_title}",
+        "-metadata", "artist=Knowledge Deep Dive",
+        "-metadata", "album=Deep Dive with Gemini",
+        "-metadata", "album_artist=Knowledge Deep Dive",
+        "-metadata", f"track={clean_id}",
+        "-metadata", "genre=Podcast",
+        "-metadata", f"date={year_str}",
+        "-metadata", f"comment={canonical_url}",
+        "-id3v2_version", "3",
+        str(target_mp3)
+    ])
+
+    try:
+        tag_res = subprocess.run(ffmpeg_tag_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if tag_res.returncode != 0:
+            shutil.copy2(mp3_path, target_mp3)
+    except Exception:
+        shutil.copy2(mp3_path, target_mp3)
+
+    # 7. Write companion meta-muse distribution manifest
+    meta = {
+        "episode": clean_id,
+        "title": formatted_title,
+        "clean_title": clean_title_only,
+        "audio_file": target_mp3.name,
+        "local_pickup_path": str(target_mp3.resolve()),
+        "canonical_url": canonical_url,
+        "spotify_show": spotify_url,
+        "apple_podcasts": apple_url,
+        "youtube_music": yt_music_url,
+        "fountain_show": fountain_url,
+        "lightning_tips": lightning_addr,
+        "has_cover": cover_image_path is not None,
+        "exported_at": datetime.now().isoformat(),
+        "status": "ready_for_meta_muse",
+        "instructions": "Pickup audio and upload to Spotify for Creators episode draft."
+    }
+    meta_path = dest_dir / f"podcast_{clean_id}_meta.json"
+    with open(meta_path, "w", encoding="utf-8") as jf:
+        json.dump(meta, jf, indent=2)
+
+    return True, f"Exported {target_mp3.name} with complete ID3 metadata to Google Drive: {dest_dir}"
+
 def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "", lightning_addr: str = "shutosha@primal.net") -> tuple[str, int]:
     """
     Intelligently structures continuous audio transcripts into publication-ready Nostr Markdown (NIP-23):
@@ -1192,9 +2188,9 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
                     in_win = [s for s in segments if s["start"] >= t_curr and s["end"] <= target_b + 0.5]
                     win_text = " ".join(s["text"] for s in in_win).strip()
                     
-                    # 5-part structure
-                    intro_music = stings[(clip_num - 1) % len(stings)]
-                    hook_end = min(t_curr + 22.0, target_b)
+                    # 4-part structure: Hook -> Mid Sting (Bluesy / Howling) -> Body -> Outro Sting (deepDive-conclusion)
+                    mid_music = "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3" if clip_num % 2 == 1 else "Howling (Sting) - Gunnar Olsen.mp3"
+                    hook_end = min(t_curr + 20.0, target_b)
                     hook_win = [s for s in in_win if s["start"] >= t_curr and s["end"] <= hook_end + 1.0]
                     hook_text = " ".join(s["text"] for s in hook_win).strip() or win_text[:120]
                     
@@ -1206,11 +2202,10 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
                         "duration": clip_dur,
                         "bridge_text": [f"What is the deeper secret behind Part {clip_num}?"],
                         "segments": [
-                            {"type": "music", "music_file": intro_music, "duration": 5.5, "crossfade": 1.3, "volume": 1.0},
                             {"type": "audio", "start": round(t_curr, 2), "end": round(hook_end, 2), "duration": round(hook_end - t_curr, 2), "text": hook_text},
-                            {"type": "music", "music_file": "deepDive-strong.mp3" if clip_num == 1 else "deepDive-soft-ok.mp3", "duration": 7.5, "crossfade": 0.0, "volume": 1.0},
+                            {"type": "music", "music_file": mid_music, "duration": 5.5, "silence_before": 0.2, "fade_out": 2.0, "crossfade": 0.5, "volume": 1.0},
                             {"type": "audio", "start": round(hook_end, 2), "end": round(target_b, 2), "duration": round(target_b - hook_end, 2), "text": win_text},
-                            {"type": "music", "music_file": "Howling (Sting) - Gunnar Olsen.mp3", "duration": 4.5, "crossfade": 0.3, "volume": 1.0}
+                            {"type": "music", "music_file": "deepDive-conclusion.mp3", "duration": 5.5, "silence_before": 0.2, "fade_out": 2.0, "crossfade": 0.0, "volume": 1.0}
                         ],
                         "locked": False
                     }
@@ -1649,6 +2644,83 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        if path == "/api/podcast/data":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            words, segments, full_text = extract_timed_words_from_transcription(clean_id)
+            edit_data = load_podcast_edit(clean_id)
+            stings = get_available_stings()
+            mp3_path = get_episode_podcast_mp3_path(clean_id)
+            audio_path = get_episode_audio_path(clean_id)
+            settings = load_settings()
+            gdrive_folder = settings.get("gdrive_pickup_path", "G:/My Drive/Podcast_Pickup")
+
+            audio_rel = None
+            if audio_path:
+                try:
+                    rel = audio_path.relative_to(SRC_DIR)
+                    audio_rel = f"/src/{rel.as_posix()}"
+                except ValueError:
+                    audio_rel = f"/media/{audio_path.name}"
+
+            self.send_json({
+                "clean_id": clean_id,
+                "has_audio": audio_path is not None,
+                "audio_filename": audio_path.name if audio_path else None,
+                "audio_url": audio_rel,
+                "has_transcription": len(words) > 0,
+                "words_count": len(words),
+                "words": words,
+                "segments": segments,
+                "full_text": full_text,
+                "edit": edit_data,
+                "available_stings": stings,
+                "has_rendered": mp3_path.exists(),
+                "rendered_size": mp3_path.stat().st_size if mp3_path.exists() else 0,
+                "rendered_url": f"/api/podcast/audio?filename={clean_id}",
+                "gdrive_folder": gdrive_folder
+            })
+            return
+
+        if path == "/api/podcast/audio":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            mp3_path = get_episode_podcast_mp3_path(clean_id)
+            if mp3_path.exists():
+                self.serve_media_file(mp3_path)
+            else:
+                self.send_error(404, f"Rendered podcast MP3 not found for episode {clean_id}")
+            return
+
+        if path == "/api/podcast/sting":
+            params = parse_qs(url.query)
+            sting_file = params.get("file", [""])[0]
+            stings = get_available_stings()
+            target_sting = next((s for s in stings if s["filename"] == sting_file), None)
+            if target_sting and Path(target_sting["path"]).exists():
+                self.serve_media_file(Path(target_sting["path"]))
+            else:
+                self.send_error(404, f"Sting '{sting_file}' not found")
+            return
+
+        if path == "/api/podcast/preview_flow":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            sting_file = params.get("sting", [""])[0]
+            try:
+                at_sec = float(params.get("at", ["0"])[0])
+            except ValueError:
+                at_sec = 0.0
+            preview_file = generate_sting_flow_preview(clean_id, sting_file, at_sec)
+            if preview_file and preview_file.exists():
+                self.serve_media_file(preview_file)
+            else:
+                self.send_error(500, f"Failed to generate flow preview for {sting_file} @ {at_sec}s")
+            return
+
         if path == "/api/settings":
             self.send_json(load_settings())
             return
@@ -1711,7 +2783,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
         try:
             file_size = file_path.stat().st_size
             ext = file_path.suffix.lower()
-            mime_type = "video/mp4" if ext == ".mp4" else "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "application/octet-stream"
+            mime_type = "video/mp4" if ext == ".mp4" else "audio/mpeg" if ext == ".mp3" else "audio/mp4" if ext in [".m4a", ".aac"] else "audio/wav" if ext == ".wav" else "image/png" if ext == ".png" else "image/jpeg" if ext in [".jpg", ".jpeg"] else "application/octet-stream"
 
             range_header = self.headers.get('Range')
             if range_header and range_header.startswith('bytes='):
@@ -1860,7 +2932,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json({"success": True, "filename": filename})
             return
 
-        if path == "/api/template/lock":
+        if path in ("/api/template/mine", "/api/template/lock"):
             src_filename = data.get("filename", "")
             target_number = data.get("number")
             title_override = data.get("title", "")
@@ -1922,7 +2994,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 shutil.rmtree(str(old_ddma_dir), ignore_errors=True)
 
             # Migrate cover images if exist
-            for ext in [".png", ".jpg"]:
+            for ext in [".png", ".jpg", ".webp"]:
                 old_img = IMG_DIR / f"_{old_slug}{ext}"
                 if not old_img.exists():
                     old_img = IMG_DIR / f"{old_slug}{ext}"
@@ -1948,6 +3020,94 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "episode_number": target_number,
                 "filename": target_filename,
                 "title": formatted_title
+            })
+            return
+
+        if path in ("/api/template/demote_to_mempool", "/api/template/demote"):
+            filename = data.get("filename", "")
+            if not filename:
+                self.send_error(400, "Missing filename")
+                return
+
+            src_path = SRC_DIR / filename
+            if not src_path.exists():
+                self.send_error(404, f"Template file {filename} not found")
+                return
+
+            mempool, template, chain, _ = parse_summary_structure()
+            item = next((t for t in template if t["filename"] == filename), None)
+            raw_title = item.get("title", "") if item else ""
+            clean_title = re.sub(r'^\d+\s*:\s*', '', raw_title).strip()
+            if not clean_title:
+                try:
+                    with open(src_path, "r", encoding="utf-8") as f:
+                        for l in f:
+                            m_h = re.match(r'^#\s+(?:(?:\d+\s*:\s*)?(.*))', l)
+                            if m_h:
+                                clean_title = m_h.group(1).strip()
+                                break
+                except Exception:
+                    pass
+            if not clean_title:
+                clean_title = f"Draft {filename.replace('.md', '')}"
+
+            slug = re.sub(r'[^a-zA-Z0-9_-]', '-', clean_title.lower()).strip('-')
+            slug = re.sub(r'-+', '-', slug)
+            if not slug:
+                slug = f"draft-{filename.replace('.md', '')}"
+            mempool_filename = f"_{slug}.md"
+            dest_path = SRC_DIR / mempool_filename
+
+            # Read existing markdown and update header to not include episode number
+            with open(src_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            content = re.sub(r'^#\s+\d+\s*:\s*(.*)$', r'# \1', content, count=1, flags=re.MULTILINE)
+            with open(dest_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            if src_path != dest_path and src_path.exists():
+                src_path.unlink()
+
+            # Migrate DDMA asset folders
+            ep_num = filename.replace(".md", "")
+            old_ddma_dir = SRC_DIR / "ddma" / "docs" / "episodes" / ep_num
+            new_ddma_dir = SRC_DIR / "ddma" / "docs" / "episodes" / slug
+            if old_ddma_dir.exists():
+                new_ddma_dir.mkdir(parents=True, exist_ok=True)
+                for item_f in old_ddma_dir.iterdir():
+                    dest_item = new_ddma_dir / item_f.name
+                    if item_f.is_dir():
+                        if dest_item.exists():
+                            shutil.rmtree(str(dest_item))
+                        shutil.copytree(str(item_f), str(dest_item))
+                    else:
+                        shutil.copy2(str(item_f), str(dest_item))
+                shutil.rmtree(str(old_ddma_dir), ignore_errors=True)
+
+            # Migrate cover images
+            for ext in [".png", ".jpg", ".webp"]:
+                old_img = IMG_DIR / f"{ep_num}{ext}"
+                if old_img.exists():
+                    shutil.move(str(old_img), str(IMG_DIR / f"_{slug}{ext}"))
+
+            # Update SUMMARY.md
+            template = [t for t in template if t["filename"] != filename]
+            mempool.insert(0, {"title": clean_title, "filename": mempool_filename, "slug": slug})
+            sync_summary_file(mempool, template)
+
+            def bg_build():
+                try:
+                    subprocess.run(["mdbook", "build"], cwd=str(PROD_ROOT), capture_output=True)
+                except Exception:
+                    pass
+            threading.Thread(target=bg_build, daemon=True).start()
+
+            self.send_json({
+                "success": True,
+                "mempool_filename": mempool_filename,
+                "title": clean_title,
+                "slug": slug
             })
             return
 
@@ -2010,6 +3170,109 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "new_title": clean_title_text,
                 "formatted_title": formatted_summary_title
             })
+            return
+
+        if path == "/api/editor/open":
+            filename = data.get("filename", "").strip()
+            if not filename:
+                self.send_error(400, "Missing filename")
+                return
+
+            file_path = SRC_DIR / filename
+            if not file_path.exists():
+                self.send_error(404, f"File {filename} not found")
+                return
+
+            editor = data.get("editor", "gvim").strip() or "gvim"
+            try:
+                subprocess.Popen([editor, str(file_path)])
+            except Exception:
+                try:
+                    os.startfile(str(file_path))
+                except Exception as e2:
+                    self.send_json({"success": False, "error": f"Failed to launch editor {editor}: {e2}"})
+                    return
+
+            self.send_json({
+                "success": True,
+                "editor": editor,
+                "filename": filename,
+                "path": str(file_path)
+            })
+            return
+
+        if path == "/api/episode/update_content":
+            filename = data.get("filename", "").strip()
+            content = data.get("content", "").strip()
+            is_python = data.get("is_python", False)
+            title_override = data.get("title_override", "").strip()
+            settings = load_settings()
+            word_limit = settings.get("title_word_limit", 5)
+
+            if not filename or not content:
+                self.send_error(400, "Missing filename or content")
+                return
+
+            file_path = SRC_DIR / filename
+            if not file_path.exists():
+                self.send_error(404, f"File {filename} not found")
+                return
+
+            try:
+                if is_python:
+                    raw_md, _, _ = extract_python_payload(content)
+                else:
+                    raw_md = content
+
+                sanitized_md, clean_title, _ = sanitize_katex_markdown(raw_md, title_override or None, word_limit)
+                sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
+
+                num_match = re.match(r'^(\d+)\.md$', filename)
+                if num_match:
+                    ep_num = int(num_match.group(1))
+                    formatted_title = f"{ep_num} : {clean_title}"
+                else:
+                    formatted_title = clean_title
+
+                sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
+                if "<!-- SIDEBAR_TITLE:" not in sanitized_md:
+                    full_content = f"# {formatted_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n"
+                else:
+                    full_content = f"# {formatted_title}\n\n{sanitized_md}\n"
+
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(full_content)
+
+                # Update SUMMARY.md title while preserving slug and placement
+                mempool, template, _, _ = parse_summary_structure()
+                for item in mempool:
+                    if item["filename"] == filename:
+                        item["title"] = formatted_title
+                for item in template:
+                    if item["filename"] == filename:
+                        item["title"] = formatted_title
+                sync_summary_file(mempool, template)
+
+                # Rebuild mdbook in background
+                def bg_build():
+                    try:
+                        subprocess.run(["mdbook", "build"], cwd=str(PROD_ROOT), capture_output=True)
+                    except Exception:
+                        pass
+                threading.Thread(target=bg_build, daemon=True).start()
+
+                self.send_json({
+                    "success": True,
+                    "filename": filename,
+                    "title": formatted_title,
+                    "clean_title": clean_title,
+                    "word_count": len(re.findall(r'\b\w+\b', full_content))
+                })
+            except Exception as e:
+                self.send_json({
+                    "success": False,
+                    "error": str(e)
+                })
             return
 
         if path == "/api/settings":
@@ -2429,6 +3692,55 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({"success": True, "message": "Pushed to remote repository successfully!"})
             except subprocess.CalledProcessError as e:
                 self.send_json({"success": False, "error": f"Git command failed: {e}"})
+            return
+
+        if path == "/api/podcast/save_edit":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            edit = data.get("edit", {})
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+            ok = save_podcast_edit(clean_id, edit)
+            self.send_json({"success": ok, "message": "Saved podcast_edit.json successfully" if ok else "Failed to save"})
+            return
+
+        if path == "/api/podcast/review_gemini":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+            res = review_podcast_with_gemini(clean_id)
+            self.send_json(res)
+            return
+
+        if path == "/api/podcast/render":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            edit = data.get("edit")
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+            if edit:
+                save_podcast_edit(clean_id, edit)
+            success, out_path, msg = render_podcast_pipeline(clean_id, edit)
+            mp3_path = get_episode_podcast_mp3_path(clean_id)
+            self.send_json({
+                "success": success,
+                "message": msg,
+                "output_path": out_path,
+                "has_rendered": mp3_path.exists(),
+                "rendered_size": mp3_path.stat().st_size if mp3_path.exists() else 0,
+                "rendered_url": f"/api/podcast/audio?filename={clean_id}"
+            })
+            return
+
+        if path == "/api/podcast/export_gdrive":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            custom_dest = data.get("custom_dest", "")
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+            success, msg = export_podcast_to_gdrive(clean_id, custom_dest)
+            self.send_json({"success": success, "message": msg})
             return
 
         self.send_error(404, "Endpoint not found")

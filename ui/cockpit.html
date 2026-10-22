@@ -692,6 +692,244 @@
             background: #141417;
         }
 
+        /* Podcast Tab & Studio Styles */
+        .podcast-mode-switch {
+            display: flex;
+            align-items: center;
+            background: #f1f5f9;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 3px;
+            gap: 4px;
+            margin-bottom: 1.25rem;
+            width: fit-content;
+        }
+
+        .btn-mode-tab {
+            padding: 0.35rem 0.85rem;
+            font-size: 0.76rem;
+            font-weight: 600;
+            border-radius: 4px;
+            border: none;
+            background: transparent;
+            color: var(--text-dark-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-mode-tab.active {
+            background: #ffffff;
+            color: var(--text-dark-primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .podcast-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 0.65rem 0.85rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+        }
+
+        .podcast-search-box {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex: 1 1 320px;
+        }
+
+        .podcast-search-input {
+            width: 100%;
+            padding: 0.4rem 0.65rem;
+            font-size: 0.82rem;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            outline: none;
+            background: #f8fafc;
+        }
+
+        .podcast-search-input:focus {
+            background: #ffffff;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+        }
+
+        .search-match-badge {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: #64748b;
+            background: #f1f5f9;
+            padding: 0.2rem 0.45rem;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+
+        .podcast-action-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+
+        .podcast-metrics-strip {
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 0.45rem 0.85rem;
+            font-size: 0.76rem;
+            color: var(--text-dark-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .podcast-transcript-paper {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 1.75rem 2rem;
+            font-family: var(--font-serif);
+            font-size: 1.05rem;
+            line-height: 1.75;
+            color: var(--text-dark-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+            min-height: 420px;
+            user-select: text;
+        }
+
+        .tx-para {
+            margin-bottom: 1.25rem;
+        }
+
+        .tx-word {
+            display: inline-block;
+            cursor: pointer;
+            padding: 1px 1px;
+            border-radius: 2px;
+            transition: background 0.1s ease;
+        }
+
+        .tx-word:hover {
+            background: #e2e8f0;
+        }
+
+        .tx-word.tx-selected {
+            background: #bfdbfe;
+            color: #1e3a8a;
+        }
+
+        .tx-word.tx-cut {
+            text-decoration: line-through;
+            color: #b91c1c !important;
+            background: #fee2e2 !important;
+            opacity: 0.85;
+        }
+
+        .tx-word.tx-search-match {
+            background: #fde047 !important;
+            color: #854d0e !important;
+            font-weight: 700;
+        }
+
+        .tx-word.tx-search-current {
+            background: #fbbf24 !important;
+            outline: 2px solid #d97706 !important;
+        }
+
+        .tx-cut-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px dashed #f87171;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            margin: 0 0.3rem;
+            cursor: pointer;
+            user-select: none;
+            vertical-align: middle;
+        }
+
+        .tx-cut-pill:hover {
+            background: #fee2e2;
+            border-color: #ef4444;
+        }
+
+        .tx-sting-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: #eef2ff;
+            color: #4338ca;
+            border: 1px solid #c7d2fe;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            margin: 0.4rem 0.2rem;
+            cursor: default;
+            user-select: none;
+            vertical-align: middle;
+        }
+
+        .tx-sting-pill .btn-pill-remove {
+            cursor: pointer;
+            color: #6366f1;
+            font-weight: 900;
+            margin-left: 0.25rem;
+        }
+
+        .tx-sting-pill .btn-pill-remove:hover {
+            color: #ef4444;
+        }
+
+        .tx-sting-label:hover {
+            text-decoration: underline;
+        }
+
+        .flow-play-btn.playing {
+            background: #ef4444 !important;
+            color: #ffffff !important;
+            border-color: #dc2626 !important;
+        }
+
+        .gemini-rec-card {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-left: 3px solid #6366f1;
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .gemini-rec-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
         /* Media Tab Full View */
         .media-full-view {
             padding: 2rem 2.5rem 4rem;
@@ -1281,7 +1519,7 @@
         <!-- LEVEL 1: GLOBAL WORKFLOW PILLARS (RESEARCH TO REELS) -->
         <div class="middle-tab-switcher">
             <button class="btn-middle-tab active" id="tab-btn-research" onclick="switchMiddleTab('research')"><span>🔬</span> Research</button>
-            <button class="btn-middle-tab" id="tab-btn-narrative" onclick="switchMiddleTab('narrative')"><span>🎙️</span> Narrative</button>
+            <button class="btn-middle-tab" id="tab-btn-narrative" onclick="switchMiddleTab('narrative')"><span>🎙️</span> Podcast</button>
             <button class="btn-middle-tab" id="tab-btn-media" onclick="switchMiddleTab('media')"><span>🎬</span> Reels</button>
         </div>
 
@@ -1289,12 +1527,15 @@
             <!-- Episode Number Assignment (Auto-Calculated) -->
             <div class="ep-number-control">
                 <span class="ep-label">NEXT EP:</span>
-                <input type="text" class="ep-input" id="top-ep-num" value="# 247 (Auto)" readonly title="Auto-assigned when locked from Mempool into Template">
+                <input type="text" class="ep-input" id="top-ep-num" value="# 248 (Auto)" readonly title="Auto-assigned when mined from Mempool into Block Template">
             </div>
 
-            <!-- Ingest & Lock Action -->
-            <button class="btn-cmd primary" onclick="triggerMineLock()" id="btn-lock">
-                <span>⚡</span> Mine &amp; Lock
+            <!-- Mine from Mempool to Template -->
+            <button class="btn-cmd primary" onclick="triggerMine()" id="btn-lock" title="Mine selected Mempool draft into the Block Template">
+                <span>⚡</span> Mine
+            </button>
+            <button class="btn-cmd" onclick="triggerDemoteSelected()" id="btn-demote" style="display:none; color: #b45309; border-color: #fde68a; background: #fffbeb;" title="Demote selected template episode back to Mempool">
+                <span>↩</span> Return to Mempool
             </button>
 
             <!-- Settings -->
@@ -1341,7 +1582,19 @@
                 </div>
 
                 <!-- LEVEL 2 SUB-TOOLBAR: RESEARCH (WEB CHANNEL: MDBOOK · KATEX) -->
-                <div class="channel-actions" id="channel-actions-research" style="display: flex; align-items: center; gap: 0.5rem;">
+                <div class="channel-actions" id="channel-actions-research" style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <button class="btn-cmd" onclick="openInEditor()" id="btn-edit-gvim" title="Open active article directly in gVim editor">
+                        <span>✏️</span> Edit (gVim)
+                    </button>
+                    <button class="btn-cmd" onclick="triggerUpdatePython()" id="btn-update-py" title="Update active article research in place from a Python payload (.py) without changing slug">
+                        <span>🐍</span> Update .py
+                    </button>
+                    <button class="btn-cmd" onclick="triggerUpdateMarkdown()" id="btn-update-md" title="Update active article research in place from a Markdown file (.md) without changing slug">
+                        <span>📝</span> Update .md
+                    </button>
+                    <input type="file" id="input-update-py" accept=".py" style="display: none;" onchange="handleUpdatePyFile(event)">
+                    <input type="file" id="input-update-md" accept=".md" style="display: none;" onchange="handleUpdateMdFile(event)">
+
                     <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve">
                         <span>📖</span> mdserve (Local)
                     </button>
@@ -1355,10 +1608,24 @@
                     <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
 
-                <!-- LEVEL 2 SUB-TOOLBAR: NARRATIVE (SOCIAL CHANNEL: NOSTR NIP-23 · PROSE) -->
+                <!-- LEVEL 2 SUB-TOOLBAR: PODCAST GENERATION -->
                 <div class="channel-actions" id="channel-actions-narrative" style="display: none; align-items: center; gap: 0.5rem;">
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
+                    <button class="btn-cmd danger" id="btn-top-cut" onclick="cutSelectedWords()" disabled title="Cut selected speech from podcast (Del)">
+                        <span>✂️</span> Cut Speech
+                    </button>
+                    <button class="btn-cmd" id="btn-top-undo" onclick="undoLastCut()" disabled title="Undo last cut">
+                        <span>↩️</span> Undo
+                    </button>
+                    <button class="btn-cmd" id="btn-top-gemini" onclick="runGeminiReview()" title="Gemini Audio Director: Suggest stings & pacing">
+                        <span>🤖</span> Gemini Review
+                    </button>
+                    <button class="btn-cmd emerald" id="btn-top-render" onclick="renderPodcast()" title="Render Master Podcast (FFmpeg -16 LUFS)">
+                        <span>🎧</span> Render Podcast
+                    </button>
+                    <button class="btn-cmd" style="background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" id="btn-top-gdrive" onclick="exportToGoogleDrive()" title="Push podcast to Google Drive for meta-muse Spotify pickup">
+                        <span>📁</span> Push to Drive
+                    </button>
+                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshPodcastData()">Refresh</button>
                 </div>
 
                 <!-- LEVEL 2 SUB-TOOLBAR: REELS (VIDEO CHANNEL: DDMA 740x740 CLIPS) -->
@@ -1378,61 +1645,120 @@
                 </div>
             </div>
 
-            <!-- TAB 2: 🎙️ NARRATIVE (EDITORIAL NOSTR PUBLICATION + SPOKEN TRANSCRIPT MODES) -->
+            <!-- TAB 2: 🎙️ PODCAST GENERATION STUDIO & TRANSCRIPT EDITOR -->
             <div class="tab-view preview-content-scroll" id="tab-view-narrative">
-                <div class="paper-sheet" id="narrative-paper-sheet">
-                    <!-- Narrative Action Toolbar -->
-                    <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.6rem;">
-                        <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="AI Editorial Formatting Rules:
+                <!-- Mode Switcher: Podcast Studio vs Social Prose / Nostr -->
+                <div class="podcast-mode-switch">
+                    <button class="btn-mode-tab active" id="btn-submode-podcast" onclick="switchPodcastSubmode('podcast')">
+                        🎙️ Podcast Studio &amp; Cuts
+                    </button>
+                    <button class="btn-mode-tab" id="btn-submode-nostr" onclick="switchPodcastSubmode('nostr')">
+                        📝 Social Prose &amp; Nostr
+                    </button>
+                </div>
+
+                <!-- SUBMODE A: PODCAST STUDIO & CUTS -->
+                <div id="submode-view-podcast" style="display: block; width: 100%;">
+                    <!-- Sticky Search & Action Toolbar -->
+                    <div class="podcast-toolbar">
+                        <div class="podcast-search-box">
+                            <input type="text" id="tx-search-input" class="podcast-search-input" placeholder="🔍 Search transcript (e.g. 'let me rephrase', bloopers)..." oninput="handleTranscriptSearch(this.value)" onkeydown="if(event.key==='Enter') navigateSearch(event.shiftKey ? -1 : 1)">
+                            <button type="button" class="btn-cmd" style="padding: 0.35rem 0.55rem; font-size: 0.75rem;" onclick="navigateSearch(-1)" title="Previous match">◀</button>
+                            <button type="button" class="btn-cmd" style="padding: 0.35rem 0.55rem; font-size: 0.75rem;" onclick="navigateSearch(1)" title="Next match">▶</button>
+                            <span id="tx-search-count" class="search-match-badge" style="display: none;">0 of 0</span>
+                        </div>
+                        <div class="podcast-action-buttons">
+                            <button class="btn-cmd danger" id="btn-body-cut" onclick="cutSelectedWords()" disabled title="Cut highlighted speech (Del)">
+                                <span>✂️</span> Cut Selected Speech
+                            </button>
+                            <button class="btn-cmd" id="btn-body-undo" onclick="undoLastCut()" disabled title="Undo most recent cut">
+                                <span>↩️</span> Undo
+                            </button>
+                            <button class="btn-cmd" onclick="promptAddCustomSting()" title="Manually place a sting at cursor/timestamp">
+                                <span>🎵</span> + Add Sting
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Metrics & Timeline Strip -->
+                    <div class="podcast-metrics-strip">
+                        <span>⏱️ Raw Audio: <strong id="metric-source-dur">--:--</strong></span>
+                        <span>•</span>
+                        <span>✂️ Cuts: <strong id="metric-cuts-count">0</strong> (<span id="metric-cuts-dur" style="color: #dc2626;">-0.0s</span>)</span>
+                        <span>•</span>
+                        <span>🎵 Stings: <strong id="metric-stings-count">0</strong></span>
+                        <span>•</span>
+                        <span>🎙️ Master Podcast: <strong id="metric-final-dur">--:--</strong></span>
+                        <span>•</span>
+                        <span id="podcast-render-badge" style="font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px; background: #e2e8f0; color: #475569;">Not Rendered</span>
+                    </div>
+
+                    <!-- Main Interactive Transcript Surface -->
+                    <div id="podcast-transcript-paper" class="podcast-transcript-paper">
+                        <div style="padding: 3rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
+                            <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎙️</div>
+                            <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark-secondary);">Loading word-level timed transcript...</p>
+                            <p style="font-size: 0.82rem;">Upload NotebookLM audio or select an episode to view word-timed audio cuts.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SUBMODE B: SOCIAL PROSE & NOSTR (PRESERVED) -->
+                <div id="submode-view-nostr" style="display: none; width: 100%;">
+                    <div class="paper-sheet" id="narrative-paper-sheet">
+                        <!-- Narrative Action Toolbar -->
+                        <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.6rem;">
+                            <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="AI Editorial Formatting Rules:
 • Clean Grammar: Strips spoken conversational fillers (&quot;you know&quot;, &quot;right?&quot;), normalizes punctuation &amp; casing.
 • Semantic Structure: Injects thematic H2 section headings.
 • Bullet Lists: Converts verbal enumeration (&quot;First...&quot;, &quot;Second...&quot;) into clean bullet points.
 • Entity Bolding: Highlights core architectural entities &amp; concepts.
 • Promo Isolation: Quarantines sponsor/channel notes into callout blocks.
 • Multi-Platform Ready: Formats for Nostr, Substack, Medium, and LinkedIn.">
-                            <span>⚡</span> Format with AI
-                        </button>
-                        <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / gVim">
-                            <span>📟</span> Edit in Vim (.md)
-                        </button>
-                    </div>
+                                <span>⚡</span> Format with AI
+                            </button>
+                            <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / gVim">
+                                <span>📟</span> Edit in Vim (.md)
+                            </button>
+                        </div>
 
-                    <!-- H1 Header -->
-                    <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
+                        <!-- H1 Header -->
+                        <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
 
-                    <!-- Read-Only Rendered Narrative Body -->
-                    <div class="rendered-body" id="narrative-rendered-body">
-                        <p style="color: var(--text-dark-muted); font-style: italic;">No narrative transcript loaded for this episode. Upload audio and run Whisper, or paste content in the Audio Studio deck.</p>
-                    </div>
+                        <!-- Read-Only Rendered Narrative Body -->
+                        <div class="rendered-body" id="narrative-rendered-body">
+                            <p style="color: var(--text-dark-muted); font-style: italic;">No narrative transcript loaded for this episode. Upload audio and run Whisper, or paste content in the Audio Studio deck.</p>
+                        </div>
 
-                    <!-- Bottom Syndication and Sats Wallet -->
-                    <div id="narrative-bottom-syndication">
-                        <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
-                            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; font-family: var(--font-sans);">Tips and Donations</h3>
-                            <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
-                                If you enjoyed this research, consider supporting the project with a tip in <strong>Sats</strong>. It's a simple, global way to support independent research.
-                            </p>
-                            <div style="display: flex; justify-content: center; margin: 1rem 0;">
-                                <lightning-widget
-                                  name="Thanks for supporting the publication"
-                                  accent="#f9ce00"
-                                  to="shutosha@primal.net"
-                                  image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
-                                ></lightning-widget>
-                            </div>
-                            <div style="display: flex; gap: 0.6rem; justify-content: center; margin: 1.25rem 0; flex-wrap: wrap;">
-                                <a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">▶ Spotify</a>
-                                <a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">◈ Apple Podcasts</a>
-                                <a href="https://music.youtube.com" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⫸ YouTube Music</a>
-                                <a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⚡ Fountain.fm</a>
-                            </div>
-                            <p style="font-size: 0.75rem; color: var(--text-dark-muted); margin-top: 0.5rem;">
-                                To send Sats, you'll need a <a href="https://lightningaddress.com/" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline;">lightning wallet</a>.
-                            </p>
-                            <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed var(--border-light); font-size: 0.8rem; color: var(--text-dark-secondary);">
-                                🔬 Explore the full peer-reviewed research paper with mathematical proofs &amp; interactive models on:
-                                <br>
-                                <a href="https://deepdive.shutri.com/index.html" target="_blank" id="narrative-canonical-preview" style="color: var(--accent-amber-dark); font-weight: 600; text-decoration: underline; font-family: var(--font-mono); font-size: 0.75rem;">https://deepdive.shutri.com/index.html</a>
+                        <!-- Bottom Syndication and Sats Wallet -->
+                        <div id="narrative-bottom-syndication">
+                            <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
+                                <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; font-family: var(--font-sans);">Tips and Donations</h3>
+                                <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
+                                    If you enjoyed this research, consider supporting the project with a tip in <strong>Sats</strong>. It's a simple, global way to support independent research.
+                                </p>
+                                <div style="display: flex; justify-content: center; margin: 1rem 0;">
+                                    <lightning-widget
+                                      name="Thanks for supporting the publication"
+                                      accent="#f9ce00"
+                                      to="shutosha@primal.net"
+                                      image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
+                                    ></lightning-widget>
+                                </div>
+                                <div style="display: flex; gap: 0.6rem; justify-content: center; margin: 1.25rem 0; flex-wrap: wrap;">
+                                    <a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">▶ Spotify</a>
+                                    <a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">◈ Apple Podcasts</a>
+                                    <a href="https://music.youtube.com" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⫸ YouTube Music</a>
+                                    <a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⚡ Fountain.fm</a>
+                                </div>
+                                <p style="font-size: 0.75rem; color: var(--text-dark-muted); margin-top: 0.5rem;">
+                                    To send Sats, you'll need a <a href="https://lightningaddress.com/" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline;">lightning wallet</a>.
+                                </p>
+                                <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed var(--border-light); font-size: 0.8rem; color: var(--text-dark-secondary);">
+                                    🔬 Explore the full peer-reviewed research paper with mathematical proofs &amp; interactive models on:
+                                    <br>
+                                    <a href="https://deepdive.shutri.com/index.html" target="_blank" id="narrative-canonical-preview" style="color: var(--accent-amber-dark); font-weight: 600; text-decoration: underline; font-family: var(--font-mono); font-size: 0.75rem;">https://deepdive.shutri.com/index.html</a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1541,15 +1867,15 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: NARRATIVE DECK (AUDIO DROPZONE, PLAYER, WHISPER STT) -->
+            <!-- SECTION 2: PODCAST GENERATION DECK (AUDIO, WHISPER, GEMINI, GDRIVE) -->
             <div class="right-deck-section" id="right-deck-narrative">
-                <!-- Pillar Purpose: Narrative -->
-                <div class="deck-mission-card" style="border-left-color: #3b82f6;">
-                    <div class="deck-mission-title" style="color: #1d4ed8;">
-                        <span>🎙️</span> Editorial Long-Form Publishing
+                <!-- Pillar Purpose: Podcast & Narrative -->
+                <div class="deck-mission-card" style="border-left-color: #6366f1;">
+                    <div class="deck-mission-title" style="color: #4338ca;">
+                        <span>🎙️</span> Podcast Generation &amp; Distribution
                     </div>
                     <p class="deck-mission-desc">
-                        A narrative, accessible version of the research for long-form publishing on <strong>Nostr (NIP-23)</strong>, <strong>Substack</strong>, <strong>Medium</strong>, and <strong>LinkedIn Articles</strong> (integrations planned).
+                        Ingest NotebookLM audio, cut speech directly from the transcript, embed Gemini-curated music stings, and export to Google Drive for <strong>meta-muse</strong> (Spotify for Creators).
                     </p>
                 </div>
 
@@ -1601,7 +1927,94 @@
                     <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
                 </div>
 
-                <!-- 3. Nostr Long-Form Publication Pipeline (NIP-23) -->
+                <!-- 3. Gemini Musical Director & Pacing -->
+                <div class="audio-card" id="podcast-gemini-deck-card">
+                    <div class="studio-title" style="margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; color: #4338ca; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>🤖</span> Gemini Music Director
+                        </span>
+                        <span id="gemini-status-tag" style="font-size: 0.68rem; font-weight: 700; background: #e0e7ff; color: #4338ca; padding: 0.15rem 0.45rem; border-radius: 4px;">
+                            AI Pacing
+                        </span>
+                    </div>
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin-bottom: 0.6rem; line-height: 1.4;">
+                        Analyze transcript pacing to detect topic transitions and recommend music stings from <code>ddma/music/</code>.
+                    </p>
+                    <button class="btn-cmd" id="btn-trigger-gemini-deck" style="width: 100%; justify-content: center; padding: 0.5rem; margin-bottom: 0.6rem; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" onclick="runGeminiReview()">
+                        <span>⚡</span> Run Gemini Audio Review
+                    </button>
+
+                    <!-- 4 Signature Canonical Stings Quick Flow Deck -->
+                    <div style="margin-bottom: 0.6rem; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 0.5rem;">
+                        <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-dark-secondary); margin-bottom: 0.35rem; display: flex; justify-content: space-between; align-items: center;">
+                            <span>🎯 4 Canonical Stings</span>
+                            <span style="font-size: 0.62rem; color: #4f46e5; font-weight: 600;">0.2s Front / 2s Fade + 0.5s XFade</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
+                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('deepDive-strong.mp3', this)" title="Signature Intro Curtain Raiser">
+                                <span>🎺 deepDive-strong</span>
+                                <span style="font-size: 0.58rem; background: #e0e7ff; color: #3730a3; padding: 1px 3px; border-radius: 3px;">Intro</span>
+                            </button>
+                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3', this)" title="Reflective Technical Chapter">
+                                <span>🎷 Bluesy Vibes</span>
+                                <span style="font-size: 0.58rem; background: #fef3c7; color: #92400e; padding: 1px 3px; border-radius: 3px;">Reflect</span>
+                            </button>
+                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('Howling (Sting) - Gunnar Olsen.mp3', this)" title="Dynamic Driving Pivot">
+                                <span>🎸 Howling</span>
+                                <span style="font-size: 0.58rem; background: #fee2e2; color: #991b1b; padding: 1px 3px; border-radius: 3px;">Pivot</span>
+                            </button>
+                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('deepDive-conclusion.mp3', this)" title="Signature Show Outro Synthesis">
+                                <span>🎹 deepDive-concl.</span>
+                                <span style="font-size: 0.58rem; background: #d1fae5; color: #065f46; padding: 1px 3px; border-radius: 3px;">Outro</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="gemini-recs-container" style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 240px; overflow-y: auto;">
+                        <div style="font-size: 0.7rem; color: var(--text-dark-muted); text-align: center; font-style: italic; padding: 0.5rem 0;">
+                            No review recommendations yet. Click above to run Gemini review.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Master Podcast Render & Google Drive Sync -->
+                <div class="audio-card" id="podcast-export-deck-card">
+                    <div class="studio-title" style="margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>🎧</span> Master Podcast &amp; Spotify Export
+                        </span>
+                        <span id="podcast-deck-render-tag" style="font-size: 0.68rem; font-weight: 700; background: #d1fae5; color: #065f46; padding: 0.15rem 0.45rem; border-radius: 4px;">
+                            -16 LUFS
+                        </span>
+                    </div>
+
+                    <button class="btn-cmd emerald" id="btn-render-master-deck" style="width: 100%; justify-content: center; padding: 0.55rem; margin-bottom: 0.6rem;" onclick="renderPodcast()">
+                        <span>🎧</span> Render Master (-16 LUFS Podcast)
+                    </button>
+                    <div id="podcast-render-status-deck" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-bottom: 0.5rem;"></div>
+
+                    <!-- Master Audio Player -->
+                    <div id="podcast-master-player-wrap" style="display: none; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); margin-bottom: 0.25rem;" id="podcast-master-filename">podcast_output.mp3</div>
+                        <audio id="podcast-master-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
+                    </div>
+
+                    <!-- Google Drive Export for meta-muse -->
+                    <div style="border-top: 1px dashed var(--border-light); padding-top: 0.6rem;">
+                        <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); display: block; margin-bottom: 0.25rem;">
+                            📁 Google Drive Pickup Folder (for meta-muse):
+                        </label>
+                        <input type="text" id="gdrive-pickup-input" value="G:/My Drive/Podcast_Pickup" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.5rem; background: #ffffff;">
+                        <button class="btn-cmd" id="btn-export-gdrive-deck" style="width: 100%; justify-content: center; padding: 0.45rem; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" onclick="exportToGoogleDrive()">
+                            <span>📁</span> Push to Google Drive for meta-muse
+                        </button>
+                        <div id="gdrive-mempool-warning" style="display: none; font-size: 0.65rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.3rem 0.45rem; margin-top: 0.35rem; line-height: 1.35;">
+                            ⚠️ Episode is in Mempool. Click "⚡ Mine" to assign an episode number before pushing to Google Drive.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Nostr Long-Form Publication Pipeline (NIP-23) -->
                 <div class="audio-card" id="narrative-nostr-preview" style="display: none;">
                     <div class="studio-title" style="margin-bottom: 0.2rem;">
                         <span style="font-weight: 700; color: #3730a3; display: flex; align-items: center; gap: 0.35rem;">
@@ -1728,7 +2141,9 @@
             <div class="form-group">
                 <label class="form-label">1. Episode Draft Name / Slug &lt;name&gt;</label>
                 <input type="text" class="form-input" id="new-draft-slug" placeholder="e.g. qualia_gauge or universal_compression" value="universal_compression">
-                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-dark-muted);">Used in SUMMARY.md Mempool as: <code id="slug-preview-tag">- [universal_compression](_universal_compression.md)</code></span>
+                <div style="font-size: 0.72rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.45rem 0.6rem; margin-top: 0.35rem; line-height: 1.45;">
+                    <strong>⚠️ Permanent Primary Key:</strong> The slug is permanent once created and anchors all audio files, Whisper word-level transcripts, DDMA video reels, and Gemini music director work. It cannot be changed after creation. (Article titles can be freely updated anytime without affecting the slug).
+                </div>
             </div>
 
             <div class="form-group">
@@ -2090,8 +2505,9 @@ if __name__ == '__main__':
                         <div class="ep-card-meta">
                             <span class="ep-card-num"># ${item.number || item.slug}</span>
                             <div style="display: flex; align-items: center; gap: 0.3rem;">
-                                ${item.is_locked ? '<span style="font-size: 0.62rem; color: var(--accent-emerald); font-family: var(--font-mono);">Locked</span>' : ''}
+                                <span style="font-size: 0.62rem; color: var(--accent-indigo); font-family: var(--font-mono);">Mined</span>
                                 <button class="btn-edit-title-icon" onclick="event.stopPropagation(); startInlineEdit('${item.filename}', true)" title="Edit Summary Title">✏️</button>
+                                <button class="btn-edit-title-icon" onclick="event.stopPropagation(); demoteTemplateToMempool('${item.filename}', '${escapeHtml(item.title)}')" title="Demote episode back to Mempool">↩</button>
                             </div>
                         </div>
                         
@@ -2280,7 +2696,7 @@ if __name__ == '__main__':
             const titleEl = document.getElementById('right-pane-dynamic-title');
             if (titleEl) {
                 if (tabName === 'research') titleEl.innerHTML = '🔬 Research &amp; AST Inspector';
-                else if (tabName === 'narrative') titleEl.innerHTML = '🎙️ Audio Studio &amp; Whisper';
+                else if (tabName === 'narrative') titleEl.innerHTML = '🎙️ Podcast Generation Studio';
                 else if (tabName === 'media') titleEl.innerHTML = '🎬 DDMA Media Controller';
             }
 
@@ -2289,6 +2705,7 @@ if __name__ == '__main__':
                 updateResearchAstMetrics();
             } else if (tabName === 'narrative') {
                 syncNarrativeEditorViews();
+                syncPodcastStudio(selectedEpisode ? selectedEpisode.filename : '');
             } else if (tabName === 'media') {
                 loadDdmaStatus(selectedEpisode ? selectedEpisode.filename : '');
             }
@@ -2329,24 +2746,32 @@ if __name__ == '__main__':
                 if (mediaTitle) mediaTitle.innerText = `# ${cleanId} : ${titleOnly}`;
 
                 loadAudioStatus(data.filename);
+                syncPodcastStudio(data.filename);
                 updateResearchAstMetrics();
                 loadDdmaStatus(data.filename);
 
                 const stageTag = document.getElementById('current-stage-tag');
                 if (stageTag) {
+                    const lockBtn = document.getElementById('btn-lock');
+                    const demoteBtn = document.getElementById('btn-demote');
                     if (data.is_draft) {
                         stageTag.innerText = 'MEMPOOL DRAFT';
                         stageTag.style.background = '#fef3c7';
                         stageTag.style.color = '#92400e';
-                        const lockBtn = document.getElementById('btn-lock');
                         if (lockBtn) lockBtn.style.display = 'inline-flex';
+                        if (demoteBtn) demoteBtn.style.display = 'none';
                     } else {
                         stageTag.innerText = `TEMPLATE (${data.filename.replace('.md', '')})`;
                         stageTag.style.background = '#dbeafe';
                         stageTag.style.color = '#1e40af';
-                        const lockBtn = document.getElementById('btn-lock');
                         if (lockBtn) lockBtn.style.display = 'none';
+                        if (demoteBtn) demoteBtn.style.display = 'inline-flex';
                     }
+                }
+
+                const gdriveWarn = document.getElementById('gdrive-mempool-warning');
+                if (gdriveWarn) {
+                    gdriveWarn.style.display = data.is_draft ? 'block' : 'none';
                 }
 
                 renderMarkdownInPreview(data.content);
@@ -2553,6 +2978,759 @@ if __name__ == '__main__':
             }
         }
 
+        // ==========================================
+        // 🎙️ PODCAST GENERATION STUDIO JAVASCRIPT STATE & ENGINE
+        // ==========================================
+        let currentPodcastData = null;
+        let podcastSubmode = 'podcast';
+        let selectedWordRange = null;
+        let searchMatches = [];
+        let currentSearchMatchIdx = -1;
+
+        function switchPodcastSubmode(mode) {
+            podcastSubmode = mode;
+            const btnPod = document.getElementById('btn-submode-podcast');
+            const btnNostr = document.getElementById('btn-submode-nostr');
+            const viewPod = document.getElementById('submode-view-podcast');
+            const viewNostr = document.getElementById('submode-view-nostr');
+
+            if (mode === 'podcast') {
+                if (btnPod) btnPod.classList.add('active');
+                if (btnNostr) btnNostr.classList.remove('active');
+                if (viewPod) viewPod.style.display = 'block';
+                if (viewNostr) viewNostr.style.display = 'none';
+            } else {
+                if (btnPod) btnPod.classList.remove('active');
+                if (btnNostr) btnNostr.classList.add('active');
+                if (viewPod) viewPod.style.display = 'none';
+                if (viewNostr) viewNostr.style.display = 'block';
+            }
+        }
+
+        async function syncPodcastStudio(filename) {
+            const ep = selectedEpisode;
+            const targetFn = filename || ep?.filename;
+            if (!targetFn) return;
+
+            try {
+                const res = await fetch(`/api/podcast/data?filename=${encodeURIComponent(targetFn)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                currentPodcastData = data;
+
+                renderPodcastStudioView(data);
+                renderPodcastRightDeck(data);
+            } catch (err) {
+                console.error("Failed to load podcast data:", err);
+            }
+        }
+
+        function refreshPodcastData() {
+            if (selectedEpisode) {
+                syncPodcastStudio(selectedEpisode.filename);
+                showToast("Refreshing podcast data...");
+            }
+        }
+
+        function formatDuration(sec) {
+            if (!sec || isNaN(sec) || sec <= 0) return "00:00";
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        function renderPodcastStudioView(data) {
+            const paper = document.getElementById('podcast-transcript-paper');
+            if (!paper) return;
+
+            const words = data.words || [];
+            const edit = data.edit || { cuts: [], stings: [] };
+            const cuts = edit.cuts || [];
+            const stings = edit.stings || [];
+
+            let totalSourceDur = 0;
+            if (words.length > 0) {
+                totalSourceDur = words[words.length - 1].end;
+            }
+            let totalCutSecs = 0;
+            cuts.forEach(c => {
+                totalCutSecs += Math.max(0, (c.end - c.start));
+            });
+            const estFinalDur = Math.max(0, totalSourceDur - totalCutSecs);
+
+            const srcDurEl = document.getElementById('metric-source-dur');
+            if (srcDurEl) srcDurEl.innerText = formatDuration(totalSourceDur);
+
+            const cutsCountEl = document.getElementById('metric-cuts-count');
+            if (cutsCountEl) cutsCountEl.innerText = cuts.length;
+
+            const cutsDurEl = document.getElementById('metric-cuts-dur');
+            if (cutsDurEl) cutsDurEl.innerText = `-${totalCutSecs.toFixed(1)}s`;
+
+            const stingsCountEl = document.getElementById('metric-stings-count');
+            if (stingsCountEl) stingsCountEl.innerText = stings.length;
+
+            const finalDurEl = document.getElementById('metric-final-dur');
+            if (finalDurEl) finalDurEl.innerText = formatDuration(estFinalDur);
+
+            const renderBadge = document.getElementById('podcast-render-badge');
+            if (renderBadge) {
+                if (data.has_rendered) {
+                    renderBadge.style.background = '#d1fae5';
+                    renderBadge.style.color = '#065f46';
+                    renderBadge.innerText = `Rendered (${(data.rendered_size / 1024 / 1024).toFixed(1)} MB)`;
+                } else {
+                    renderBadge.style.background = '#e2e8f0';
+                    renderBadge.style.color = '#475569';
+                    renderBadge.innerText = 'Not Rendered';
+                }
+            }
+
+            const undoBtn = document.getElementById('btn-body-undo');
+            const topUndoBtn = document.getElementById('btn-top-undo');
+            if (undoBtn) undoBtn.disabled = cuts.length === 0;
+            if (topUndoBtn) topUndoBtn.disabled = cuts.length === 0;
+
+            if (words.length === 0) {
+                paper.innerHTML = `
+                    <div style="padding: 3rem 1rem; text-align: center; color: var(--text-dark-muted); font-style: italic;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎙️</div>
+                        <p style="margin-bottom: 0.5rem; font-weight: 600; color: var(--text-dark-secondary);">No acoustic transcript available yet.</p>
+                        <p style="font-size: 0.82rem;">Upload the NotebookLM original audio in the Audio Track card and click <strong>⚡ Transcribe Audio</strong>.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            let currentPara = [];
+            let lastSegmentId = -1;
+
+            function isWordCut(w) {
+                for (const c of cuts) {
+                    if (w.start >= (c.start - 0.05) && w.end <= (c.end + 0.05)) {
+                        return c;
+                    }
+                }
+                return null;
+            }
+
+            const sortedStings = [...stings].sort((a,b) => a.at - b.at);
+            const placedStingIds = new Set();
+
+            words.forEach((w, idx) => {
+                if ((w.segment_id !== lastSegmentId && currentPara.length >= 35) || currentPara.length >= 70) {
+                    html += `<div class="tx-para">${currentPara.join('')}</div>`;
+                    currentPara = [];
+                }
+                lastSegmentId = w.segment_id;
+
+                sortedStings.forEach(s => {
+                    const sid = s.id || ('sting_' + s.at + '_' + s.music_file);
+                    if (!placedStingIds.has(sid) && s.at <= w.start) {
+                        placedStingIds.add(sid);
+                        currentPara.push(`
+                            <span class="tx-sting-pill" title="Music sting plays here (speech ducked). Click to preview flow ±30s.">
+                                <span class="tx-sting-label" onclick="togglePlayFlowPreview('${escapeHtml(s.music_file)}', ${s.at}, this)" style="cursor: pointer;">🎧 🎵 ${escapeHtml(s.music_file)} @ ${s.at}s</span>
+                                <span class="btn-pill-remove" onclick="removeSting('${escapeHtml(sid)}')" title="Remove this sting">✕</span>
+                            </span>
+                        `);
+                    }
+                });
+
+                const cutObj = isWordCut(w);
+                if (cutObj) {
+                    currentPara.push(`<span class="tx-word tx-cut" data-idx="${idx}" data-start="${w.start}" data-end="${w.end}" data-cut-id="${escapeHtml(cutObj.id || '')}">${escapeHtml(w.word)} </span>`);
+                } else {
+                    currentPara.push(`<span class="tx-word" data-idx="${idx}" data-start="${w.start}" data-end="${w.end}">${escapeHtml(w.word)} </span>`);
+                }
+            });
+
+            // Append any remaining stings positioned at or beyond the last word
+            sortedStings.forEach(s => {
+                const sid = s.id || ('sting_' + s.at + '_' + s.music_file);
+                if (!placedStingIds.has(sid)) {
+                    placedStingIds.add(sid);
+                    currentPara.push(`
+                        <span class="tx-sting-pill" title="Music sting plays here (speech ducked). Click to preview flow ±30s.">
+                            <span class="tx-sting-label" onclick="togglePlayFlowPreview('${escapeHtml(s.music_file)}', ${s.at}, this)" style="cursor: pointer;">🎧 🎵 ${escapeHtml(s.music_file)} @ ${s.at}s</span>
+                            <span class="btn-pill-remove" onclick="removeSting('${escapeHtml(sid)}')" title="Remove this sting">✕</span>
+                        </span>
+                    `);
+                }
+            });
+
+            if (currentPara.length > 0) {
+                html += `<div class="tx-para">${currentPara.join('')}</div>`;
+            }
+
+            paper.innerHTML = html;
+            attachTranscriptSelectionHandlers();
+        }
+
+        function attachTranscriptSelectionHandlers() {
+            const paper = document.getElementById('podcast-transcript-paper');
+            if (!paper) return;
+
+            document.removeEventListener('selectionchange', handleTextSelectionChange);
+            document.addEventListener('selectionchange', handleTextSelectionChange);
+        }
+
+        function handleTextSelectionChange() {
+            const selection = window.getSelection();
+            const cutBtn = document.getElementById('btn-body-cut');
+            const topCutBtn = document.getElementById('btn-top-cut');
+
+            if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+                selectedWordRange = null;
+                if (cutBtn) cutBtn.disabled = true;
+                if (topCutBtn) topCutBtn.disabled = true;
+                return;
+            }
+
+            const range = selection.getRangeAt(0);
+            const container = document.getElementById('podcast-transcript-paper');
+            if (!container || !container.contains(range.commonAncestorContainer)) {
+                return;
+            }
+
+            const words = Array.from(container.querySelectorAll('.tx-word'));
+            const selectedWords = words.filter(wEl => selection.containsNode(wEl, true));
+
+            if (selectedWords.length > 0) {
+                const first = selectedWords[0];
+                const last = selectedWords[selectedWords.length - 1];
+                const startT = parseFloat(first.dataset.start);
+                const endT = parseFloat(last.dataset.end);
+                const text = selectedWords.map(w => w.innerText).join(' ').trim();
+
+                selectedWordRange = {
+                    start: startT,
+                    end: endT,
+                    text: text,
+                    count: selectedWords.length
+                };
+
+                if (cutBtn) {
+                    cutBtn.disabled = false;
+                    cutBtn.innerHTML = `<span>✂️</span> Cut Speech (${(endT - startT).toFixed(1)}s)`;
+                }
+                if (topCutBtn) {
+                    topCutBtn.disabled = false;
+                    topCutBtn.innerHTML = `<span>✂️</span> Cut (${(endT - startT).toFixed(1)}s)`;
+                }
+            } else {
+                selectedWordRange = null;
+                if (cutBtn) cutBtn.disabled = true;
+                if (topCutBtn) topCutBtn.disabled = true;
+            }
+        }
+
+        async function cutSelectedWords() {
+            if (!selectedWordRange || !currentPodcastData) return;
+            const edit = currentPodcastData.edit || { cuts: [], stings: [] };
+            edit.cuts = edit.cuts || [];
+
+            const newCut = {
+                id: 'cut_' + Date.now(),
+                start: selectedWordRange.start,
+                end: selectedWordRange.end,
+                text: selectedWordRange.text,
+                reason: 'manual_cut'
+            };
+
+            edit.cuts.push(newCut);
+            window.getSelection()?.removeAllRanges();
+            selectedWordRange = null;
+
+            showToast(`Cut ${(newCut.end - newCut.start).toFixed(1)}s of audio speech`);
+
+            await savePodcastEditToServer(edit);
+            renderPodcastStudioView(currentPodcastData);
+        }
+
+        async function undoLastCut() {
+            if (!currentPodcastData) return;
+            const edit = currentPodcastData.edit || { cuts: [], stings: [] };
+            if (!edit.cuts || edit.cuts.length === 0) return;
+
+            const removed = edit.cuts.pop();
+            showToast(`Restored cut: "${removed.text.slice(0, 30)}..."`);
+            await savePodcastEditToServer(edit);
+            renderPodcastStudioView(currentPodcastData);
+        }
+
+        async function removeSting(stingId) {
+            if (!currentPodcastData) return;
+            const edit = currentPodcastData.edit || { cuts: [], stings: [] };
+            edit.stings = (edit.stings || []).filter(s => {
+                if (s.id) return s.id !== stingId;
+                const legacyId = 'sting_' + s.at + '_' + s.music_file;
+                return legacyId !== stingId && s.music_file !== stingId;
+            });
+            showToast("Music sting removed");
+            await savePodcastEditToServer(edit);
+            renderPodcastStudioView(currentPodcastData);
+        }
+
+        async function promptAddCustomSting() {
+            if (!currentPodcastData) return;
+            const stings = currentPodcastData.available_stings || [];
+            if (stings.length === 0) {
+                showToast("No music stings found in ddma/music/");
+                return;
+            }
+            const stingNames = stings.map((s, i) => `${i + 1}. ${s.filename}`).join('\n');
+            const chosen = prompt(`Select a music sting:\n\n${stingNames}\n\nEnter number (1-${stings.length}):`, "1");
+            if (!chosen) return;
+            const idx = parseInt(chosen, 10) - 1;
+            if (idx < 0 || idx >= stings.length) return;
+
+            const timeStr = prompt("Enter timestamp in seconds to place this sting (e.g. 120.5):", "30.0");
+            if (!timeStr) return;
+            const timeVal = parseFloat(timeStr);
+            if (isNaN(timeVal) || timeVal < 0) return;
+
+            const edit = currentPodcastData.edit || { cuts: [], stings: [] };
+            edit.stings = edit.stings || [];
+            edit.stings.push({
+                id: 'sting_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                at: timeVal,
+                music_file: stings[idx].filename,
+                mode: 'overlay_duck',
+                duck_db: -14,
+                duration: 5.5
+            });
+
+            await savePodcastEditToServer(edit);
+            renderPodcastStudioView(currentPodcastData);
+            showToast(`Added sting: ${stings[idx].filename} @ ${timeVal}s`);
+        }
+
+        async function savePodcastEditToServer(editObj) {
+            if (!selectedEpisode) return;
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            try {
+                const res = await fetch('/api/podcast/save_edit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, edit: editObj })
+                });
+                if (res.ok) {
+                    if (currentPodcastData) currentPodcastData.edit = editObj;
+                }
+            } catch (e) {
+                console.error("Failed to save podcast edit:", e);
+            }
+        }
+
+        function handleTranscriptSearch(query) {
+            const container = document.getElementById('podcast-transcript-paper');
+            const countEl = document.getElementById('tx-search-count');
+            if (!container) return;
+
+            container.querySelectorAll('.tx-search-match, .tx-search-current').forEach(el => {
+                el.classList.remove('tx-search-match', 'tx-search-current');
+            });
+            searchMatches = [];
+            currentSearchMatchIdx = -1;
+
+            const q = query.trim().toLowerCase();
+            if (!q) {
+                if (countEl) countEl.style.display = 'none';
+                return;
+            }
+
+            const words = Array.from(container.querySelectorAll('.tx-word'));
+            words.forEach(wEl => {
+                if (wEl.innerText.toLowerCase().includes(q)) {
+                    wEl.classList.add('tx-search-match');
+                    searchMatches.push(wEl);
+                }
+            });
+
+            if (countEl) {
+                countEl.style.display = 'inline-block';
+                countEl.innerText = `${searchMatches.length} found`;
+            }
+
+            if (searchMatches.length > 0) {
+                navigateSearch(1);
+            }
+        }
+
+        function navigateSearch(direction) {
+            if (searchMatches.length === 0) return;
+            if (currentSearchMatchIdx >= 0 && currentSearchMatchIdx < searchMatches.length) {
+                searchMatches[currentSearchMatchIdx].classList.remove('tx-search-current');
+            }
+
+            currentSearchMatchIdx = (currentSearchMatchIdx + direction + searchMatches.length) % searchMatches.length;
+            const cur = searchMatches[currentSearchMatchIdx];
+            cur.classList.add('tx-search-current');
+            cur.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            const countEl = document.getElementById('tx-search-count');
+            if (countEl) {
+                countEl.innerText = `${currentSearchMatchIdx + 1} of ${searchMatches.length}`;
+            }
+        }
+
+        async function runGeminiReview() {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const statusTag = document.getElementById('gemini-status-tag');
+            const container = document.getElementById('gemini-recs-container');
+
+            if (statusTag) {
+                statusTag.style.background = '#fef3c7';
+                statusTag.style.color = '#92400e';
+                statusTag.innerText = 'Analyzing...';
+            }
+            if (container) {
+                container.innerHTML = '<div style="font-size: 0.72rem; color: var(--text-dark-secondary); text-align: center; padding: 1rem 0;">Analyzing pacing with Gemini...</div>';
+            }
+
+            try {
+                const res = await fetch('/api/podcast/review_gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast(data.error || "Gemini review failed");
+                    if (statusTag) {
+                        statusTag.style.background = '#fee2e2';
+                        statusTag.style.color = '#991b1b';
+                        statusTag.innerText = 'Review Failed';
+                    }
+                    return;
+                }
+
+                if (statusTag) {
+                    statusTag.style.background = '#d1fae5';
+                    statusTag.style.color = '#065f46';
+                    statusTag.innerText = `${(data.recommendations || []).length} Stings Suggested`;
+                }
+
+                renderGeminiRecommendations(data.recommendations || []);
+            } catch (err) {
+                showToast("Gemini review error: " + err.message);
+            }
+        }
+
+        let currentFlowAudio = null;
+        let currentFlowBtn = null;
+
+        function previewCanonicalFlow(stingFile, btnEl) {
+            if (!currentPodcastData) {
+                showToast("Please select an episode first");
+                return;
+            }
+            const words = currentPodcastData.words || [];
+            const segments = currentPodcastData.segments || [];
+            let totalDur = words.length > 0 ? words[words.length - 1].end : 600.0;
+
+            function findSentenceBoundary(targetT, windowSec = 40.0) {
+                let bestT = targetT;
+                let bestScore = -999;
+                for (let i = 0; i < segments.length; i++) {
+                    const s = segments[i];
+                    const endT = parseFloat(s.end || 0);
+                    if (Math.abs(endT - targetT) <= windowSec) {
+                        const txt = (s.text || '').trim();
+                        const isPunct = txt.endsWith('.') || txt.endsWith('?') || txt.endsWith('!');
+                        let pause = 0;
+                        if (i + 1 < segments.length) {
+                            pause = Math.max(0, parseFloat(segments[i+1].start || endT) - endT);
+                        }
+                        let score = (isPunct ? 15 : 0) + (pause >= 0.2 ? 5 : 0) - (Math.abs(endT - targetT) / windowSec) * 5;
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestT = endT;
+                        }
+                    }
+                }
+                return bestT;
+            }
+
+            let atSec = 30.0;
+            if (stingFile.includes('strong')) {
+                atSec = findSentenceBoundary(30.0, 25.0);
+            } else if (stingFile.includes('Bluesy')) {
+                atSec = findSentenceBoundary(totalDur * 0.35, 45.0);
+            } else if (stingFile.includes('Howling')) {
+                atSec = findSentenceBoundary(totalDur * 0.65, 45.0);
+            } else if (stingFile.includes('conclusion')) {
+                // Outro: ALWAYS at the very end of the speech track to conclude with music!
+                atSec = totalDur;
+            }
+            
+            togglePlayFlowPreview(stingFile, atSec, btnEl);
+        }
+
+        function togglePlayFlowPreview(stingFile, atSec, btnEl) {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+
+            if (currentFlowAudio && !currentFlowAudio.paused) {
+                currentFlowAudio.pause();
+                if (currentFlowBtn) {
+                    currentFlowBtn.innerHTML = currentFlowBtn.getAttribute('data-orig-html') || '🎧 Flow';
+                    currentFlowBtn.classList.remove('playing');
+                }
+                if (currentFlowBtn === btnEl) {
+                    currentFlowAudio = null;
+                    currentFlowBtn = null;
+                    return;
+                }
+            }
+
+            if (btnEl) {
+                if (!btnEl.getAttribute('data-orig-html')) {
+                    btnEl.setAttribute('data-orig-html', btnEl.innerHTML);
+                }
+                btnEl.innerHTML = '⏳ Mixing...';
+            }
+
+            const url = `/api/podcast/preview_flow?filename=${encodeURIComponent(cleanId)}&sting=${encodeURIComponent(stingFile)}&at=${encodeURIComponent(atSec)}`;
+            const audio = new Audio(url);
+            currentFlowAudio = audio;
+            currentFlowBtn = btnEl;
+
+            audio.onplay = () => {
+                if (btnEl) {
+                    btnEl.innerHTML = '⏹ Stop Flow';
+                    btnEl.classList.add('playing');
+                }
+            };
+
+            audio.onended = () => {
+                if (btnEl) {
+                    btnEl.innerHTML = btnEl.getAttribute('data-orig-html') || '🎧 Flow';
+                    btnEl.classList.remove('playing');
+                }
+                currentFlowAudio = null;
+                currentFlowBtn = null;
+            };
+
+            audio.onerror = (e) => {
+                console.error("Flow audio preview failed:", e);
+                showToast("Flow preview failed to generate");
+                if (btnEl) {
+                    btnEl.innerHTML = btnEl.getAttribute('data-orig-html') || '🎧 Flow';
+                    btnEl.classList.remove('playing');
+                }
+                currentFlowAudio = null;
+                currentFlowBtn = null;
+            };
+
+            audio.play().catch(e => {
+                console.error("Audio playback error:", e);
+                if (btnEl) {
+                    btnEl.innerHTML = btnEl.getAttribute('data-orig-html') || '🎧 Flow';
+                    btnEl.classList.remove('playing');
+                }
+            });
+        }
+
+        function renderGeminiRecommendations(recs) {
+            const container = document.getElementById('gemini-recs-container');
+            if (!container) return;
+
+            if (recs.length === 0) {
+                container.innerHTML = '<div style="font-size: 0.7rem; color: var(--text-dark-muted); text-align: center; font-style: italic; padding: 0.5rem 0;">No recommendations returned.</div>';
+                return;
+            }
+
+            let html = '';
+            recs.forEach((r, idx) => {
+                html += `
+                    <div class="gemini-rec-card">
+                        <div class="gemini-rec-header">
+                            <span style="color: #4338ca; font-weight: 700;">🎵 ${escapeHtml(r.music_file)}</span>
+                            <span style="color: var(--text-dark-muted); font-size: 0.68rem;">@ ${r.at}s</span>
+                        </div>
+                        <p style="font-size: 0.72rem; color: var(--text-dark-primary); margin: 0; line-height: 1.35;">${escapeHtml(r.reason || '')}</p>
+                        <div style="display: flex; gap: 0.35rem; margin-top: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            <button type="button" class="btn-cmd flow-play-btn" style="padding: 0.2rem 0.55rem; font-size: 0.68rem; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; font-weight: 600;" onclick="togglePlayFlowPreview('${escapeHtml(r.music_file)}', ${r.at}, this)" title="0.2s front silence | 2s sting fade out | 0.5s podcast crossfade">
+                                🎧 Play Flow
+                            </button>
+                            <button type="button" class="btn-cmd emerald" style="padding: 0.2rem 0.55rem; font-size: 0.68rem;" onclick="acceptGeminiSting(${JSON.stringify(r).replace(/"/g, '&quot;')})">
+                                + Accept
+                            </button>
+                            <button type="button" class="btn-sub" style="padding: 0.2rem 0.45rem; font-size: 0.65rem;" onclick="previewStingAudio('${escapeHtml(r.music_file)}')" title="Isolated sting audio only">
+                                Sting Only
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function previewStingAudio(stingFile) {
+            const audio = new Audio(`/api/podcast/sting?file=${encodeURIComponent(stingFile)}`);
+            audio.play().catch(e => console.error("Could not play sting:", e));
+        }
+
+        async function acceptGeminiSting(rec) {
+            if (!currentPodcastData) return;
+            const edit = currentPodcastData.edit || { cuts: [], stings: [] };
+            edit.stings = edit.stings || [];
+            
+            const exists = edit.stings.some(s => Math.abs(s.at - rec.at) < 1.0);
+            if (!exists) {
+                edit.stings.push({
+                    id: 'sting_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                    at: rec.at,
+                    music_file: rec.music_file,
+                    mode: rec.mode || 'overlay_duck',
+                    duck_db: rec.duck_db || -14,
+                    duration: rec.duration || 5.5
+                });
+                await savePodcastEditToServer(edit);
+                renderPodcastStudioView(currentPodcastData);
+                showToast(`Accepted sting: ${rec.music_file} @ ${rec.at}s`);
+            } else {
+                showToast("A sting is already placed at this timestamp");
+            }
+        }
+
+        async function renderPodcast() {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const statusEl = document.getElementById('podcast-render-status-deck');
+            const tagEl = document.getElementById('podcast-deck-render-tag');
+
+            if (statusEl) statusEl.innerText = "Slicing audio & applying Loudnorm (-16 LUFS)...";
+            if (tagEl) {
+                tagEl.style.background = '#fef3c7';
+                tagEl.style.color = '#92400e';
+                tagEl.innerText = 'Rendering...';
+            }
+
+            try {
+                const res = await fetch('/api/podcast/render', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, edit: currentPodcastData?.edit })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast(data.message || "Podcast rendering failed");
+                    if (statusEl) statusEl.innerText = "Error: " + (data.message || "Render failed");
+                    if (tagEl) {
+                        tagEl.style.background = '#fee2e2';
+                        tagEl.style.color = '#991b1b';
+                        tagEl.innerText = 'Failed';
+                    }
+                    return;
+                }
+
+                showToast(data.message);
+                if (statusEl) statusEl.innerText = `Render complete! (${(data.rendered_size / 1024 / 1024).toFixed(1)} MB)`;
+                if (tagEl) {
+                    tagEl.style.background = '#d1fae5';
+                    tagEl.style.color = '#065f46';
+                    tagEl.innerText = '-16 LUFS OK';
+                }
+
+                const wrap = document.getElementById('podcast-master-player-wrap');
+                const player = document.getElementById('podcast-master-audio-player');
+                const fnEl = document.getElementById('podcast-master-filename');
+                if (wrap && player) {
+                    wrap.style.display = 'block';
+                    player.src = `${data.rendered_url}&t=${Date.now()}`;
+                    if (fnEl) fnEl.innerText = `podcast_${cleanId}.mp3 (${(data.rendered_size / 1024 / 1024).toFixed(1)} MB)`;
+                }
+
+                syncPodcastStudio(cleanId);
+            } catch (err) {
+                showToast("Rendering error: " + err.message);
+            }
+        }
+
+        async function exportToGoogleDrive() {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            if (selectedEpisode.is_draft || selectedEpisode.filename.startsWith('_')) {
+                showToast("⚠️ Episode is in Mempool. Click '⚡ Mine' to assign an episode number before pushing to Google Drive!");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const inputEl = document.getElementById('gdrive-pickup-input');
+            const customDest = inputEl ? inputEl.value.trim() : '';
+
+            showToast("Tagging audio with ID3 metadata & exporting to Google Drive...");
+
+            try {
+                const res = await fetch('/api/podcast/export_gdrive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, custom_dest: customDest })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast("❌ " + (data.message || data.error || "Google Drive export failed"));
+                    return;
+                }
+                showToast("✅ " + data.message);
+            } catch (err) {
+                showToast("Google Drive export error: " + err.message);
+            }
+        }
+
+        function renderPodcastRightDeck(data) {
+            const playerWrap = document.getElementById('podcast-master-player-wrap');
+            const player = document.getElementById('podcast-master-audio-player');
+            const fnEl = document.getElementById('podcast-master-filename');
+            const tagEl = document.getElementById('podcast-deck-render-tag');
+            const statusEl = document.getElementById('podcast-render-status-deck');
+            const gdriveInput = document.getElementById('gdrive-pickup-input');
+
+            if (gdriveInput && data.gdrive_folder) {
+                gdriveInput.value = data.gdrive_folder;
+            }
+
+            if (data.has_rendered) {
+                if (playerWrap && player) {
+                    playerWrap.style.display = 'block';
+                    player.src = `${data.rendered_url}&t=${Date.now()}`;
+                    if (fnEl) fnEl.innerText = `podcast_${data.clean_id}.mp3 (${(data.rendered_size / 1024 / 1024).toFixed(1)} MB)`;
+                }
+                if (tagEl) {
+                    tagEl.style.background = '#d1fae5';
+                    tagEl.style.color = '#065f46';
+                    tagEl.innerText = '-16 LUFS OK';
+                }
+                if (statusEl) {
+                    statusEl.innerText = `Master MP3 ready (${(data.rendered_size / 1024 / 1024).toFixed(1)} MB)`;
+                }
+            } else {
+                if (playerWrap) playerWrap.style.display = 'none';
+                if (tagEl) {
+                    tagEl.style.background = '#e2e8f0';
+                    tagEl.style.color = '#475569';
+                    tagEl.innerText = 'Not Rendered';
+                }
+                if (statusEl) statusEl.innerText = 'Click Render Master to build with Loudnorm';
+            }
+        }
+
         function syncNarrativeEditorViews() {
             renderNarrativeTab(selectedEpisode, currentAudioData);
         }
@@ -2756,14 +3934,14 @@ if __name__ == '__main__':
             }
         }
 
-        async function triggerMineLock() {
+        async function triggerMine() {
             if (!selectedEpisode || !selectedEpisode.is_draft) {
-                showToast('Please select a Mempool draft to mine and lock!');
+                showToast('Please select a Mempool draft to mine!');
                 return;
             }
 
             const targetNum = currentStatus.next_episode_number;
-            const res = await fetch('/api/template/lock', {
+            const res = await fetch('/api/template/mine', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -2774,9 +3952,43 @@ if __name__ == '__main__':
 
             const data = await res.json();
             if (data.success) {
-                showToast(`⚡ Locked into Template as #${data.episode_number}!`);
+                showToast(`⚡ Mined into Block Template as #${data.episode_number}!`);
                 await fetchStatus();
                 loadEpisode(data.filename);
+            } else {
+                showToast(`Mining failed: ${data.error || 'Unknown error'}`);
+            }
+        }
+        const triggerMineLock = triggerMine;
+
+        async function triggerDemoteSelected() {
+            if (!selectedEpisode || selectedEpisode.is_draft) {
+                showToast('Please select an active Template episode to return to Mempool.');
+                return;
+            }
+            await demoteTemplateToMempool(selectedEpisode.filename, selectedEpisode.title || selectedEpisode.filename);
+        }
+
+        async function demoteTemplateToMempool(filename, title) {
+            if (!confirm(`Return "${title}" back to Mempool drafts?`)) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/template/demote_to_mempool', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ filename })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`↩ Returned to Mempool: ${data.mempool_filename}`);
+                    await fetchStatus();
+                    loadEpisode(data.mempool_filename);
+                } else {
+                    showToast(`Demote failed: ${data.error || 'Server error'}`);
+                }
+            } catch (err) {
+                showToast(`Error: ${err.message}`);
             }
         }
 
@@ -2848,6 +4060,116 @@ if __name__ == '__main__':
                 loadEpisode(selectedEpisode.filename, true);
                 showToast('Refreshed episode view');
             }
+        }
+
+        async function openInEditor() {
+            if (!selectedEpisode || !selectedEpisode.filename) {
+                showToast('Please select an active episode to edit');
+                return;
+            }
+            try {
+                const res = await fetch('/api/editor/open', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ filename: selectedEpisode.filename, editor: 'gvim' })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✏️ Opened in gVim: ${selectedEpisode.filename}`);
+                } else {
+                    showToast(`Editor launch failed: ${data.error || 'Check server'}`);
+                }
+            } catch (err) {
+                showToast(`Error: ${err.message}`);
+            }
+        }
+
+        function triggerUpdatePython() {
+            if (!selectedEpisode || !selectedEpisode.filename) {
+                showToast('Please select an active episode to update');
+                return;
+            }
+            const inp = document.getElementById('input-update-py');
+            if (inp) {
+                inp.value = '';
+                inp.click();
+            }
+        }
+
+        async function handleUpdatePyFile(event) {
+            const file = event.target.files[0];
+            if (!file || !selectedEpisode) return;
+            showToast(`Reading ${file.name}...`);
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const content = e.target.result;
+                try {
+                    const res = await fetch('/api/episode/update_content', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            filename: selectedEpisode.filename,
+                            content: content,
+                            is_python: true
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`✅ Updated research from ${file.name} (Slug & media preserved!)`);
+                        await fetchStatus();
+                        loadEpisode(selectedEpisode.filename);
+                    } else {
+                        showToast(`Update failed: ${data.error || 'Server error'}`);
+                    }
+                } catch (err) {
+                    showToast(`Update error: ${err.message}`);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function triggerUpdateMarkdown() {
+            if (!selectedEpisode || !selectedEpisode.filename) {
+                showToast('Please select an active episode to update');
+                return;
+            }
+            const inp = document.getElementById('input-update-md');
+            if (inp) {
+                inp.value = '';
+                inp.click();
+            }
+        }
+
+        async function handleUpdateMdFile(event) {
+            const file = event.target.files[0];
+            if (!file || !selectedEpisode) return;
+            showToast(`Reading ${file.name}...`);
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const content = e.target.result;
+                try {
+                    const res = await fetch('/api/episode/update_content', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            filename: selectedEpisode.filename,
+                            content: content,
+                            is_python: false
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`✅ Updated research from ${file.name} (Slug & media preserved!)`);
+                        await fetchStatus();
+                        loadEpisode(selectedEpisode.filename);
+                    } else {
+                        showToast(`Update failed: ${data.error || 'Server error'}`);
+                    }
+                } catch (err) {
+                    showToast(`Update error: ${err.message}`);
+                }
+            };
+            reader.readAsText(file);
         }
 
         function openModal(id) {
@@ -3040,6 +4362,10 @@ if __name__ == '__main__':
             if (!selectedEpisode) {
                 showToast('Please select an episode first');
                 return;
+            }
+            if (currentPodcastData && currentPodcastData.has_transcription) {
+                const proceed = confirm(`A word-level transcript already exists for this episode (${currentPodcastData.words_count} words).\n\nRe-transcribing will re-run Whisper and take several minutes. Are you sure you want to proceed?`);
+                if (!proceed) return;
             }
             const model = document.getElementById('whisper-model-select').value;
             const btn = document.getElementById('btn-transcribe');
