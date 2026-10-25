@@ -31,6 +31,9 @@ INGEST_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = INGEST_DIR.parent
 
 # Auto-discover canonical deepDive production workspace if running in sibling mdIngest
+
+# Global async background job tracker for long-form video rendering
+VIDEO_RENDER_JOBS = {}
 candidate_roots = [PROJECT_ROOT, PROJECT_ROOT.parent / "deepDive"]
 PROD_ROOT = next((r for r in candidate_roots if (r / "src" / "SUMMARY.md").exists() and (r / "src" / "SUMMARY.md").stat().st_size > 1000), PROJECT_ROOT)
 
@@ -630,6 +633,122 @@ def get_episode_podcast_edit_path(clean_id: str) -> Path:
 def get_episode_podcast_mp3_path(clean_id: str) -> Path:
     """Path to rendered master podcast MP3."""
     return get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp3"
+
+def get_episode_podcast_video_path(clean_id: str) -> Path:
+    """Path to rendered master podcast 1080p horizontal MP4."""
+    return get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp4"
+
+def render_podcast_video_pipeline(clean_id: str, preview_seconds: float = None, progress_callback = None) -> tuple[bool, str, str]:
+    """
+    Renders 1920x1080 horizontal motion graphics video podcast:
+    - Left 1080x1080: Dan Koe minimalist vector graphics
+    - Right 840x1080: Episode Identity, Live Word Karaoke Captions, and Progress
+    Returns (success: bool, path_or_err: str, message: str)
+    """
+    for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+        if d.exists() and str(d.resolve()) not in sys.path:
+            sys.path.insert(0, str(d.resolve()))
+    
+    try:
+        import importlib
+        import longform_video_engine as lve
+        importlib.reload(lve)
+        if hasattr(lve, 'wsi'):
+            importlib.reload(lve.wsi)
+    except ImportError as e:
+        return False, "", f"Failed to load longform_video_engine: {e}"
+
+    # 1. Locate Master Podcast Audio (rendered MP3 or source audio)
+    audio_path = get_episode_podcast_mp3_path(clean_id)
+    if not audio_path.exists():
+        audio_path = get_episode_audio_path(clean_id)
+    if not audio_path or not audio_path.exists():
+        return False, "", f"Audio not found for episode {clean_id}. Please render podcast audio first."
+
+    # 2. Locate Word-Level Transcription
+    trans_path = get_episode_transcription_json_path(clean_id)
+    if not trans_path or not trans_path.exists():
+        return False, "", f"Word-level transcription.json not found for episode {clean_id}."
+    
+    try:
+        with open(trans_path, "r", encoding="utf-8") as f:
+            trans_data = json.load(f)
+    except Exception as e:
+        return False, "", f"Error reading transcription.json: {e}"
+
+    # 3. Determine Episode Title
+    ep_title = f"Episode {clean_id}"
+    try:
+        mempool, template, chain, _ = parse_summary_structure()
+        all_items = mempool + template + chain
+        matching = next((it for it in all_items if it.get("filename") == f"{clean_id}.md" or str(it.get("number")) == clean_id), None)
+        if matching and matching.get("title"):
+            ep_title = matching["title"]
+    except Exception:
+        pass
+
+    # 4. Total Duration
+    total_dur = 0.0
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            total_dur = float(res.stdout.strip())
+    except Exception:
+        pass
+
+    # 5. Load Edit Specification and Map Timeline
+    edit_data = load_podcast_edit(clean_id)
+    mapped_trans, sting_intervals, mapped_dur = lve.map_timeline_with_stings_and_cuts(
+        transcription_data=trans_data,
+        edit_data=edit_data,
+        total_source_dur=total_dur
+    )
+    effective_dur = mapped_dur if mapped_dur > 0 else (total_dur or 3200.0)
+
+    # 6. Discover Episode Cover Art
+    cover_image_path = None
+    episode_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    for img_candidate in [
+        episode_dir / "cover.webp",
+        episode_dir / "cover.png",
+        episode_dir / "cover.jpg",
+        IMG_DIR / f"{clean_id}.png",
+        IMG_DIR / f"{clean_id}.jpg"
+    ]:
+        if img_candidate.exists():
+            cover_image_path = img_candidate
+            break
+
+    # 7. Plan Storyboard (Aligned to mapped timeline)
+    storyboard_cache = get_episode_podcast_dir(clean_id) / "podcast_video_storyboard.json"
+    scenes = lve.generate_longform_storyboard(
+        transcription_data=mapped_trans,
+        total_duration=effective_dur,
+        episode_title=ep_title,
+        cached_path=str(storyboard_cache)
+    )
+
+    out_mp4 = get_episode_podcast_video_path(clean_id)
+
+    try:
+        lve.render_horizontal_podcast_video(
+            scenes=scenes,
+            audio_path=str(audio_path),
+            transcription_data=trans_data,
+            out_mp4_path=str(out_mp4),
+            episode_num=clean_id,
+            episode_title=ep_title,
+            duration=effective_dur,
+            max_seconds=preview_seconds,
+            edit_data=edit_data,
+            cover_image_path=str(cover_image_path) if cover_image_path else None,
+            progress_callback=progress_callback
+        )
+        dur_desc = f"{int(preview_seconds)}s preview" if preview_seconds else "full episode"
+        return True, str(out_mp4), f"1080p Horizontal motion graphics video rendered successfully ({dur_desc})!"
+    except Exception as e:
+        return False, "", f"Video rendering failed: {e}"
 
 def get_episode_podcast_meta_path(clean_id: str) -> Path:
     """Path to meta-muse companion distribution manifest."""
@@ -1610,12 +1729,24 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
         except Exception as ex_cov:
             print(f"[EXPORT] Warning exporting cover image: {ex_cov}")
 
+    # 6.6 Copy MP4 video if present
+    video_path = get_episode_podcast_video_path(clean_id)
+    target_video_path = dest_dir / f"podcast_{clean_id}.mp4"
+    has_video_exported = False
+    if video_path.exists():
+        try:
+            shutil.copy2(video_path, target_video_path)
+            has_video_exported = True
+        except Exception as ex_vid:
+            print(f"[EXPORT] Warning copying video to Google Drive: {ex_vid}")
+
     # 7. Write companion meta-muse distribution manifest
     meta = {
         "episode": clean_id,
         "title": formatted_title,
         "clean_title": clean_title_only,
         "audio_file": target_mp3.name,
+        "video_file": target_video_path.name if has_video_exported else None,
         "cover_file": target_cover_path.name if has_cover_exported else None,
         "local_pickup_path": str(target_mp3.resolve()),
         "canonical_url": canonical_url,
@@ -1634,6 +1765,121 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
         json.dump(meta, jf, indent=2)
 
     return True, f"Exported {target_mp3.name} with complete ID3 metadata to Google Drive: {dest_dir}"
+
+def export_video_to_gdrive(clean_id: str, custom_dest: str = None) -> tuple[bool, str]:
+    """
+    Exports rendered 1080p horizontal podcast video and comprehensive video_meta.json
+    to dedicated Google Drive folder (default G:/My Drive/Podcast_Video_Pickup)
+    for YouTube, Spotify Video, and TikTok long-form distribution.
+    """
+    video_path = get_episode_podcast_video_path(clean_id)
+    if not video_path.exists():
+        return False, f"Video not found for episode {clean_id}. Please render the video master first."
+
+    default_dest = Path("G:/My Drive/Podcast_Video_Pickup")
+    dest_dir = Path(custom_dest.strip()) if custom_dest and custom_dest.strip() else default_dest
+
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        return False, f"Could not access or create Google Drive destination '{dest_dir}': {e}"
+
+    # Get episode details
+    mempool, template, chain, _ = parse_summary_structure()
+    all_items = mempool + template + chain
+    matching = next((it for it in all_items if it.get("filename") == f"{clean_id}.md" or str(it.get("number")) == clean_id), None)
+    ep_title = matching["title"] if matching and matching.get("title") else f"Episode {clean_id}"
+    clean_title_only = re.sub(r"^\d+\s*[:\-]\s*", "", ep_title).strip()
+    formatted_title = f"{clean_id} : {clean_title_only}" if clean_id.isdigit() else clean_title_only
+
+    # Probe duration
+    total_dur = 0.0
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(video_path)]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if res.returncode == 0 and res.stdout.strip():
+            total_dur = float(res.stdout.strip())
+    except Exception:
+        pass
+
+    target_video_path = dest_dir / f"podcast_{clean_id}.mp4"
+    try:
+        shutil.copy2(video_path, target_video_path)
+    except Exception as e:
+        return False, f"Failed copying video to Google Drive: {e}"
+
+    # Export thumbnail
+    target_thumb_path = dest_dir / f"podcast_{clean_id}_thumbnail.jpg"
+    has_thumb = False
+    episode_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
+    cover_image_path = None
+    for cand in [
+        episode_dir / "cover.webp",
+        episode_dir / "cover.png",
+        episode_dir / "cover.jpg",
+        IMG_DIR / f"{clean_id}.png",
+        IMG_DIR / f"{clean_id}.jpg"
+    ]:
+        if cand.exists():
+            cover_image_path = cand
+            break
+
+    if cover_image_path:
+        try:
+            cmd_thumb = [
+                "ffmpeg", "-y", "-i", str(cover_image_path),
+                "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black",
+                "-q:v", "2",
+                str(target_thumb_path)
+            ]
+            res_th = subprocess.run(cmd_thumb, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if res_th.returncode == 0 and target_thumb_path.exists():
+                has_thumb = True
+        except Exception:
+            pass
+
+    # Read article summary
+    summary_text = ""
+    md_file = SRC_DIR / f"{clean_id}.md"
+    if md_file.exists():
+        try:
+            with open(md_file, "r", encoding="utf-8") as f:
+                c_txt = f.read()
+                paras = [p.strip() for p in c_txt.split("\n\n") if p.strip() and not p.strip().startswith("#") and not p.strip().startswith("<!--")]
+                if paras:
+                    summary_text = paras[0][:400]
+        except Exception:
+            pass
+
+    size_mb = round(target_video_path.stat().st_size / (1024 * 1024), 1)
+    mins = int(total_dur // 60)
+    secs = int(total_dur % 60)
+
+    video_meta = {
+        "episode": clean_id,
+        "title": formatted_title,
+        "clean_title": clean_title_only,
+        "video_file": target_video_path.name,
+        "thumbnail_file": target_thumb_path.name if has_thumb else None,
+        "file_size_mb": size_mb,
+        "resolution": "1920x1080",
+        "aspect_ratio": "16:9",
+        "duration_seconds": round(total_dur, 2),
+        "duration_formatted": f"{mins:02d}:{secs:02d}",
+        "canonical_url": f"https://deepdive.shutri.com/{clean_id}.html",
+        "distribution_targets": ["YouTube", "Spotify Video", "TikTok Long-Form"],
+        "description": summary_text,
+        "status": "ready_for_video_distribution",
+        "exported_at": datetime.now().isoformat(),
+        "instructions": "Distribute 1080p video podcast to YouTube Channel, Spotify for Creators Video, and TikTok."
+    }
+
+    meta_path = dest_dir / f"podcast_{clean_id}_video_meta.json"
+    with open(meta_path, "w", encoding="utf-8") as jf:
+        json.dump(video_meta, jf, indent=2)
+
+    return True, f"Exported {target_video_path.name} ({size_mb} MB) and video_meta.json to {dest_dir}"
+
 
 def smart_streamline_narrative(raw_text: str, title: str = "", ep_num: str = "", lightning_addr: str = "shutosha@primal.net") -> tuple[str, int]:
     """
@@ -2701,6 +2947,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "has_rendered": mp3_path.exists(),
                 "rendered_size": mp3_path.stat().st_size if mp3_path.exists() else 0,
                 "rendered_url": f"/api/podcast/audio?filename={clean_id}",
+                "has_video": get_episode_podcast_video_path(clean_id).exists(),
+                "video_size": get_episode_podcast_video_path(clean_id).stat().st_size if get_episode_podcast_video_path(clean_id).exists() else 0,
+                "video_url": f"/api/podcast/video?filename={clean_id}",
                 "gdrive_folder": gdrive_folder
             })
             return
@@ -2714,6 +2963,52 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.serve_media_file(mp3_path)
             else:
                 self.send_error(404, f"Rendered podcast MP3 not found for episode {clean_id}")
+            return
+
+        if path == "/api/podcast/video_render_status":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            job = VIDEO_RENDER_JOBS.get(clean_id)
+            mp4_path = get_episode_podcast_video_path(clean_id)
+            has_mp4 = mp4_path.exists()
+            mp4_size = mp4_path.stat().st_size if has_mp4 else 0
+
+            if job:
+                resp = {
+                    "status": job.get("status", "idle"),
+                    "progress_pct": job.get("progress_pct", 0),
+                    "elapsed_seconds": job.get("elapsed_seconds", 0),
+                    "eta_seconds": job.get("eta_seconds", 0),
+                    "message": job.get("message", ""),
+                    "error": job.get("error"),
+                    "has_video": has_mp4,
+                    "video_size": mp4_size,
+                    "video_url": f"/api/podcast/video?filename={clean_id}"
+                }
+            else:
+                resp = {
+                    "status": "ready" if has_mp4 else "idle",
+                    "progress_pct": 100 if has_mp4 else 0,
+                    "elapsed_seconds": 0,
+                    "eta_seconds": 0,
+                    "message": "Video master ready" if has_mp4 else "Not rendered",
+                    "has_video": has_mp4,
+                    "video_size": mp4_size,
+                    "video_url": f"/api/podcast/video?filename={clean_id}"
+                }
+            self.send_json(resp)
+            return
+
+        if path == "/api/podcast/video":
+            params = parse_qs(url.query)
+            fn = params.get("filename", [""])[0]
+            clean_id = fn.replace(".md", "").lstrip("_")
+            mp4_path = get_episode_podcast_video_path(clean_id)
+            if mp4_path.exists():
+                self.serve_media_file(mp4_path)
+            else:
+                self.send_error(404, f"Rendered podcast MP4 not found for episode {clean_id}")
             return
 
         if path == "/api/podcast/sting":
@@ -2841,6 +3136,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', mime_type)
                 self.send_header('Content-Length', str(file_size))
                 self.send_header('Accept-Ranges', 'bytes')
+                self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Expires', '0')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
 
@@ -3755,6 +4053,102 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
             return
 
+        if path == "/api/podcast/render_video":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            preview_seconds = data.get("preview_seconds")
+            if preview_seconds is not None:
+                try:
+                    preview_seconds = float(preview_seconds)
+                except Exception:
+                    preview_seconds = None
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+
+            current_job = VIDEO_RENDER_JOBS.get(clean_id)
+            if current_job and current_job.get("status") == "rendering":
+                self.send_json({
+                    "success": True,
+                    "status": "rendering",
+                    "message": "Video render is already running in background",
+                    "progress_pct": current_job.get("progress_pct", 0)
+                })
+                return
+
+            VIDEO_RENDER_JOBS[clean_id] = {
+                "status": "rendering",
+                "progress_pct": 0,
+                "current_time": 0.0,
+                "total_duration": 0.0,
+                "started_at": time.time(),
+                "elapsed_seconds": 0,
+                "eta_seconds": 0,
+                "message": "Initializing 1080p video render in background...",
+                "error": None,
+                "preview_seconds": preview_seconds
+            }
+
+            def _bg_video_worker(c_id, p_secs):
+                def _prog_cb(pct, cur_t, tot_dur):
+                    if c_id in VIDEO_RENDER_JOBS:
+                        j = VIDEO_RENDER_JOBS[c_id]
+                        j["progress_pct"] = pct
+                        j["current_time"] = cur_t
+                        j["total_duration"] = tot_dur
+                        elapsed = time.time() - j["started_at"]
+                        j["elapsed_seconds"] = int(elapsed)
+                        if pct > 0:
+                            total_est = (elapsed / pct) * 100
+                            j["eta_seconds"] = max(0, int(total_est - elapsed))
+                        else:
+                            j["eta_seconds"] = 0
+                        mins_e = int(elapsed // 60)
+                        secs_e = int(elapsed % 60)
+                        eta_m = int(j["eta_seconds"] // 60)
+                        eta_s = int(j["eta_seconds"] % 60)
+                        j["message"] = f"Rendering {pct}% • {mins_e:02d}:{secs_e:02d} elapsed • ETA {eta_m:02d}:{eta_s:02d}"
+
+                try:
+                    ok, out_p, msg_text = render_podcast_video_pipeline(
+                        c_id,
+                        preview_seconds=p_secs,
+                        progress_callback=_prog_cb
+                    )
+                    v_path = get_episode_podcast_video_path(c_id)
+                    f_sz = v_path.stat().st_size if v_path.exists() else 0
+                    if ok:
+                        VIDEO_RENDER_JOBS[c_id].update({
+                            "status": "ready",
+                            "progress_pct": 100,
+                            "message": msg_text,
+                            "rendered_path": str(out_p),
+                            "rendered_size": f_sz,
+                            "error": None
+                        })
+                    else:
+                        VIDEO_RENDER_JOBS[c_id].update({
+                            "status": "error",
+                            "error": msg_text,
+                            "message": msg_text
+                        })
+                except Exception as ex:
+                    VIDEO_RENDER_JOBS[c_id].update({
+                        "status": "error",
+                        "error": str(ex),
+                        "message": f"Render failed: {ex}"
+                    })
+
+            th = threading.Thread(target=_bg_video_worker, args=(clean_id, preview_seconds), daemon=True)
+            th.start()
+
+            self.send_json({
+                "success": True,
+                "status": "rendering",
+                "message": f"Video render started in background ({'60s preview' if preview_seconds else 'full 54m episode'})",
+                "progress_pct": 0
+            })
+            return
+
         if path == "/api/podcast/export_gdrive":
             clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
             custom_dest = data.get("custom_dest", "")
@@ -3762,6 +4156,16 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({"success": False, "error": "clean_id is required"}, status=400)
                 return
             success, msg = export_podcast_to_gdrive(clean_id, custom_dest)
+            self.send_json({"success": success, "message": msg})
+            return
+
+        if path == "/api/podcast/export_gdrive_video":
+            clean_id = data.get("clean_id", "").replace(".md", "").lstrip("_")
+            custom_dest = data.get("custom_dest", "")
+            if not clean_id:
+                self.send_json({"success": False, "error": "clean_id is required"}, status=400)
+                return
+            success, msg = export_video_to_gdrive(clean_id, custom_dest)
             self.send_json({"success": success, "message": msg})
             return
 

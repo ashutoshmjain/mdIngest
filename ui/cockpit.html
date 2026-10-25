@@ -1622,6 +1622,12 @@
                     <button class="btn-cmd emerald" id="btn-top-render" onclick="renderPodcast()" title="Render Master Podcast (FFmpeg -16 LUFS)">
                         <span>🎧</span> Render Podcast
                     </button>
+                    <button class="btn-cmd" style="background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; font-weight: 700;" id="btn-top-render-full-video" onclick="renderVideoPodcast('full')" title="Render Full 1080p Horizontal Video (54m) for YouTube & Spotify Video">
+                        <span>🎬</span> Render Full Video
+                    </button>
+                    <button class="btn-cmd" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1; font-size: 0.74rem;" id="btn-top-render-preview-video" onclick="renderVideoPodcast('preview')" title="Render Quick 60s Test Preview (~10s render time)">
+                        <span>⚡</span> 60s Preview
+                    </button>
                     <button class="btn-cmd" style="background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" id="btn-top-gdrive" onclick="exportToGoogleDrive()" title="Push podcast to Google Drive for meta-muse Spotify pickup">
                         <span>📁</span> Push to Drive
                     </button>
@@ -1977,19 +1983,23 @@
                     </div>
                 </div>
 
-                <!-- 4. Master Podcast Render & Google Drive Sync -->
+                <!-- 4A. Master Podcast Audio & Spotify Export -->
                 <div class="audio-card" id="podcast-export-deck-card">
                     <div class="studio-title" style="margin-bottom: 0.5rem;">
                         <span style="font-weight: 700; color: #065f46; display: flex; align-items: center; gap: 0.35rem;">
-                            <span>🎧</span> Master Podcast &amp; Spotify Export
+                            <span>🎧</span> Master Podcast Audio &amp; Spotify Export
                         </span>
                         <span id="podcast-deck-render-tag" style="font-size: 0.68rem; font-weight: 700; background: #d1fae5; color: #065f46; padding: 0.15rem 0.45rem; border-radius: 4px;">
                             -16 LUFS
                         </span>
                     </div>
 
-                    <button class="btn-cmd emerald" id="btn-render-master-deck" style="width: 100%; justify-content: center; padding: 0.55rem; margin-bottom: 0.6rem;" onclick="renderPodcast()">
-                        <span>🎧</span> Render Master (-16 LUFS Podcast)
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0 0 0.5rem 0; line-height: 1.35;">
+                        Audio mastering with non-destructive cuts &amp; music stings for Brownie &amp; Spotify for Creators.
+                    </p>
+
+                    <button class="btn-cmd emerald" id="btn-render-master-deck" style="width: 100%; justify-content: center; padding: 0.55rem; margin-bottom: 0.5rem;" onclick="renderPodcast()">
+                        <span>🎧</span> Render Master (-16 LUFS Audio)
                     </button>
                     <div id="podcast-render-status-deck" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-bottom: 0.5rem;"></div>
 
@@ -1999,14 +2009,14 @@
                         <audio id="podcast-master-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
                     </div>
 
-                    <!-- Google Drive Export for meta-muse -->
-                    <div style="border-top: 1px dashed var(--border-light); padding-top: 0.6rem;">
+                    <!-- Google Drive Export for meta-muse (Audio) -->
+                    <div style="border-top: 1px dashed var(--border-light); padding-top: 0.5rem;">
                         <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); display: block; margin-bottom: 0.25rem;">
-                            📁 Google Drive Pickup Folder (for meta-muse):
+                            📁 Audio Pickup Folder (for Brownie / Spotify):
                         </label>
-                        <input type="text" id="gdrive-pickup-input" value="G:/My Drive/Podcast_Pickup" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.5rem; background: #ffffff;">
+                        <input type="text" id="gdrive-pickup-input" value="G:/My Drive/Podcast_Pickup" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.4rem; background: #ffffff;">
                         <button class="btn-cmd" id="btn-export-gdrive-deck" style="width: 100%; justify-content: center; padding: 0.45rem; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" onclick="exportToGoogleDrive()">
-                            <span>📁</span> Push to Google Drive for meta-muse
+                            <span>📁</span> Push Audio to Google Drive
                         </button>
                         <div id="gdrive-mempool-warning" style="display: none; font-size: 0.65rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.3rem 0.45rem; margin-top: 0.35rem; line-height: 1.35;">
                             ⚠️ Episode is in Mempool. Click "⚡ Mine" to assign an episode number before pushing to Google Drive.
@@ -2014,7 +2024,69 @@
                     </div>
                 </div>
 
-                <!-- 5. Nostr Long-Form Publication Pipeline (NIP-23) -->
+                <!-- 4B. Dedicated Long-Form Video Master Deck -->
+                <div class="audio-card" id="podcast-video-deck-card" style="border-left: 3px solid #8b5cf6;">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span style="font-weight: 700; color: #6d28d9; display: flex; align-items: center; gap: 0.35rem;">
+                            <span>🎬</span> Long-Form Video Master
+                        </span>
+                        <span style="font-size: 0.68rem; font-weight: 700; background: #ede9fe; color: #6d28d9; padding: 0.15rem 0.45rem; border-radius: 4px;">
+                            1080p Horizontal
+                        </span>
+                    </div>
+
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0 0 0.5rem 0; line-height: 1.35;">
+                        Full 1920×1080 motion graphics video for YouTube, Spotify Video &amp; TikTok. Features Dan Koe vector animations, borderless karaoke subtitles, alternating screen layouts, and cover art chapter interludes.
+                    </p>
+
+                    <div style="display: flex; gap: 0.4rem; margin-bottom: 0.5rem;">
+                        <button class="btn-cmd" id="btn-render-full-video-deck" style="flex: 2; justify-content: center; padding: 0.55rem; background: #6d28d9; color: #ffffff; border-color: #5b21b6; font-weight: 700;" onclick="renderVideoPodcast('full')" title="Render Complete 1080p Horizontal Motion Graphics Video (54m)">
+                            <span>🎬</span> Render Full Video
+                        </button>
+                        <button class="btn-cmd" id="btn-render-preview-video-deck" style="flex: 1; justify-content: center; padding: 0.55rem; background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; font-size: 0.72rem;" onclick="renderVideoPodcast('preview')" title="Render Quick 60s Test Preview (~10s render time)">
+                            <span>⚡</span> 60s Preview
+                        </button>
+                    </div>
+                                        <div id="podcast-video-status-deck" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-bottom: 0.5rem;"></div>
+
+                    <!-- Live Dynamic Render Progress Bar (Preserved Across Page Refreshes) -->
+                    <div id="podcast-video-progress-wrap" style="display: none; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 0.55rem 0.65rem; margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <span id="podcast-video-progress-label" style="font-size: 0.7rem; font-weight: 700; color: #6d28d9;">Rendering Full Video...</span>
+                            <span id="podcast-video-progress-pct" style="font-size: 0.75rem; font-family: var(--font-mono); font-weight: 800; color: #7c3aed;">0%</span>
+                        </div>
+                        <div style="width: 100%; height: 7px; background: #ede9fe; border-radius: 4px; overflow: hidden; margin-bottom: 0.35rem;">
+                            <div id="podcast-video-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #8b5cf6, #6d28d9); transition: width 0.3s ease;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.65rem; color: #6d28d9;">
+                            <span id="podcast-video-elapsed">⏱️ Elapsed: 00:00</span>
+                            <span id="podcast-video-eta">⏳ ETA: Calculating...</span>
+                        </div>
+                    </div>
+
+                    <!-- Master Video Player (1080p Horizontal) -->
+                    <div id="podcast-video-master-player-wrap" style="display: none; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 0.5rem; margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                            <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary);" id="podcast-video-master-filename">podcast_video.mp4</div>
+                            <span style="font-size: 0.65rem; background: #ede9fe; color: #6d28d9; padding: 0.1rem 0.35rem; border-radius: 4px; font-weight: 700;">1080p Horizontal</span>
+                        </div>
+                        <video id="podcast-video-master-player" style="width: 100%; aspect-ratio: 16/9; border-radius: 4px; background: #000;" controls preload="metadata"></video>
+                    </div>
+
+                    <!-- Google Drive Pickup for Video Distribution -->
+                    <div style="border-top: 1px dashed var(--border-light); padding-top: 0.5rem;">
+                        <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); display: block; margin-bottom: 0.25rem;">
+                            📁 Video Pickup Folder (for YouTube / Video Pipeline):
+                        </label>
+                        <input type="text" id="gdrive-video-pickup-input" value="G:/My Drive/Podcast_Video_Pickup" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.4rem; background: #ffffff;">
+                        <button class="btn-cmd" id="btn-export-gdrive-video-deck" style="width: 100%; justify-content: center; padding: 0.45rem; background: #fdf4ff; color: #86198f; border-color: #f5d0fe;" onclick="exportVideoToGoogleDrive()">
+                            <span>📁</span> Push Video to Google Drive
+                        </button>
+                        <div id="gdrive-video-export-status" style="font-family: var(--font-mono); font-size: 0.65rem; text-align: center; margin-top: 0.35rem; min-height: 12px;"></div>
+                    </div>
+                </div>
+
+                <!-- 5. Nostr Long-Form Publication Pipeline<!-- 5. Nostr Long-Form Publication Pipeline (NIP-23) -->
                 <div class="audio-card" id="narrative-nostr-preview" style="display: none;">
                     <div class="studio-title" style="margin-bottom: 0.2rem;">
                         <span style="font-weight: 700; color: #3730a3; display: flex; align-items: center; gap: 0.35rem;">
@@ -3662,6 +3734,172 @@ if __name__ == '__main__':
             }
         }
 
+        let videoPollTimer = null;
+
+        function formatPodcastSecs(sec) {
+            if (!sec || isNaN(sec)) return "00:00";
+            sec = Math.max(0, Math.round(sec));
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        async function checkAndRestoreVideoRenderStatus(cleanId) {
+            if (!cleanId) return;
+            try {
+                const res = await fetch(`/api/podcast/video_render_status?filename=${cleanId}&_t=${Date.now()}`);
+                const data = await res.json();
+                if (data.status === 'rendering') {
+                    startVideoRenderPolling(cleanId);
+                } else if (data.status === 'ready' && data.has_video) {
+                    const statusDeck = document.getElementById('podcast-video-status-deck');
+                    if (statusDeck) statusDeck.innerText = `Full Video Master: ${(data.video_size / 1024 / 1024).toFixed(1)} MB`;
+                }
+            } catch (e) {
+                console.warn("Could not check video render status:", e);
+            }
+        }
+
+        function startVideoRenderPolling(cleanId) {
+            if (videoPollTimer) clearInterval(videoPollTimer);
+
+            const btnTopFull = document.getElementById('btn-top-render-full-video');
+            const btnTopPrev = document.getElementById('btn-top-render-preview-video');
+            const btnDeckFull = document.getElementById('btn-render-full-video-deck');
+            const btnDeckPrev = document.getElementById('btn-render-preview-video-deck');
+            const allBtns = [btnTopFull, btnTopPrev, btnDeckFull, btnDeckPrev].filter(Boolean);
+            allBtns.forEach(b => { b.disabled = true; });
+
+            const pWrap = document.getElementById('podcast-video-progress-wrap');
+            const pBar = document.getElementById('podcast-video-progress-bar');
+            const pPct = document.getElementById('podcast-video-progress-pct');
+            const pElapsed = document.getElementById('podcast-video-elapsed');
+            const pEta = document.getElementById('podcast-video-eta');
+            const statusDeck = document.getElementById('podcast-video-status-deck');
+
+            if (pWrap) pWrap.style.display = 'block';
+
+            const poll = async () => {
+                try {
+                    const res = await fetch(`/api/podcast/video_render_status?filename=${cleanId}&_t=${Date.now()}`);
+                    const data = await res.json();
+
+                    if (data.status === 'rendering') {
+                        const pct = data.progress_pct || 0;
+                        if (pBar) pBar.style.width = `${pct}%`;
+                        if (pPct) pPct.innerText = `${pct}%`;
+                        if (pElapsed) pElapsed.innerText = `⏱️ Elapsed: ${formatPodcastSecs(data.elapsed_seconds)}`;
+                        if (pEta) pEta.innerText = `⏳ ETA: ${formatPodcastSecs(data.eta_seconds)}`;
+                        if (statusDeck) statusDeck.innerText = data.message || `Rendering in background (${pct}%)...`;
+                    } else if (data.status === 'ready') {
+                        clearInterval(videoPollTimer);
+                        videoPollTimer = null;
+                        allBtns.forEach(b => { b.disabled = false; });
+                        if (pWrap) pWrap.style.display = 'none';
+                        if (statusDeck) statusDeck.innerText = `✅ Video master ready! (${(data.video_size / 1024 / 1024).toFixed(1)} MB)`;
+                        showToast("🎬 1080p Video Master rendered successfully!");
+
+                        const wrap = document.getElementById('podcast-video-master-player-wrap');
+                        const player = document.getElementById('podcast-video-master-player');
+                        const fnEl = document.getElementById('podcast-video-master-filename');
+                        if (wrap && player) {
+                            wrap.style.display = 'block';
+                            player.src = `${data.video_url}&t=${Date.now()}`;
+                            if (fnEl) fnEl.innerText = `podcast_${cleanId}.mp4 (${(data.video_size / 1024 / 1024).toFixed(1)} MB)`;
+                        }
+                    } else if (data.status === 'error') {
+                        clearInterval(videoPollTimer);
+                        videoPollTimer = null;
+                        allBtns.forEach(b => { b.disabled = false; });
+                        if (pWrap) pWrap.style.display = 'none';
+                        if (statusDeck) statusDeck.innerText = `❌ Render error: ${data.error || data.message}`;
+                        showToast("❌ Video render failed: " + (data.error || data.message));
+                    }
+                } catch (err) {
+                    console.warn("Polling error:", err);
+                }
+            };
+
+            poll();
+            videoPollTimer = setInterval(poll, 1500);
+        }
+
+        async function renderVideoPodcast(mode = 'full') {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            if (selectedEpisode.is_draft || selectedEpisode.filename.startsWith('_')) {
+                showToast("⚠️ Episode is in Mempool. Click '⚡ Mine' to assign an episode number first!");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const isPreview = (mode === 'preview');
+            const previewSecs = isPreview ? 60 : null;
+
+            showToast(isPreview ? "🎬 Rendering 60-second 1080p video preview..." : "🎬 Launching Full 1080p Video Podcast Render in background...");
+
+            try {
+                const res = await fetch('/api/podcast/render_video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, preview_seconds: previewSecs })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || data.message || "Failed to launch video render");
+                }
+                showToast("✅ " + data.message);
+                startVideoRenderPolling(cleanId);
+            } catch (err) {
+                showToast("Video render error: " + err.message);
+                const statusDeck = document.getElementById('podcast-video-status-deck');
+                if (statusDeck) statusDeck.innerText = "Video render error: " + err.message;
+            }
+        }
+
+
+        async function exportVideoToGoogleDrive() {
+            if (!selectedEpisode) {
+                showToast("Please select an episode first");
+                return;
+            }
+            if (selectedEpisode.is_draft || selectedEpisode.filename.startsWith('_')) {
+                showToast("⚠️ Episode is in Mempool. Click '⚡ Mine' to assign an episode number before pushing to Google Drive!");
+                return;
+            }
+            const cleanId = selectedEpisode.filename.replace('.md', '').replace(/^_/, '');
+            const inputEl = document.getElementById('gdrive-video-pickup-input');
+            const customDest = inputEl ? inputEl.value.trim() : 'G:/My Drive/Podcast_Video_Pickup';
+            const statusEl = document.getElementById('gdrive-video-export-status');
+            const btn = document.getElementById('btn-export-gdrive-video-deck');
+
+            if (btn) btn.disabled = true;
+            if (statusEl) statusEl.innerHTML = `<span style="color:#6d28d9;">⏳ Copying video & writing metadata manifest to Google Drive...</span>`;
+            showToast("Pushing 1080p Video to Google Drive...");
+
+            try {
+                const res = await fetch('/api/podcast/export_gdrive_video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, custom_dest: customDest })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showToast("❌ " + (data.message || data.error || "Video Google Drive export failed"));
+                    if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626;">✗ ${data.message || data.error}</span>`;
+                    return;
+                }
+                showToast("✅ " + data.message);
+                if (statusEl) statusEl.innerHTML = `<span style="color:#059669;">✓ ${data.message}</span>`;
+            } catch (err) {
+                showToast("Video Google Drive export error: " + err.message);
+                if (statusEl) statusEl.innerHTML = `<span style="color:#dc2626;">✗ ${err.message}</span>`;
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
         async function exportToGoogleDrive() {
             if (!selectedEpisode) {
                 showToast("Please select an episode first");
@@ -3704,6 +3942,19 @@ if __name__ == '__main__':
 
             if (gdriveInput && data.gdrive_folder) {
                 gdriveInput.value = data.gdrive_folder;
+            }
+
+            // Master Video Deck Update
+            const vidWrap = document.getElementById('podcast-video-master-player-wrap');
+            const vidPlayer = document.getElementById('podcast-video-master-player');
+            const vidFnEl = document.getElementById('podcast-video-master-filename');
+            checkAndRestoreVideoRenderStatus(data.clean_id);
+            if (data.has_video && vidWrap && vidPlayer) {
+                vidWrap.style.display = 'block';
+                vidPlayer.src = `${data.video_url}&t=${Date.now()}`;
+                if (vidFnEl) vidFnEl.innerText = `podcast_${data.clean_id}.mp4 (${(data.video_size / 1024 / 1024).toFixed(1)} MB)`;
+            } else if (vidWrap) {
+                vidWrap.style.display = 'none';
             }
 
             if (data.has_rendered) {
