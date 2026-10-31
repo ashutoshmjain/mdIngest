@@ -1658,6 +1658,9 @@
                     <button class="btn-mode-tab active" id="btn-submode-podcast" onclick="switchPodcastSubmode('podcast')">
                         🎙️ Podcast Studio &amp; Cuts
                     </button>
+                    <button class="btn-mode-tab" id="btn-submode-longform" onclick="switchPodcastSubmode('longform')" style="display:flex;align-items:center;gap:6px;">
+                        🎬 Longform Beat Studio <span style="font-size:0.65rem;background:#ede9fe;color:#6d28d9;padding:1px 6px;border-radius:999px;font-weight:800;">389 Beats</span>
+                    </button>
                     <button class="btn-mode-tab" id="btn-submode-nostr" onclick="switchPodcastSubmode('nostr')">
                         📝 Social Prose &amp; Nostr
                     </button>
@@ -1767,6 +1770,136 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- SUBMODE C: 🎬 LONGFORM BEAT-BY-BEAT TIMELINE & ARCHETYPE STUDIO (HORIZONTAL SPLIT) -->
+                <div id="submode-view-longform" style="display: none; width: 100%; max-width: 1120px;">
+                    <div style="background: #ffffff; border: 1px solid var(--border-light); border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); overflow: hidden; display: flex; flex-direction: column;">
+
+                        <!-- TOP HALF OF HORIZONTAL SPLIT: 16:9 Longform Video + Progressive Chapter & Beat Timeline -->
+                        <div style="background: #0f172a; padding: 14px 18px; border-bottom: 2px solid #1e293b;">
+                            <!-- Header Bar inside Top Pane -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="background: #7c3aed; color: #ffffff; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 5px;">1920×1080 MASTER</span>
+                                    <span id="lf-studio-header-title" style="color: #f8fafc; font-weight: 800; font-size: 0.92rem;">Longform Beat-by-Beat Timeline &amp; Archetype Studio</span>
+                                    <span id="lf-studio-mem-badge" style="font-family: var(--font-mono); font-size: 0.68rem; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.3);">⚡ Progressive LRU (Max 3 Chapters in RAM)</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; background: #1e293b; padding: 3px 9px; border-radius: 5px;">00:00 / 54:14</span>
+                                    <button type="button" class="btn-cmd" onclick="renderVideoPodcast('full')" style="font-size: 0.7rem; padding: 4px 10px; background: #4f46e5; color: #fff; border-color: #4338ca; font-weight: 700;" title="Re-compile the 54-minute 1080p master MP4 with all updated Manim archetypes">
+                                        🎬 Re-Compile 54m Master MP4
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Video + Chapter Selector Grid -->
+                            <div style="display: grid; grid-template-columns: minmax(420px, 1.35fr) minmax(280px, 1fr); gap: 14px; align-items: stretch;">
+                                <!-- Left: 16:9 Master Video Player (+ Instant 740x740 Recompiled Beat Inset Overlay) -->
+                                <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #334155; display: flex; flex-direction: column; justify-content: center;">
+                                    <video id="lf-studio-video-player" style="width: 100%; aspect-ratio: 16/9; display: block; background: #000;" controls preload="metadata"></video>
+                                    
+                                    <!-- Instant 7.5s Beat Preview Overlay (when a beat is regenerated with AI) -->
+                                    <div id="lf-beat-preview-overlay" style="display: none; position: absolute; right: 12px; bottom: 48px; width: 190px; background: #090d16; border: 2px solid #8b5cf6; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.75); overflow: hidden; z-index: 15;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: #6d28d9; color: #fff; font-size: 0.65rem; font-weight: 800; font-family: var(--font-mono);">
+                                            <span id="lf-beat-preview-label">✨ UPDATED BEAT</span>
+                                            <button type="button" onclick="closeLfBeatPreview()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:0.75rem;line-height:1;">✕</button>
+                                        </div>
+                                        <video id="lf-beat-preview-video" style="width: 100%; aspect-ratio: 1/1; display: block; background: #000;" controls loop muted playsinline></video>
+                                    </div>
+                                </div>
+
+                                <!-- Right: Progressive 23-Chapter Navigator & Active Chapter Beat Scrubber -->
+                                <div style="display: flex; flex-direction: column; justify-content: space-between; background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 10px 12px; max-height: 340px; overflow: hidden;">
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                            <span style="font-size: 0.68rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📚 1. Chapter Timeline (23 Parts)</span>
+                                            <span id="lf-active-chapter-meta" style="font-family: var(--font-mono); font-size: 0.68rem; color: #a78bfa; font-weight: 700;">Part 1</span>
+                                        </div>
+                                        <!-- Scrollable 23-Chapter Pill List -->
+                                        <div id="lf-chapter-strip" style="display: flex; flex-wrap: wrap; gap: 5px; max-height: 125px; overflow-y: auto; padding-right: 4px; margin-bottom: 10px;">
+                                            <span style="color: #64748b; font-size: 0.75rem;">Loading chapters...</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Active Chapter Micro-Beat Scrubber -->
+                                    <div style="border-top: 1px solid #334155; padding-top: 8px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                            <span style="font-size: 0.68rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">⏱️ 2. Micro-Beats in Active Chapter (~7.5s each)</span>
+                                            <button type="button" onclick="previewIsolatedLfBeat()" style="background: rgba(139, 92, 246, 0.2); border: 1px solid #8b5cf6; color: #ddd6fe; border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-weight: 700; cursor: pointer;" title="Preview the isolated 740x740 Manim vector MP4 for this beat">
+                                                👁️ Preview 740×740 Vector MP4
+                                            </button>
+                                        </div>
+                                        <div id="lf-beat-pill-strip" style="display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
+                                            <span style="color: #64748b; font-size: 0.75rem;">Select a chapter to inspect beats...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BOTTOM HALF OF HORIZONTAL SPLIT: Active Beat Inspector, Spoken Dialogue & Gemini/Manim Editor -->
+                        <div style="padding: 16px 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 14px;">
+                            <!-- Beat Identity & Spoken Dialogue Card -->
+                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                        <span id="lf-beat-badge" style="background: #0284c7; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 5px; font-family: var(--font-mono);">PART 1 • BEAT 1/18</span>
+                                        <span id="lf-beat-classname" style="font-family: var(--font-mono); font-weight: 800; font-size: 0.85rem; color: #0f172a;">Scene01_01</span>
+                                        <span style="color: #94a3b8;">•</span>
+                                        <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">Visual Geometry:</span>
+                                        <span id="lf-beat-visual-summary" style="font-size: 0.78rem; color: #0369a1; font-weight: 700; background: #f0f9ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;">Bespoke monochrome vector animation</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span id="lf-beat-pyfile-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: #0369a1; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; font-weight: 700;">archetypes/clip_01_gemini_scenes.py</span>
+                                        <span id="lf-beat-time-range" style="font-family: var(--font-mono); font-size: 0.75rem; color: #64748b; font-weight: 700;">39.7s – 47.2s (7.5s)</span>
+                                    </div>
+                                </div>
+
+                                <div style="font-size: 0.68rem; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+                                    🗣️ Spoken Dialogue in This Beat (Synchronized with Burned-In Captions):
+                                </div>
+                                <div id="lf-beat-spoken-text" style="font-size: 0.86rem; color: #1e293b; background: #f8fafc; padding: 9px 12px; border-radius: 6px; border-left: 3px solid #0284c7; font-style: italic; line-height: 1.45;">
+                                    "Pause or scrub the Longform video above to inspect any 7.5-second beat's dialogue and Manim vector archetype."
+                                </div>
+                            </div>
+
+                            <!-- Producer Feedback / Gemini AI Regeneration + Live Manim Python Code Editor -->
+                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                    <label for="lf-beat-directive-input" style="font-size: 0.78rem; font-weight: 800; color: #6d28d9; display: flex; align-items: center; gap: 6px;">
+                                        <span>✍️ Producer Feedback / Request Archetype Change (Updates Shared Longform + DDMA Short Library):</span>
+                                    </label>
+                                    <span id="lf-beat-compile-status" style="font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: #059669;"></span>
+                                </div>
+
+                                <textarea id="lf-beat-directive-input" rows="2" placeholder="Pause the video and describe what you want changed in this 7.5s animation (e.g. 'Show a commercial airplane flying across the sky', 'Show a 100m sprinter racing toward a finish line')..." style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 11px; font-size: 0.84rem; font-family: inherit; resize: vertical; background: #f8fafc; color: #0f172a; margin-bottom: 10px;"></textarea>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <button type="button" onclick="toggleLfCodeEditor()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                                        💻 Show / Edit Manim Python Code
+                                    </button>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <button type="button" id="lf-btn-regen-beat" onclick="regenerateLfBeatWithAI(false)" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); border: none; color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);">
+                                            ✨ Regenerate This Beat with AI &amp; Recompile (~3s)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Collapsible Manim Python Code Editor -->
+                                <div id="lf-code-editor-drawer" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                        <span style="font-size: 0.72rem; font-weight: 800; color: #334155; font-family: var(--font-mono);">🐍 Direct Manim Scene Class Definition (740×740 Square Vector Canvas):</span>
+                                        <button type="button" onclick="regenerateLfBeatWithAI(true)" style="background: #0284c7; border: none; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 0.74rem; font-weight: 800; cursor: pointer;">
+                                            💾 Save Custom Code &amp; Recompile Beat (~3s)
+                                        </button>
+                                    </div>
+                                    <textarea id="lf-beat-code-textarea" rows="12" spellcheck="false" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.76rem; line-height: 1.45; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -2047,6 +2180,9 @@
                             <span>⚡</span> 60s Preview
                         </button>
                     </div>
+                    <button class="btn-cmd" onclick="switchTab('narrative'); switchPodcastSubmode('longform');" style="width: 100%; justify-content: center; padding: 0.5rem; margin-bottom: 0.5rem; background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800; font-size: 0.75rem;" title="Open the Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio">
+                        <span>🔍</span> Open Beat-by-Beat Timeline Studio (389 Scenes)
+                    </button>
                                         <div id="podcast-video-status-deck" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-bottom: 0.5rem;"></div>
 
                     <!-- Live Dynamic Render Progress Bar (Preserved Across Page Refreshes) -->
@@ -3062,20 +3198,347 @@ if __name__ == '__main__':
         function switchPodcastSubmode(mode) {
             podcastSubmode = mode;
             const btnPod = document.getElementById('btn-submode-podcast');
+            const btnLf = document.getElementById('btn-submode-longform');
             const btnNostr = document.getElementById('btn-submode-nostr');
             const viewPod = document.getElementById('submode-view-podcast');
+            const viewLf = document.getElementById('submode-view-longform');
             const viewNostr = document.getElementById('submode-view-nostr');
+
+            [btnPod, btnLf, btnNostr].forEach(b => { if (b) b.classList.remove('active'); });
+            [viewPod, viewLf, viewNostr].forEach(v => { if (v) v.style.display = 'none'; });
 
             if (mode === 'podcast') {
                 if (btnPod) btnPod.classList.add('active');
-                if (btnNostr) btnNostr.classList.remove('active');
                 if (viewPod) viewPod.style.display = 'block';
-                if (viewNostr) viewNostr.style.display = 'none';
+            } else if (mode === 'longform') {
+                if (btnLf) btnLf.classList.add('active');
+                if (viewLf) viewLf.style.display = 'block';
+                initLongformBeatStudio();
             } else {
-                if (btnPod) btnPod.classList.remove('active');
                 if (btnNostr) btnNostr.classList.add('active');
-                if (viewPod) viewPod.style.display = 'none';
                 if (viewNostr) viewNostr.style.display = 'block';
+            }
+        }
+
+        // ==========================================
+        // 🎬 LONGFORM BEAT-BY-BEAT TIMELINE STUDIO (PROGRESSIVE LRU LOADER)
+        // ==========================================
+        let lfTimelineIndex = null;
+        let lfChapterLRU = new Map(); // Keeps at most 3 chapters in RAM for memory safety
+        const LF_MAX_LRU_CHAPTERS = 3;
+        let lfActiveClipNum = 1;
+        let lfActiveBeatIdx = 0;
+        let lfLoadingChapter = false;
+        let lfVideoListenerBound = false;
+
+        async function initLongformBeatStudio() {
+            const ep = selectedEpisode;
+            const cleanId = (ep?.filename || '248').replace('.md', '').replace(/^_/, '') || '248';
+            const videoEl = document.getElementById('lf-studio-video-player');
+
+            try {
+                const res = await fetch(`/api/podcast/longform_index?filename=${encodeURIComponent(cleanId)}`);
+                if (!res.ok) return;
+                lfTimelineIndex = await res.json();
+
+                if (videoEl) {
+                    const targetSrc = lfTimelineIndex.video_url || `/api/podcast/video?filename=${encodeURIComponent(cleanId)}`;
+                    if (!videoEl.getAttribute('src') || !videoEl.getAttribute('src').includes(cleanId)) {
+                        videoEl.src = targetSrc;
+                    }
+                    if (!lfVideoListenerBound) {
+                        lfVideoListenerBound = true;
+                        videoEl.addEventListener('timeupdate', () => {
+                            onLfVideoTimeUpdate(videoEl.currentTime);
+                        });
+                    }
+                }
+
+                renderLfChapterStrip();
+                await selectLfChapter(lfActiveClipNum || 1, false);
+            } catch (err) {
+                console.error("Failed to initialize Longform Beat Studio:", err);
+            }
+        }
+
+        function updateLfMemBadge() {
+            const badge = document.getElementById('lf-studio-mem-badge');
+            if (!badge) return;
+            const keys = Array.from(lfChapterLRU.keys()).map(k => `Part ${k}`);
+            badge.innerText = `⚡ RAM Cache: ${keys.length}/${LF_MAX_LRU_CHAPTERS} Chapters (${keys.join(', ') || 'empty'})`;
+        }
+
+        async function fetchLfChapterProgressive(clipNum) {
+            const cNum = parseInt(clipNum, 10) || 1;
+            if (lfChapterLRU.has(cNum)) {
+                // Refresh LRU order
+                const cached = lfChapterLRU.get(cNum);
+                lfChapterLRU.delete(cNum);
+                lfChapterLRU.set(cNum, cached);
+                updateLfMemBadge();
+                return cached;
+            }
+
+            const ep = selectedEpisode;
+            const cleanId = (ep?.filename || '248').replace('.md', '').replace(/^_/, '') || '248';
+            const res = await fetch(`/api/podcast/longform_beats?filename=${encodeURIComponent(cleanId)}&clip_num=${cNum}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            // Evict oldest chapter if cache exceeds LF_MAX_LRU_CHAPTERS
+            if (lfChapterLRU.size >= LF_MAX_LRU_CHAPTERS) {
+                const oldestKey = lfChapterLRU.keys().next().value;
+                lfChapterLRU.delete(oldestKey);
+            }
+            lfChapterLRU.set(cNum, data);
+            updateLfMemBadge();
+            return data;
+        }
+
+        function renderLfChapterStrip() {
+            const strip = document.getElementById('lf-chapter-strip');
+            if (!strip || !lfTimelineIndex || !lfTimelineIndex.chapters) return;
+
+            strip.innerHTML = lfTimelineIndex.chapters.map(ch => {
+                const isActive = ch.clip_num === lfActiveClipNum;
+                const bg = isActive ? '#7c3aed' : '#0f172a';
+                const col = isActive ? '#ffffff' : '#cbd5e1';
+                const border = isActive ? '#a78bfa' : '#334155';
+                return `<button type="button" id="lf-ch-btn-${ch.clip_num}" onclick="selectLfChapter(${ch.clip_num}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;transition:all 0.12s;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)} - ${formatDuration(ch.end)})">
+                    P${ch.clip_num}: ${escapeHtml(ch.title.slice(0, 18))}
+                </button>`;
+            }).join('');
+        }
+
+        async function selectLfChapter(clipNum, seekVideo = false) {
+            const cNum = parseInt(clipNum, 10) || 1;
+            lfActiveClipNum = cNum;
+            renderLfChapterStrip();
+
+            const metaEl = document.getElementById('lf-active-chapter-meta');
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
+            if (metaEl && chInfo) {
+                metaEl.innerText = `Part ${cNum}: ${chInfo.title} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})`;
+            }
+
+            try {
+                const chData = await fetchLfChapterProgressive(cNum);
+                const beats = chData.beats || [];
+                renderLfBeatPills(beats);
+
+                if (beats.length > 0) {
+                    selectLfBeat(0, seekVideo);
+                }
+            } catch (err) {
+                console.error("Failed loading chapter beats:", err);
+            }
+        }
+
+        function renderLfBeatPills(beats) {
+            const strip = document.getElementById('lf-beat-pill-strip');
+            if (!strip) return;
+            if (!beats || beats.length === 0) {
+                strip.innerHTML = '<span style="color:#64748b;font-size:0.75rem;">No beats found in this chapter.</span>';
+                return;
+            }
+            strip.innerHTML = beats.map((b, idx) => {
+                const isActive = idx === lfActiveBeatIdx;
+                const bg = isActive ? '#0284c7' : '#0f172a';
+                const col = isActive ? '#ffffff' : '#bae6fd';
+                const border = isActive ? '#38bdf8' : '#334155';
+                return `<button type="button" id="lf-beat-pill-${idx}" onclick="selectLfBeat(${idx}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:999px;padding:4px 10px;font-size:0.7rem;font-weight:800;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;" title="${b.class_name} (${b.longform_start.toFixed(1)}s - ${b.longform_end.toFixed(1)}s)">
+                    #${b.index} (${formatDuration(b.longform_start)})
+                </button>`;
+            }).join('');
+        }
+
+        function selectLfBeat(beatIdx, seekVideo = false) {
+            const chData = lfChapterLRU.get(lfActiveClipNum);
+            if (!chData || !chData.beats || !chData.beats[beatIdx]) return;
+
+            lfActiveBeatIdx = beatIdx;
+            const b = chData.beats[beatIdx];
+
+            // Highlight pill
+            chData.beats.forEach((_, idx) => {
+                const pill = document.getElementById(`lf-beat-pill-${idx}`);
+                if (!pill) return;
+                if (idx === beatIdx) {
+                    pill.style.background = '#0284c7';
+                    pill.style.color = '#ffffff';
+                    pill.style.borderColor = '#38bdf8';
+                } else {
+                    pill.style.background = '#0f172a';
+                    pill.style.color = '#bae6fd';
+                    pill.style.borderColor = '#334155';
+                }
+            });
+
+            // Populate Bottom Inspector Pane
+            const badgeEl = document.getElementById('lf-beat-badge');
+            const clsEl = document.getElementById('lf-beat-classname');
+            const visEl = document.getElementById('lf-beat-visual-summary');
+            const pyEl = document.getElementById('lf-beat-pyfile-badge');
+            const timeEl = document.getElementById('lf-beat-time-range');
+            const txtEl = document.getElementById('lf-beat-spoken-text');
+            const dirInput = document.getElementById('lf-beat-directive-input');
+            const codeArea = document.getElementById('lf-beat-code-textarea');
+
+            if (badgeEl) badgeEl.innerText = `PART ${lfActiveClipNum} • BEAT ${b.index}/${chData.beats.length}`;
+            if (clsEl) clsEl.innerText = b.class_name;
+            if (visEl) visEl.innerText = b.visual_summary || b.title || 'Bespoke monochrome vector animation';
+            if (pyEl) pyEl.innerText = chData.py_file || `archetypes/clip_${String(lfActiveClipNum).padStart(2, '0')}_gemini_scenes.py`;
+            if (timeEl) timeEl.innerText = `${formatDuration(b.longform_start)} – ${formatDuration(b.longform_end)} (${b.longform_start.toFixed(1)}s – ${b.longform_end.toFixed(1)}s)`;
+            if (txtEl) txtEl.innerText = b.text ? `"${b.text}"` : '(Instrumental / Transition Beat)';
+
+            const videoEl = document.getElementById('lf-studio-video-player');
+            const isTyping = document.activeElement === dirInput || document.activeElement === codeArea;
+            if (!isTyping || (videoEl && videoEl.paused)) {
+                if (dirInput && document.activeElement !== dirInput) dirInput.value = b.user_notes || '';
+                if (codeArea && document.activeElement !== codeArea) codeArea.value = b.code || '';
+            }
+
+            if (seekVideo && videoEl) {
+                videoEl.currentTime = b.longform_start + 0.08;
+            }
+        }
+
+        async function onLfVideoTimeUpdate(currentTime) {
+            const playheadBadge = document.getElementById('lf-studio-playhead-badge');
+            const totalDur = lfTimelineIndex?.total_duration || 3254.08;
+            if (playheadBadge) {
+                playheadBadge.innerText = `${formatDuration(currentTime)} / ${formatDuration(totalDur)}`;
+            }
+
+            if (!lfTimelineIndex || !lfTimelineIndex.chapters) return;
+
+            // Find which chapter covers currentTime
+            const activeCh = lfTimelineIndex.chapters.find(c => currentTime >= c.start && currentTime < c.end);
+            if (!activeCh) return;
+
+            if (activeCh.clip_num !== lfActiveClipNum && !lfLoadingChapter) {
+                lfLoadingChapter = true;
+                lfActiveClipNum = activeCh.clip_num;
+                renderLfChapterStrip();
+                try {
+                    const chData = await fetchLfChapterProgressive(activeCh.clip_num);
+                    renderLfBeatPills(chData.beats || []);
+                    // Also prefetch the next chapter in background if within 20s of chapter end
+                } catch (e) {
+                    console.warn("Progressive chapter switch failed:", e);
+                } finally {
+                    lfLoadingChapter = false;
+                }
+            }
+
+            const chData = lfChapterLRU.get(lfActiveClipNum);
+            if (chData && chData.beats) {
+                const bIdx = chData.beats.findIndex(b => currentTime >= b.longform_start && currentTime < b.longform_end);
+                if (bIdx !== -1 && bIdx !== lfActiveBeatIdx) {
+                    selectLfBeat(bIdx, false);
+                }
+            }
+        }
+
+        function toggleLfCodeEditor() {
+            const drawer = document.getElementById('lf-code-editor-drawer');
+            if (!drawer) return;
+            drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function previewIsolatedLfBeat(customUrl = null) {
+            const chData = lfChapterLRU.get(lfActiveClipNum);
+            const b = chData?.beats?.[lfActiveBeatIdx];
+            if (!b) return;
+
+            const overlay = document.getElementById('lf-beat-preview-overlay');
+            const vid = document.getElementById('lf-beat-preview-video');
+            const lbl = document.getElementById('lf-beat-preview-label');
+            if (!overlay || !vid) return;
+
+            overlay.style.display = 'block';
+            if (lbl) lbl.innerText = `✨ ${b.class_name}`;
+            vid.src = customUrl || `${b.beat_video_url}&t=${Date.now()}`;
+            vid.play().catch(() => {});
+        }
+
+        function closeLfBeatPreview() {
+            const overlay = document.getElementById('lf-beat-preview-overlay');
+            const vid = document.getElementById('lf-beat-preview-video');
+            if (vid) vid.pause();
+            if (overlay) overlay.style.display = 'none';
+        }
+
+        async function regenerateLfBeatWithAI(useCustomCode = false) {
+            const chData = lfChapterLRU.get(lfActiveClipNum);
+            const b = chData?.beats?.[lfActiveBeatIdx];
+            if (!b) return;
+
+            const dirInput = document.getElementById('lf-beat-directive-input');
+            const codeArea = document.getElementById('lf-beat-code-textarea');
+            const statusEl = document.getElementById('lf-beat-compile-status');
+            const regenBtn = document.getElementById('lf-btn-regen-beat');
+            const masterVideo = document.getElementById('lf-studio-video-player');
+
+            const directive = dirInput ? dirInput.value.trim() : '';
+            const customCode = (useCustomCode && codeArea) ? codeArea.value : null;
+
+            if (!useCustomCode && !directive) {
+                alert("Please enter your Producer Feedback / change request for this beat first!");
+                return;
+            }
+
+            if (masterVideo && !masterVideo.paused) masterVideo.pause();
+            if (regenBtn) regenBtn.disabled = true;
+            if (statusEl) {
+                statusEl.style.color = '#d97706';
+                statusEl.innerText = useCustomCode
+                    ? `⏳ Compiling custom Manim code for ${b.class_name} (~3s)...`
+                    : `⏳ Gemini AI rewriting ${b.class_name} & compiling 740×740 beat (~3s)...`;
+            }
+
+            const ep = selectedEpisode;
+            const cleanId = (ep?.filename || '248').replace('.md', '').replace(/^_/, '') || '248';
+
+            try {
+                const res = await fetch('/api/podcast/update_longform_beat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        clean_id: cleanId,
+                        clip_num: lfActiveClipNum,
+                        beat_index: b.index,
+                        class_name: b.class_name,
+                        user_directive: directive,
+                        spoken_text: b.text || '',
+                        custom_code: customCode,
+                        duration: b.duration || 7.5
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || data.error || data.success === false) {
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+
+                if (data.chapter_data) {
+                    lfChapterLRU.set(lfActiveClipNum, data.chapter_data);
+                }
+                selectLfBeat(lfActiveBeatIdx, false);
+
+                if (statusEl) {
+                    statusEl.style.color = '#059669';
+                    statusEl.innerText = `✅ Compiled ${b.class_name}! Previewing updated 7.5s vector beat above.`;
+                }
+                showToast(`✅ Updated ${b.class_name} in shared Longform + Short library!`);
+                previewIsolatedLfBeat(data.beat_video_url);
+            } catch (err) {
+                if (statusEl) {
+                    statusEl.style.color = '#dc2626';
+                    statusEl.innerText = `❌ Error: ${err.message}`;
+                }
+                showToast(`❌ Archetype update failed: ${err.message}`);
+            } finally {
+                if (regenBtn) regenBtn.disabled = false;
             }
         }
 
@@ -3092,6 +3555,11 @@ if __name__ == '__main__':
 
                 renderPodcastStudioView(data);
                 renderPodcastRightDeck(data);
+                if (podcastSubmode === 'longform') {
+                    lfTimelineIndex = null;
+                    lfChapterLRU.clear();
+                    initLongformBeatStudio();
+                }
             } catch (err) {
                 console.error("Failed to load podcast data:", err);
             }

@@ -636,7 +636,20 @@ def get_episode_podcast_mp3_path(clean_id: str) -> Path:
 
 def get_episode_podcast_video_path(clean_id: str) -> Path:
     """Path to rendered master podcast 1080p horizontal MP4."""
-    return get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp4"
+    canonical = get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp4"
+    if canonical.exists():
+        return canonical
+    for alt in [
+        PROJECT_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
+        PROD_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
+        Path("G:/My Drive/pickup_longform") / f"podcast_{clean_id}.mp4",
+    ]:
+        try:
+            if alt.exists():
+                return alt
+        except Exception:
+            pass
+    return canonical
 
 def render_podcast_video_pipeline(clean_id: str, preview_seconds: float = None, progress_callback = None) -> tuple[bool, str, str]:
     """
@@ -3011,6 +3024,55 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(404, f"Rendered podcast MP4 not found for episode {clean_id}")
             return
 
+        if path == "/api/podcast/longform_index":
+            params = parse_qs(url.query)
+            fn = params.get("filename", ["248"])[0]
+            clean_id = fn.replace(".md", "").lstrip("_") or "248"
+            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                if d.exists() and str(d.resolve()) not in sys.path:
+                    sys.path.insert(0, str(d.resolve()))
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                idx_data = archetype_studio.get_longform_timeline_index(clean_id)
+                mp4_path = get_episode_podcast_video_path(clean_id)
+                idx_data["has_video"] = mp4_path.exists()
+                idx_data["video_url"] = f"/api/podcast/video?filename={clean_id}"
+                self.send_json(idx_data)
+            except Exception as e:
+                self.send_json({"error": str(e)}, status=500)
+            return
+
+        if path == "/api/podcast/longform_beats":
+            params = parse_qs(url.query)
+            fn = params.get("filename", ["248"])[0]
+            clean_id = fn.replace(".md", "").lstrip("_") or "248"
+            clip_num = int(params.get("clip_num", ["1"])[0])
+            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                if d.exists() and str(d.resolve()) not in sys.path:
+                    sys.path.insert(0, str(d.resolve()))
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                b_data = archetype_studio.get_longform_chapter_beats(clean_id, clip_num)
+                self.send_json(b_data)
+            except Exception as e:
+                self.send_json({"error": str(e)}, status=500)
+            return
+
+        if path == "/api/podcast/beat_video":
+            params = parse_qs(url.query)
+            clip_num = int(params.get("clip_num", ["1"])[0])
+            cls_name = params.get("class_name", [""])[0].strip()
+            media_root = PROJECT_ROOT.parent / "media" / "videos" / f"clip_{clip_num:02d}_gemini_scenes" / "740p15" / f"{cls_name}.mp4"
+            if media_root.exists():
+                self.serve_media_file(media_root)
+            else:
+                self.send_error(404, f"Beat MP4 not found: {cls_name}")
+            return
+
         if path == "/api/podcast/sting":
             params = parse_qs(url.query)
             sting_file = params.get("file", [""])[0]
@@ -4167,6 +4229,40 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
             success, msg = export_video_to_gdrive(clean_id, custom_dest)
             self.send_json({"success": success, "message": msg})
+            return
+
+        if path == "/api/podcast/update_longform_beat":
+            clean_id = str(data.get("clean_id", "248")).replace(".md", "").lstrip("_") or "248"
+            clip_num = int(data.get("clip_num", 1))
+            beat_index = int(data.get("beat_index", 1))
+            class_name = str(data.get("class_name", "")).strip()
+            user_directive = str(data.get("user_directive", "")).strip()
+            spoken_text = str(data.get("spoken_text", "")).strip()
+            custom_code = data.get("custom_code")
+            duration = float(data.get("duration", 7.5))
+
+            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                if d.exists() and str(d.resolve()) not in sys.path:
+                    sys.path.insert(0, str(d.resolve()))
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                res = archetype_studio.update_single_scene_with_ai(
+                    clip_num=clip_num,
+                    beat_index=beat_index,
+                    class_name=class_name,
+                    user_directive=user_directive,
+                    spoken_text=spoken_text,
+                    custom_code=custom_code,
+                    duration=duration,
+                )
+                ch_beats = archetype_studio.get_longform_chapter_beats(clean_id, clip_num)
+                res["chapter_data"] = ch_beats
+                res["beat_video_url"] = f"/api/podcast/beat_video?clip_num={clip_num}&class_name={class_name}&t={int(time.time())}"
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
             return
 
         self.send_error(404, "Endpoint not found")
