@@ -1622,6 +1622,9 @@
                     <button class="btn-cmd emerald" id="btn-top-render" onclick="renderPodcast()" title="Render Master Podcast (FFmpeg -16 LUFS)">
                         <span>🎧</span> Render Podcast
                     </button>
+                    <button class="btn-cmd" style="background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800;" id="btn-top-beat-studio" onclick="toggleLongformBeatStudio()" title="Toggle Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio (389 Scenes)">
+                        <span>🔍</span> Beat Studio (389)
+                    </button>
                     <button class="btn-cmd" style="background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; font-weight: 700;" id="btn-top-render-full-video" onclick="renderVideoPodcast('full')" title="Render Full 1080p Horizontal Video (54m) for YouTube & Spotify Video">
                         <span>🎬</span> Render Full Video
                     </button>
@@ -2180,7 +2183,7 @@
                             <span>⚡</span> 60s Preview
                         </button>
                     </div>
-                    <button class="btn-cmd" onclick="switchTab('narrative'); switchPodcastSubmode('longform');" style="width: 100%; justify-content: center; padding: 0.5rem; margin-bottom: 0.5rem; background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800; font-size: 0.75rem;" title="Open the Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio">
+                    <button class="btn-cmd" onclick="openLongformBeatStudio();" style="width: 100%; justify-content: center; padding: 0.5rem; margin-bottom: 0.5rem; background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800; font-size: 0.75rem;" title="Open the Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio">
                         <span>🔍</span> Open Beat-by-Beat Timeline Studio (389 Scenes)
                     </button>
                                         <div id="podcast-video-status-deck" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-bottom: 0.5rem;"></div>
@@ -3195,6 +3198,30 @@ if __name__ == '__main__':
         let searchMatches = [];
         let currentSearchMatchIdx = -1;
 
+        // Alias switchTab -> switchMiddleTab for backward compatibility
+        window.switchTab = switchMiddleTab;
+
+        function openLongformBeatStudio() {
+            if (activeMiddleTab !== 'narrative') {
+                switchMiddleTab('narrative');
+            }
+            switchPodcastSubmode('longform');
+            const viewNarrative = document.getElementById('tab-view-narrative');
+            if (viewNarrative) {
+                viewNarrative.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+            showToast('🎬 Opened Longform Beat-by-Beat Timeline Studio (389 Scenes)');
+        }
+
+        function toggleLongformBeatStudio() {
+            if (podcastSubmode === 'longform') {
+                switchPodcastSubmode('podcast');
+                showToast('🎙️ Returned to Podcast Transcript & Cuts');
+            } else {
+                openLongformBeatStudio();
+            }
+        }
+
         function switchPodcastSubmode(mode) {
             podcastSubmode = mode;
             const btnPod = document.getElementById('btn-submode-podcast');
@@ -3203,6 +3230,7 @@ if __name__ == '__main__':
             const viewPod = document.getElementById('submode-view-podcast');
             const viewLf = document.getElementById('submode-view-longform');
             const viewNostr = document.getElementById('submode-view-nostr');
+            const topBeatBtn = document.getElementById('btn-top-beat-studio');
 
             [btnPod, btnLf, btnNostr].forEach(b => { if (b) b.classList.remove('active'); });
             [viewPod, viewLf, viewNostr].forEach(v => { if (v) v.style.display = 'none'; });
@@ -3210,13 +3238,31 @@ if __name__ == '__main__':
             if (mode === 'podcast') {
                 if (btnPod) btnPod.classList.add('active');
                 if (viewPod) viewPod.style.display = 'block';
+                if (topBeatBtn) {
+                    topBeatBtn.style.background = '#f0f9ff';
+                    topBeatBtn.style.color = '#0369a1';
+                    topBeatBtn.style.borderColor = '#bae6fd';
+                    topBeatBtn.innerHTML = '<span>🔍</span> Beat Studio (389)';
+                }
             } else if (mode === 'longform') {
                 if (btnLf) btnLf.classList.add('active');
                 if (viewLf) viewLf.style.display = 'block';
+                if (topBeatBtn) {
+                    topBeatBtn.style.background = '#0284c7';
+                    topBeatBtn.style.color = '#ffffff';
+                    topBeatBtn.style.borderColor = '#0369a1';
+                    topBeatBtn.innerHTML = '<span>🎙️</span> Back to Transcript';
+                }
                 initLongformBeatStudio();
             } else {
                 if (btnNostr) btnNostr.classList.add('active');
                 if (viewNostr) viewNostr.style.display = 'block';
+                if (topBeatBtn) {
+                    topBeatBtn.style.background = '#f0f9ff';
+                    topBeatBtn.style.color = '#0369a1';
+                    topBeatBtn.style.borderColor = '#bae6fd';
+                    topBeatBtn.innerHTML = '<span>🔍</span> Beat Studio (389)';
+                }
             }
         }
 
