@@ -4265,6 +4265,31 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json({"success": False, "error": str(e)}, status=500)
             return
 
+        if path == "/api/podcast/patch_longform_chapter":
+            clean_id = str(data.get("clean_id", "248")).replace(".md", "").lstrip("_") or "248"
+            clip_num = int(data.get("clip_num", 1))
+
+            ddma_dir = None
+            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                if d.exists():
+                    ddma_dir = d
+                    break
+            if not ddma_dir:
+                self.send_json({"success": False, "error": "ddma directory not found"}, status=500)
+                return
+
+            try:
+                cmd = [sys.executable, "render_longform_parallel.py", "--patch", str(clip_num)]
+                res = subprocess.run(cmd, cwd=str(ddma_dir), capture_output=True, text=True, timeout=120)
+                if res.returncode == 0:
+                    self.send_json({"success": True, "message": f"Successfully patched Part {clip_num} into Master MP4!"})
+                else:
+                    err_msg = res.stderr[-500:] if res.stderr else res.stdout[-500:]
+                    self.send_json({"success": False, "error": f"Patch failed: {err_msg}"}, status=500)
+            except Exception as ex:
+                self.send_json({"success": False, "error": str(ex)}, status=500)
+            return
+
         self.send_error(404, "Endpoint not found")
 
     def send_json(self, data, status=200):

@@ -1794,6 +1794,9 @@
                                     <button type="button" class="btn-cmd" onclick="renderVideoPodcast('full')" style="font-size: 0.7rem; padding: 4px 10px; background: #4f46e5; color: #fff; border-color: #4338ca; font-weight: 700;" title="Re-compile the 54-minute 1080p master MP4 with all updated Manim archetypes">
                                         🎬 Re-Compile 54m Master MP4
                                     </button>
+                                    <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: #0284c7; color: #fff; border-color: #0369a1; font-weight: 700;" title="Hot-patch ONLY the active chapter into the 54m Master (~8s, lossless keyframe splice)">
+                                        ⚡ Patch Active Chapter (~8s)
+                                    </button>
                                 </div>
                             </div>
 
@@ -1880,7 +1883,7 @@
                                 <textarea id="lf-beat-directive-input" rows="2" placeholder="Pause the video and describe what you want changed in this 7.5s animation (e.g. 'Show a commercial airplane flying across the sky', 'Show a 100m sprinter racing toward a finish line')..." style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 11px; font-size: 0.84rem; font-family: inherit; resize: vertical; background: #f8fafc; color: #0f172a; margin-bottom: 10px;"></textarea>
 
                                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <button type="button" onclick="toggleLfCodeEditor()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                                    <button type="button" id="lf-btn-toggle-code" onclick="toggleLfCodeEditor()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
                                         💻 Show / Edit Manim Python Code
                                     </button>
                                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -3347,11 +3350,13 @@ if __name__ == '__main__':
 
             strip.innerHTML = lfTimelineIndex.chapters.map(ch => {
                 const isActive = ch.clip_num === lfActiveClipNum;
-                const bg = isActive ? '#7c3aed' : '#0f172a';
-                const col = isActive ? '#ffffff' : '#cbd5e1';
-                const border = isActive ? '#a78bfa' : '#334155';
-                return `<button type="button" id="lf-ch-btn-${ch.clip_num}" onclick="selectLfChapter(${ch.clip_num}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;transition:all 0.12s;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)} - ${formatDuration(ch.end)})">
-                    P${ch.clip_num}: ${escapeHtml(ch.title.slice(0, 18))}
+                const isMosaic = ch.visual_source === 'mosaic';
+                const bg = isActive ? '#7c3aed' : (isMosaic ? '#0c2340' : '#0f172a');
+                const col = isActive ? '#ffffff' : (isMosaic ? '#7dd3fc' : '#cbd5e1');
+                const border = isActive ? '#a78bfa' : (isMosaic ? '#0284c7' : '#334155');
+                const prefix = isMosaic ? '🎞 ' : '';
+                return `<button type="button" id="lf-ch-btn-${ch.clip_num}" onclick="selectLfChapter(${ch.clip_num}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;transition:all 0.12s;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)} - ${formatDuration(ch.end)}) [${isMosaic ? 'Mosaic Master' : 'Manim Master'}]">
+                    ${prefix}P${ch.clip_num}: ${escapeHtml(ch.title.slice(0, 18))}
                 </button>`;
             }).join('');
         }
@@ -3363,8 +3368,10 @@ if __name__ == '__main__':
 
             const metaEl = document.getElementById('lf-active-chapter-meta');
             const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
+            const isMosaicCh = chInfo?.visual_source === 'mosaic';
             if (metaEl && chInfo) {
-                metaEl.innerText = `Part ${cNum}: ${chInfo.title} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})`;
+                const badge = isMosaicCh ? '<span style="background:#0284c7;color:#fff;font-size:0.64rem;padding:2px 7px;border-radius:4px;margin-left:8px;font-weight:800;letter-spacing:0.5px;">🎞 MOSAIC MASTER</span>' : '';
+                metaEl.innerHTML = `Part ${cNum}: ${escapeHtml(chInfo.title)} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})${badge}`;
             }
 
             try {
@@ -3444,6 +3451,54 @@ if __name__ == '__main__':
                 if (codeArea && document.activeElement !== codeArea) codeArea.value = b.code || '';
             }
 
+            // Handle Mosaic vs Manim Master state (Greys out beat editing for Mosaic master chapters)
+            const isMosaic = chData.visual_source === 'mosaic' || chData.locked;
+            const regenBtn = document.getElementById('lf-btn-regen-beat');
+            const toggleCodeBtn = document.getElementById('lf-btn-toggle-code');
+            const codeDrawer = document.getElementById('lf-code-editor-drawer');
+
+            if (isMosaic) {
+                if (dirInput) {
+                    dirInput.disabled = true;
+                    dirInput.value = "";
+                    dirInput.placeholder = "Chapter uses Mosaic as Active Master — set Manim as Active Master in DDMA to edit beats.";
+                    dirInput.style.opacity = '0.55';
+                    dirInput.style.cursor = 'not-allowed';
+                }
+                if (regenBtn) {
+                    regenBtn.disabled = true;
+                    regenBtn.style.opacity = '0.4';
+                    regenBtn.style.cursor = 'not-allowed';
+                    regenBtn.title = "Chapter uses Mosaic as Active Master — set Manim as Active Master in DDMA to edit beats";
+                }
+                if (toggleCodeBtn) {
+                    toggleCodeBtn.disabled = true;
+                    toggleCodeBtn.style.opacity = '0.4';
+                    toggleCodeBtn.style.cursor = 'not-allowed';
+                    toggleCodeBtn.title = "Chapter uses Mosaic as Active Master";
+                }
+                if (codeDrawer) codeDrawer.style.display = 'none';
+            } else {
+                if (dirInput) {
+                    dirInput.disabled = false;
+                    dirInput.placeholder = "Pause the video and describe what you want changed in this 7.5s animation (e.g. 'Show a commercial airplane flying across the sky', 'Show a 100m sprinter racing toward a finish line')...";
+                    dirInput.style.opacity = '1';
+                    dirInput.style.cursor = '';
+                }
+                if (regenBtn) {
+                    regenBtn.disabled = false;
+                    regenBtn.style.opacity = '1';
+                    regenBtn.style.cursor = 'pointer';
+                    regenBtn.title = "Regenerate this beat with Gemini AI";
+                }
+                if (toggleCodeBtn) {
+                    toggleCodeBtn.disabled = false;
+                    toggleCodeBtn.style.opacity = '1';
+                    toggleCodeBtn.style.cursor = 'pointer';
+                    toggleCodeBtn.title = "Show / Edit Manim Python Code";
+                }
+            }
+
             if (seekVideo && videoEl) {
                 videoEl.currentTime = b.longform_start + 0.08;
             }
@@ -3482,6 +3537,54 @@ if __name__ == '__main__':
                 const bIdx = chData.beats.findIndex(b => currentTime >= b.longform_start && currentTime < b.longform_end);
                 if (bIdx !== -1 && bIdx !== lfActiveBeatIdx) {
                     selectLfBeat(bIdx, false);
+                }
+            }
+        }
+
+        async function patchActiveLongformChapter() {
+            const ep = selectedEpisode;
+            const cleanId = (ep?.filename || '248').replace('.md', '').replace(/^_/, '') || '248';
+            const cNum = lfActiveClipNum || 1;
+            const btn = document.getElementById('btn-patch-lf-chapter');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⚡ Patching (~8s)...';
+                btn.style.cursor = 'wait';
+            }
+            showToast(`⚡ Hot-patching Part ${cNum} into Longform Master MP4...`);
+
+            try {
+                const res = await fetch('/api/podcast/patch_longform_chapter', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clean_id: cleanId, clip_num: cNum })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.error || "Failed to patch chapter");
+                }
+                showToast(`✅ Part ${cNum} successfully patched into Master MP4!`);
+
+                const videoEl = document.getElementById('lf-studio-video-player');
+                if (videoEl) {
+                    const ch = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
+                    const curTime = ch ? ch.start + 0.1 : videoEl.currentTime;
+                    const baseSrc = videoEl.src.split('?')[0];
+                    videoEl.src = `${baseSrc}?t=${Date.now()}`;
+                    videoEl.load();
+                    videoEl.currentTime = curTime;
+                }
+
+                lfChapterLRU.delete(cNum);
+                await selectLfChapter(cNum, false);
+            } catch (err) {
+                showToast(`Patch error: ${err.message}`);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                    btn.style.cursor = 'pointer';
                 }
             }
         }
