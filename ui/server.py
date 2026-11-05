@@ -1438,14 +1438,13 @@ def review_podcast_with_gemini(clean_id: str) -> dict:
 
     transcript_sample = "\n".join(summary_segments)
 
-    prompt = f"""You are the Executive Audio Director for the "Deep Dive with Gemini" podcast.
-Analyze the following timestamped dialogue transcript sections and recommend the optimal placement for our 4 signature music stings:
+    prompt = f"""You are the Executive Audio Director for the "Deep Dive with Gemini" podcast pipeline.
+Analyze the following timestamped dialogue transcript sections and recommend the optimal placement for our canonical music stings following our Tripartite episodic pacing invariant:
 
-Canonical Show Music Stings:
-1. "deepDive-strong.mp3" — Signature show intro. MUST be placed right after the opening cold hook/teaser (typically between 20s and 50s at the end of the provocative opening question/premise) before the hosts introduce the topic.
-2. "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3" — Reflective, thoughtful transition. Place when shifting into deep technical or philosophical mechanics (~25% to 45% mark).
-3. "Howling (Sting) - Gunnar Olsen.mp3" — Dynamic, driving pivot. Place at a major turning point, conflict, or second key discovery (~55% to 75% mark).
-4. "deepDive-conclusion.mp3" — Signature show outro. MUST be placed at the VERY END of the speech track right as the hosts sign off, so the episode concludes with music rather than an abrupt cutoff.
+Canonical Episodic Music Architecture:
+1. Master Show Opener Transition: "deepDive-conclusion.mp3" (or "deepDive-strong.mp3") placed right after the opening punchline / provocative premise (typically ~20s to ~45s) to launch the episode.
+2. Periodic Mid-Stings: Alternating "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3" and "Howling (Sting) - Gunnar Olsen.mp3" (5.5s, 0.5s crossfade) placed at chapter pivots between the spoken thesis hook and the deep deliberation (~every 2-3 minutes).
+3. Episode Finale Outro: "deepDive-conclusion.mp3" placed at the VERY END of the speech track right as the hosts sign off, so the episode concludes with music.
 
 Available Music Stings:
 {json.dumps(sting_names, indent=2)}
@@ -1454,44 +1453,43 @@ Dialogue Sample:
 {transcript_sample}
 
 Rules:
-1. "at" MUST be an exact sentence-ending timestamp where a complete sentence finishes (ending with a period or question mark). NEVER place a sting in the middle of a sentence or between connected clauses.
-2. "deepDive-conclusion.mp3" must always be at the very end of the dialogue to end the episode with music.
-3. "mode" should be "gap_03" (0.3s silence before and after sting).
-4. "duck_db" should be -14.
+1. "at" MUST be an exact sentence-ending timestamp where a complete sentence finishes (ending with a period, question mark, or exclamation point). NEVER place a sting mid-sentence.
+2. "mode" should be "fade_2s_xfade_05" (or "gap_03" for clean gap).
+3. "duck_db" should be -14.
 
 Return ONLY a JSON object formatted as:
 {{
   "recommendations": [
     {{
       "at": 29.68,
-      "music_file": "deepDive-strong.mp3",
-      "reason": "Signature intro curtain raiser right after opening hook.",
-      "mode": "gap_03",
-      "duration": 10.0,
+      "music_file": "deepDive-conclusion.mp3",
+      "reason": "Master show opener transition right after opening thesis hook.",
+      "mode": "fade_2s_xfade_05",
+      "duration": 5.5,
       "duck_db": -14
     }},
     {{
       "at": 1124.48,
       "music_file": "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
-      "reason": "Reflective chapter transition at complete sentence end.",
-      "mode": "gap_03",
-      "duration": 7.5,
+      "reason": "Mid-sting transition between punchline hook and core technical deliberation.",
+      "mode": "fade_2s_xfade_05",
+      "duration": 5.5,
       "duck_db": -14
     }},
     {{
       "at": 2088.58,
       "music_file": "Howling (Sting) - Gunnar Olsen.mp3",
-      "reason": "Energetic pivot at complete sentence end.",
-      "mode": "gap_03",
-      "duration": 6.8,
+      "reason": "Dynamic mid-sting pivot between chapter punchline and deliberation.",
+      "mode": "fade_2s_xfade_05",
+      "duration": 5.5,
       "duck_db": -14
     }},
     {{
       "at": 3215.34,
       "music_file": "deepDive-conclusion.mp3",
-      "reason": "Signature show outro concluding the episode with music at final words.",
-      "mode": "gap_03",
-      "duration": 15.0,
+      "reason": "Signature show finale concluding the episode with music at final words.",
+      "mode": "fade_2s_xfade_05",
+      "duration": 5.5,
       "duck_db": -14
     }}
   ]
