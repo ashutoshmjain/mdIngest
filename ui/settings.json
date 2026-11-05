@@ -10,7 +10,7 @@
   "downloads_path": "C:/Users/ashut/Downloads",
   "title_word_limit": 5,
   "recent_window_size": 21,
-  "whisper_model": "small.en",
+  "whisper_model": "large-v3-turbo",
   "whisper_word_timestamps": true,
   "external_editor": "gvim",
   "port": 8088

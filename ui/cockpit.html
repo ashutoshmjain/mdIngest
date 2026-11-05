@@ -2058,7 +2058,8 @@
                     <div class="studio-title" style="margin-bottom: 0.5rem;">
                         <span>⚡ Local Whisper STT</span>
                         <select id="whisper-model-select" style="font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); background: #ffffff;">
-                            <option value="small.en" selected>small.en (DDMA Standard • Word Timestamps)</option>
+                            <option value="large-v3-turbo" selected>large-v3-turbo (AVX-512 Turbo • Recommended)</option>
+                            <option value="small.en">small.en (DDMA Standard • Fast)</option>
                             <option value="small">small (Multilingual • High Accuracy)</option>
                             <option value="base.en">base.en (Fast English)</option>
                             <option value="base">base (Standard)</option>
@@ -2458,7 +2459,8 @@ if __name__ == '__main__':
             <div class="form-group">
                 <label class="form-label">Default Whisper STT Model (DDMA Word Timestamps)</label>
                 <select class="form-input" id="setting-whisper-model" style="background: #ffffff;">
-                    <option value="small.en">small.en (DDMA Standard • Word Timestamps)</option>
+                    <option value="large-v3-turbo" selected>large-v3-turbo (AVX-512 Turbo • Recommended)</option>
+                    <option value="small.en">small.en (DDMA Standard • Fast)</option>
                     <option value="small">small (Multilingual • High Accuracy)</option>
                     <option value="base.en">base.en (Fast English)</option>
                     <option value="base">base (Standard)</option>
@@ -5049,7 +5051,7 @@ if __name__ == '__main__':
                 document.getElementById('setting-fountain').value = currentStatus.settings.fountain_url || '';
                 document.getElementById('setting-lightning').value = currentStatus.settings.lightning_address || '';
                 if (document.getElementById('setting-whisper-model')) {
-                    document.getElementById('setting-whisper-model').value = currentStatus.settings.whisper_model || 'small.en';
+                    document.getElementById('setting-whisper-model').value = currentStatus.settings.whisper_model || 'large-v3-turbo';
                 }
                 if (document.getElementById('setting-external-editor')) {
                     document.getElementById('setting-external-editor').value = currentStatus.settings.external_editor || 'gvim';
@@ -5069,7 +5071,7 @@ if __name__ == '__main__':
                 youtube_music_url: document.getElementById('setting-yt-music').value,
                 fountain_url: document.getElementById('setting-fountain').value,
                 lightning_address: document.getElementById('setting-lightning').value,
-                whisper_model: document.getElementById('setting-whisper-model') ? document.getElementById('setting-whisper-model').value : 'small.en',
+                whisper_model: document.getElementById('setting-whisper-model') ? document.getElementById('setting-whisper-model').value : 'large-v3-turbo',
                 whisper_word_timestamps: true,
                 external_editor: document.getElementById('setting-external-editor') ? document.getElementById('setting-external-editor').value.trim() : 'gvim'
             };

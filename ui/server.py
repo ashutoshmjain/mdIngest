@@ -780,6 +780,92 @@ def get_episode_transcription_json_path(clean_id: str) -> Path | None:
             return c
     return None
 
+_FASTER_WHISPER_CACHE = {}
+
+def run_faster_whisper_transcription(audio_path, model_name="large-v3-turbo", word_timestamps=True, initial_prompt=None):
+    """
+    Transcribe audio using faster-whisper (CTranslate2 INT8 with AVX-512 optimization on Ryzen).
+    Falls back gracefully to openai-whisper if faster-whisper encounters an error.
+    Returns standard Whisper-format result dict: {"text": str, "segments": list, "language": str}.
+    """
+    global _FASTER_WHISPER_CACHE
+    try:
+        import av
+        if not hasattr(av, "_patched_metadata_errors"):
+            _orig_open = av.open
+            def _safe_av_open(*args, **kwargs):
+                kwargs.pop("metadata_errors", None)
+                return _orig_open(*args, **kwargs)
+            av.open = _safe_av_open
+            av._patched_metadata_errors = True
+    except Exception:
+        pass
+
+    fw_model_name = model_name or "large-v3-turbo"
+    try:
+        from faster_whisper import WhisperModel
+        if fw_model_name not in _FASTER_WHISPER_CACHE:
+            _FASTER_WHISPER_CACHE[fw_model_name] = WhisperModel(
+                fw_model_name,
+                device="cpu",
+                compute_type="int8",
+                cpu_threads=8
+            )
+        model = _FASTER_WHISPER_CACHE[fw_model_name]
+
+        audio_input = str(audio_path)
+        try:
+            import whisper.audio
+            audio_input = whisper.audio.load_audio(str(audio_path))
+        except Exception:
+            pass
+
+        transcribe_kwargs = {"word_timestamps": word_timestamps}
+        if initial_prompt:
+            transcribe_kwargs["initial_prompt"] = initial_prompt
+
+        segments_gen, info = model.transcribe(audio_input, **transcribe_kwargs)
+        segments_list = []
+        text_chunks = []
+        for s in segments_gen:
+            text_chunks.append(s.text)
+            seg_dict = {
+                "id": getattr(s, "id", len(segments_list)),
+                "seek": getattr(s, "seek", 0),
+                "start": round(float(s.start), 3),
+                "end": round(float(s.end), 3),
+                "text": s.text,
+                "tokens": getattr(s, "tokens", []),
+                "avg_logprob": getattr(s, "avg_logprob", 0.0),
+                "compression_ratio": getattr(s, "compression_ratio", 1.0),
+                "no_speech_prob": getattr(s, "no_speech_prob", 0.0),
+            }
+            if s.words:
+                seg_dict["words"] = [
+                    {
+                        "word": w.word,
+                        "start": round(float(w.start), 3),
+                        "end": round(float(w.end), 3),
+                        "probability": round(float(getattr(w, "probability", 1.0)), 4)
+                    }
+                    for w in s.words
+                ]
+            else:
+                seg_dict["words"] = []
+            segments_list.append(seg_dict)
+
+        return {
+            "text": "".join(text_chunks).strip(),
+            "segments": segments_list,
+            "language": getattr(info, "language", "en")
+        }
+    except Exception as e:
+        print(f"[TRANSCRIPTION] faster-whisper error ({e}); falling back to openai-whisper...")
+        import whisper
+        fallback_mname = fw_model_name if fw_model_name != "large-v3-turbo" else "small.en"
+        wmodel = whisper.load_model(fallback_mname)
+        return wmodel.transcribe(str(audio_path), fp16=False, word_timestamps=word_timestamps)
+
 CANONICAL_PODCAST_STINGS = [
     "deepDive-strong.mp3",
     "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
@@ -2316,14 +2402,9 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
     has_valid_words = bool(segments and any(s.get("words") for s in segments))
     if not has_valid_words and audio_path and audio_path.exists():
         try:
-            import whisper
             settings = load_settings()
-            mname = settings.get("whisper_model", "small.en")
-            try:
-                model = whisper.load_model(mname)
-            except Exception:
-                model = whisper.load_model("base")
-            res_obj = model.transcribe(str(audio_path), fp16=False, word_timestamps=True)
+            mname = settings.get("whisper_model", "large-v3-turbo")
+            res_obj = run_faster_whisper_transcription(audio_path, model_name=mname, word_timestamps=True)
             segments = res_obj.get("segments", [])
             transcript_text = res_obj.get("text", "").strip() or transcript_text
             
@@ -2332,7 +2413,7 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
             with open(src_trans_json, "w", encoding="utf-8") as tj:
                 json.dump(res_obj, tj, indent=4)
         except Exception as we:
-            print(f"[DDMA SEED] Whisper acoustic alignment fallback: {we}")
+            print(f"[DDMA SEED] faster-whisper acoustic alignment fallback: {we}")
 
     if not segments and transcript_text:
         # Emergency fallback: Synthesize segments from transcript sentences distributed over audio_duration
@@ -3719,7 +3800,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             fn = data.get("filename", "")
             clean_id = fn.replace(".md", "").lstrip("_")
             settings = load_settings()
-            default_model = settings.get("whisper_model", "small.en")
+            default_model = settings.get("whisper_model", "large-v3-turbo")
             model_name = data.get("model", default_model)
 
             audio_path = get_episode_audio_path(clean_id)
@@ -3728,12 +3809,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             def transcribe_worker(cid, apath, mname):
-                transcription_jobs[cid] = {"status": "processing", "progress": f"Loading Whisper ({mname})..."}
+                transcription_jobs[cid] = {"status": "processing", "progress": f"Loading faster-whisper ({mname})..."}
                 try:
-                    import whisper
-                    transcription_jobs[cid]["progress"] = f"Transcribing audio with {mname} (word_timestamps=True)..."
-                    model = whisper.load_model(mname)
-                    result = model.transcribe(str(apath), fp16=False, word_timestamps=True)
+                    transcription_jobs[cid]["progress"] = f"Transcribing audio with faster-whisper {mname} (word_timestamps=True)..."
+                    result = run_faster_whisper_transcription(apath, model_name=mname, word_timestamps=True)
                     text = result.get("text", "").strip()
 
                     # 1. Save plain transcript.txt
