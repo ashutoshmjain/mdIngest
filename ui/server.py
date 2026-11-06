@@ -588,24 +588,40 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
 transcription_jobs = {}
 
 def get_episode_audio_path(clean_id: str) -> Path | None:
-    """Discovers local audio file for an episode."""
+    """Discovers local audio file for an episode, including DDMA projects and Google Drive agy_inputs."""
     possible_dirs = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,
+        PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}",
+        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}",
         SRC_DIR / "audio",
         PROJECT_ROOT / "ddma" / "audio",
     ]
     for d in possible_dirs:
+        if not d.exists():
+            continue
         for ext in [".mp3", ".wav", ".m4a", ".ogg", ".aac"]:
-            f = d / f"audio{ext}"
-            if f.exists():
-                return f
-            f_named = d / f"{clean_id}{ext}"
-            if f_named.exists():
-                return f_named
-            f_nb = d / f"notebooklm{ext}"
-            if f_nb.exists():
-                return f_nb
+            for stem in [f"audio{ext}", f"{clean_id}{ext}", f"podcast_{clean_id}{ext}", f"notebooklm{ext}"]:
+                f = d / stem
+                if f.exists():
+                    return f
+
+    # Automatic Google Drive agy_inputs fallback for cloud-ingested episodes
+    gdrive_ep_dir = Path(r"G:\My Drivegy_inputs") / str(clean_id)
+    if gdrive_ep_dir.exists():
+        for ext in [".m4a", ".mp3", ".wav", ".ogg", ".aac"]:
+            matches = sorted(gdrive_ep_dir.glob(f"*{ext}"))
+            if matches:
+                src_audio = matches[0]
+                try:
+                    dest_dir = SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id)
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    dest_file = dest_dir / f"{clean_id}{ext}"
+                    if not dest_file.exists():
+                        shutil.copy2(str(src_audio), str(dest_file))
+                    return dest_file
+                except Exception:
+                    return src_audio
     return None
 
 def get_episode_transcript_path(clean_id: str) -> Path:
@@ -2491,8 +2507,22 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
             with open(trans_json_dest, "w", encoding="utf-8") as tj:
                 json.dump(transcription_payload, tj, indent=4)
 
-        # Generate plan.json if missing
+        # Sync plan.json from src/ddma/docs/episodes/<id>/plan.json first if available
         plan_json_dest = proj_dir / "plan.json"
+        src_plan_json = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "plan.json"
+        if src_plan_json.exists() and src_plan_json.stat().st_size > 20:
+            try:
+                should_sync = not plan_json_dest.exists() or plan_json_dest.stat().st_size == 0
+                if not should_sync:
+                    with open(plan_json_dest, "r", encoding="utf-8") as pf_chk:
+                        existing_p = json.load(pf_chk)
+                    if existing_p and isinstance(existing_p, list) and existing_p[0].get("title") == "Clip 1":
+                        should_sync = True
+                if should_sync:
+                    shutil.copy2(str(src_plan_json), str(plan_json_dest))
+            except Exception as sp_err:
+                print(f"[DDMA SEED] Warning syncing src plan.json: {sp_err}")
+
         if not plan_json_dest.exists() or plan_json_dest.stat().st_size == 0:
             # Try running ddma.py plan CLI first
             cli_script = root_dir / "ddma.py"
@@ -2556,16 +2586,16 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
                     
                     c_obj = {
                         "num": clip_num,
-                        "title": f"Clip {clip_num}",
+                        "title": f"Part {clip_num}",
                         "start": round(t_curr, 2),
                         "end": round(target_b, 2),
                         "duration": clip_dur,
-                        "bridge_text": [f"What is the deeper secret behind Part {clip_num}?"],
+                        "bridge_text": [f"What Is Part {clip_num + 1} ?"],
                         "segments": [
                             {"type": "audio", "start": round(t_curr, 2), "end": round(hook_end, 2), "duration": round(hook_end - t_curr, 2), "text": hook_text},
-                            {"type": "music", "music_file": mid_music, "duration": 5.5, "silence_before": 0.2, "fade_out": 2.0, "crossfade": 0.5, "volume": 1.0},
+                            {"type": "music", "music_file": mid_music, "duration": 5.5, "silence_before": 0.2, "gap": 0.2, "fade_out": 2.0, "crossfade": 1.0, "volume": 1.0},
                             {"type": "audio", "start": round(hook_end, 2), "end": round(target_b, 2), "duration": round(target_b - hook_end, 2), "text": win_text},
-                            {"type": "music", "music_file": "deepDive-conclusion.mp3", "duration": 5.5, "silence_before": 0.2, "fade_out": 2.0, "crossfade": 0.0, "volume": 1.0}
+                            {"type": "music", "music_file": "deepDive-conclusion.mp3", "duration": 5.5, "silence_before": 0.2, "gap": 0.2, "fade_out": 2.0, "crossfade": 0.0, "volume": 1.0}
                         ],
                         "locked": False
                     }
