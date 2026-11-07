@@ -2094,7 +2094,7 @@
                     <div style="margin-bottom: 0.6rem; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 0.5rem;">
                         <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-dark-secondary); margin-bottom: 0.35rem; display: flex; justify-content: space-between; align-items: center;">
                             <span>🎯 4 Canonical Stings</span>
-                            <span style="font-size: 0.62rem; color: #4f46e5; font-weight: 600;">0.2s Front / 2s Fade + 0.5s XFade</span>
+                            <span style="font-size: 0.62rem; color: #4f46e5; font-weight: 600;">0.2s Front / 2s Fade + 1.0s Full-Vol XFade</span>
                         </div>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
                             <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('deepDive-strong.mp3', this)" title="Signature Intro Curtain Raiser">
@@ -4105,10 +4105,17 @@ if __name__ == '__main__':
                 if (statusTag) {
                     statusTag.style.background = '#d1fae5';
                     statusTag.style.color = '#065f46';
-                    statusTag.innerText = `${(data.recommendations || []).length} Stings Suggested`;
+                    const cutCount = (data.suggested_cuts || []).length;
+                    statusTag.innerText = `${(data.recommendations || []).length} Stings${cutCount ? ' + ' + cutCount + ' Cut' : ''} Applied`;
                 }
 
-                renderGeminiRecommendations(data.recommendations || []);
+                if (data.edit && currentPodcastData) {
+                    currentPodcastData.edit = data.edit;
+                    renderPodcastStudioView(currentPodcastData);
+                }
+
+                renderGeminiRecommendations(data.recommendations || [], data.suggested_cuts || []);
+                showToast(`✅ Applied ${(data.recommendations || []).length} clip-aligned stings${(data.suggested_cuts || []).length ? ' & stripped redundant welcome' : ''}!`);
             } catch (err) {
                 showToast("Gemini review error: " + err.message);
             }
@@ -4124,7 +4131,15 @@ if __name__ == '__main__':
             }
             const words = currentPodcastData.words || [];
             const segments = currentPodcastData.segments || [];
+            const editStings = (currentPodcastData.edit && currentPodcastData.edit.stings) || [];
             let totalDur = words.length > 0 ? words[words.length - 1].end : 600.0;
+
+            // Prefer actual placed sting timestamp from podcast_edit.json if present
+            const matchedSting = editStings.find(s => (s.music_file || '') === stingFile || (s.music_file || '').includes(stingFile.split(' ')[0]));
+            if (matchedSting && typeof matchedSting.at === 'number') {
+                togglePlayFlowPreview(stingFile, matchedSting.at, btnEl);
+                return;
+            }
 
             function findSentenceBoundary(targetT, windowSec = 40.0) {
                 let bestT = targetT;
@@ -4149,13 +4164,13 @@ if __name__ == '__main__':
                 return bestT;
             }
 
-            let atSec = 30.0;
+            let atSec = 17.41;
             if (stingFile.includes('strong')) {
-                atSec = findSentenceBoundary(30.0, 25.0);
+                atSec = findSentenceBoundary(18.0, 12.0);
             } else if (stingFile.includes('Bluesy')) {
-                atSec = findSentenceBoundary(totalDur * 0.35, 45.0);
+                atSec = findSentenceBoundary(134.0, 45.0);
             } else if (stingFile.includes('Howling')) {
-                atSec = findSentenceBoundary(totalDur * 0.65, 45.0);
+                atSec = findSentenceBoundary(245.0, 45.0);
             } else if (stingFile.includes('conclusion')) {
                 // Outro: ALWAYS at the very end of the speech track to conclude with music!
                 atSec = totalDur;
@@ -4232,30 +4247,41 @@ if __name__ == '__main__':
             });
         }
 
-        function renderGeminiRecommendations(recs) {
+        function renderGeminiRecommendations(recs, suggestedCuts = []) {
             const container = document.getElementById('gemini-recs-container');
             if (!container) return;
 
-            if (recs.length === 0) {
+            if (recs.length === 0 && suggestedCuts.length === 0) {
                 container.innerHTML = '<div style="font-size: 0.7rem; color: var(--text-dark-muted); text-align: center; font-style: italic; padding: 0.5rem 0;">No recommendations returned.</div>';
                 return;
             }
 
             let html = '';
+            suggestedCuts.forEach((c) => {
+                html += `
+                    <div class="gemini-rec-card" style="background: #fef2f2; border-color: #fecaca;">
+                        <div class="gemini-rec-header">
+                            <span style="color: #b91c1c; font-weight: 700;">✂️ Stripped Welcome Speech</span>
+                            <span style="color: #991b1b; font-size: 0.68rem;">${c.start}s – ${c.end}s</span>
+                        </div>
+                        <p style="font-size: 0.71rem; color: #7f1d1d; margin: 0; line-height: 1.35;">"${escapeHtml(c.text || '')}" — ${escapeHtml(c.reason || '')}</p>
+                    </div>
+                `;
+            });
             recs.forEach((r, idx) => {
                 html += `
                     <div class="gemini-rec-card">
                         <div class="gemini-rec-header">
                             <span style="color: #4338ca; font-weight: 700;">🎵 ${escapeHtml(r.music_file)}</span>
-                            <span style="color: var(--text-dark-muted); font-size: 0.68rem;">@ ${r.at}s</span>
+                            <span style="color: var(--text-dark-muted); font-size: 0.68rem;">@ ${r.at}s (${r.duration || 5.5}s)</span>
                         </div>
                         <p style="font-size: 0.72rem; color: var(--text-dark-primary); margin: 0; line-height: 1.35;">${escapeHtml(r.reason || '')}</p>
                         <div style="display: flex; gap: 0.35rem; margin-top: 0.35rem; align-items: center; flex-wrap: wrap;">
-                            <button type="button" class="btn-cmd flow-play-btn" style="padding: 0.2rem 0.55rem; font-size: 0.68rem; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; font-weight: 600;" onclick="togglePlayFlowPreview('${escapeHtml(r.music_file)}', ${r.at}, this)" title="0.2s front silence | 2s sting fade out | 0.5s podcast crossfade">
+                            <button type="button" class="btn-cmd flow-play-btn" style="padding: 0.2rem 0.55rem; font-size: 0.68rem; background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; font-weight: 600;" onclick="togglePlayFlowPreview('${escapeHtml(r.music_file)}', ${r.at}, this)" title="0.2s front silence | 2s sting fade out | 1.0s full-volume podcast crossfade">
                                 🎧 Play Flow
                             </button>
                             <button type="button" class="btn-cmd emerald" style="padding: 0.2rem 0.55rem; font-size: 0.68rem;" onclick="acceptGeminiSting(${JSON.stringify(r).replace(/"/g, '&quot;')})">
-                                + Accept
+                                ✓ Placed
                             </button>
                             <button type="button" class="btn-sub" style="padding: 0.2rem 0.45rem; font-size: 0.65rem;" onclick="previewStingAudio('${escapeHtml(r.music_file)}')" title="Isolated sting audio only">
                                 Sting Only

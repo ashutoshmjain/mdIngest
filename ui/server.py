@@ -586,8 +586,29 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
 # Active transcription jobs: { clean_id: { "status": "idle"|"processing"|"done"|"error", "progress": str, "error": str } }
 transcription_jobs = {}
 
+def get_dd_hub_root() -> Path:
+    """Resolves the canonical dd_hub root across Local Windows, Antigravity Cloud VM, and GCP Docker."""
+    env_hub = os.environ.get("DD_HUB_ROOT")
+    if env_hub and Path(env_hub).exists():
+        return Path(env_hub)
+    settings = load_settings()
+    cfg_hub = settings.get("dd_hub_root")
+    if cfg_hub and Path(cfg_hub).exists():
+        return Path(cfg_hub)
+    for cand in [
+        Path(r"G:\My Drive\dd_hub"),
+        Path("/mnt/gdrive/dd_hub"),
+        Path("/workspace/dd_hub"),
+    ]:
+        try:
+            if cand.exists():
+                return cand
+        except Exception:
+            pass
+    return Path(r"G:\My Drive\dd_hub")
+
 def get_episode_audio_path(clean_id: str) -> Path | None:
-    """Discovers local audio file for an episode, including DDMA projects and Google Drive agy_inputs."""
+    """Discovers local audio file for an episode, including DDMA projects and Google Drive dd_hub/inputs."""
     possible_dirs = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,
@@ -605,22 +626,26 @@ def get_episode_audio_path(clean_id: str) -> Path | None:
                 if f.exists():
                     return f
 
-    # Automatic Google Drive agy_inputs fallback for cloud-ingested episodes
-    gdrive_ep_dir = Path(r"G:\My Drivegy_inputs") / str(clean_id)
-    if gdrive_ep_dir.exists():
-        for ext in [".m4a", ".mp3", ".wav", ".ogg", ".aac"]:
-            matches = sorted(gdrive_ep_dir.glob(f"*{ext}"))
-            if matches:
-                src_audio = matches[0]
-                try:
-                    dest_dir = SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id)
-                    dest_dir.mkdir(parents=True, exist_ok=True)
-                    dest_file = dest_dir / f"{clean_id}{ext}"
-                    if not dest_file.exists():
-                        shutil.copy2(str(src_audio), str(dest_file))
-                    return dest_file
-                except Exception:
-                    return src_audio
+    # Automatic Google Drive dd_hub/inputs/<ep> (and legacy agy_inputs/<ep>) fallback
+    hub_root = get_dd_hub_root()
+    for gdrive_ep_dir in [
+        hub_root / "inputs" / str(clean_id),
+        Path(r"G:\My Drive\agy_inputs") / str(clean_id),
+    ]:
+        if gdrive_ep_dir.exists():
+            for ext in [".m4a", ".mp3", ".wav", ".ogg", ".aac"]:
+                matches = sorted(gdrive_ep_dir.glob(f"*{ext}"))
+                if matches:
+                    src_audio = matches[0]
+                    try:
+                        dest_dir = SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id)
+                        dest_dir.mkdir(parents=True, exist_ok=True)
+                        dest_file = dest_dir / f"{clean_id}{ext}"
+                        if not dest_file.exists():
+                            shutil.copy2(str(src_audio), str(dest_file))
+                        return dest_file
+                    except Exception:
+                        return src_audio
     return None
 
 def get_episode_transcript_path(clean_id: str) -> Path:
@@ -654,9 +679,11 @@ def get_episode_podcast_video_path(clean_id: str) -> Path:
     canonical = get_episode_podcast_dir(clean_id) / f"podcast_{clean_id}.mp4"
     if canonical.exists():
         return canonical
+    hub_root = get_dd_hub_root()
     for alt in [
         PROJECT_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
         PROD_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
+        hub_root / "video" / f"podcast_{clean_id}.mp4",
         Path("G:/My Drive/pickup_longform") / f"podcast_{clean_id}.mp4",
     ]:
         try:
@@ -1196,7 +1223,7 @@ def render_podcast_pipeline(clean_id: str, edit_data: dict = None) -> tuple[bool
                 for vs in valid_stings:
                     t_orig = vs["orig_at"]
                     shift = 0.0
-                    for cs, ce in valid_cuts:
+                    for cs, ce in merged_cuts:
                         if ce <= t_orig:
                             shift += (ce - cs)
                         elif cs < t_orig < ce:
@@ -1231,10 +1258,10 @@ def render_podcast_pipeline(clean_id: str, edit_data: dict = None) -> tuple[bool
                     cur = pt
                 slice_ranges.append((cur, speech_dur))
 
-                # Assemble master timeline with user specifications:
-                # 1. Front of sting: 0.2s silence - no cross fade.
-                # 2. End of sting: fade out 2.0s, and cross fade 0.5s with incoming speech (no silence addition).
-                # 3. Outro sting: 0.2s silence after speech ends, fade out 2.0s to conclude episode on music.
+                # Assemble master timeline with canonical DDMA acoustic transition rules:
+                # 1. Front of sting: 0.2s silence - no crossfade.
+                # 2. End of sting: fade out 2.0s, and crossfade 1.0s into incoming speech at 100% FULL VOLUME (strictly ZERO afade=in on human speech).
+                # 3. Outro sting: 0.2s silence after speech ends, 5.5s conclusion sting fading out over final 2.0s.
                 inputs = []
                 filter_parts = []
                 labels = []
@@ -1262,14 +1289,14 @@ def render_podcast_pipeline(clean_id: str, edit_data: dict = None) -> tuple[bool
                     labels.append(f"[m{i}]")
                     in_idx += 1
 
-                    t_next_speech = max(t_cursor, t_sting_start + dur_sting - 0.5)
+                    t_next_speech = max(t_cursor, t_sting_start + dur_sting - 1.0)
                     t_speech_ms = int(t_next_speech * 1000)
                     nxt_start, nxt_end = slice_ranges[i + 1]
                     nxt_dur = nxt_end - nxt_start
 
                     inputs.extend(["-ss", f"{nxt_start:.3f}", "-t", f"{nxt_dur:.3f}", "-i", str(stitched_speech)])
                     filter_parts.append(
-                        f"[{in_idx}:a]afade=t=in:ss=0:d=0.5,adelay={t_speech_ms}|{t_speech_ms}[sl{i+1}];"
+                        f"[{in_idx}:a]adelay={t_speech_ms}|{t_speech_ms}[sl{i+1}];"
                     )
                     labels.append(f"[sl{i+1}]")
                     in_idx += 1
@@ -1407,191 +1434,317 @@ def find_best_sentence_boundary(segments: list[dict], target_t: float, window: f
     closest = min(segments, key=lambda s: abs(float(s.get("end", 0.0)) - target_t))
     return float(closest.get("end", target_t)), closest.get("text", "")
 
+def resolve_acoustic_word_end(raw_end: float, next_word_start: float | None = None, audio_path: str | Path | None = None) -> float:
+    """
+    Extends a Whisper word end timestamp into the natural breath pause so trailing sibilants/plosives
+    (e.g., '-es' in 'senses') are never clipped in half.
+    Uses an 180ms sibilant safety cushion clamped 40ms before next_word_start, refined by 16kHz PCM RMS energy if audio_path is available.
+    """
+    max_extend = min(0.32, max(0.0, (next_word_start - raw_end) - 0.04)) if next_word_start is not None else 0.22
+    if max_extend <= 0.02:
+        return round(raw_end, 2)
+    default_ext = round(raw_end + min(0.18, max_extend), 2)
+    audio_str = str(audio_path) if audio_path else ""
+    if not audio_str or not os.path.exists(audio_str):
+        return default_ext
+    try:
+        import numpy as np
+        win_start = max(0.0, raw_end - 0.05)
+        win_dur = 0.05 + max_extend
+        p = subprocess.run(
+            ["ffmpeg", "-v", "error", "-ss", f"{win_start:.3f}", "-t", f"{win_dur:.3f}", "-i", audio_str, "-f", "s16le", "-ac", "1", "-ar", "16000", "-"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        arr = np.frombuffer(p.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+        if len(arr) < 160:
+            return default_ext
+        last_active_t = raw_end + min(0.12, max_extend)
+        for i in range(800, len(arr) - 160, 160):
+            rms = float(np.sqrt(np.mean(arr[i:i + 160] ** 2)))
+            t_frame = win_start + (i + 160) / 16000.0
+            if rms > 0.0020:
+                last_active_t = t_frame + 0.03
+        return round(min(raw_end + max_extend, max(raw_end + min(0.12, max_extend), last_active_t)), 2)
+    except Exception:
+        return default_ext
+
+
+def detect_redundant_welcome_cuts(words: list[dict], segments: list[dict], opener_hook_end: float, audio_path: Path | None = None) -> list[dict]:
+    """
+    Scans the opening 40 seconds of the word-level transcript (grouped into true sentences across Whisper segments)
+    for redundant spoken welcome statements ('Welcome to [the] deep dive' or 'Today we are going on a [massive] deep dive')
+    that should be stripped because 'deepDive-strong.mp3' already delivers the spoken
+    'Welcome to deepDive, I am Satosha, and I am Satoshi' intro sting.
+    """
+    suggested_cuts = []
+    early_words = [w for w in words if float(w.get("start", 0.0)) < 40.0]
+    if not early_words:
+        return suggested_cuts
+
+    # Split word stream into true sentences at terminal punctuation (., ?, !)
+    sentences = []
+    cur_sent = []
+    for w in early_words:
+        cur_sent.append(w)
+        w_txt = w.get("word", "").strip()
+        if w_txt.endswith((".", "?", "!")):
+            sentences.append(cur_sent)
+            cur_sent = []
+    if cur_sent:
+        sentences.append(cur_sent)
+
+    for sent in sentences:
+        sent_text = " ".join(w.get("word", "").strip() for w in sent).strip()
+        sent_lower = re.sub(r"[^a-z0-9\s]", "", sent_text.lower())
+        is_welcome = ("welcome to" in sent_lower and "deep dive" in sent_lower)
+        is_going_on_dd = ("going on a" in sent_lower and "deep dive" in sent_lower and float(sent[0]["start"]) <= opener_hook_end + 12.0)
+        if is_welcome or is_going_on_dd:
+            c_start = round(max(0.0, float(sent[0]["start"]) - 0.04), 2)
+            raw_c_end = float(sent[-1]["end"])
+            next_ws = [float(w["start"]) for w in words if float(w["start"]) > raw_c_end + 0.01]
+            next_w_st = next_ws[0] if next_ws else raw_c_end + 0.25
+            c_end = round(min(raw_c_end + 0.12, max(raw_c_end, next_w_st - 0.04)), 2)
+            if not any(abs(c["start"] - c_start) < 0.5 for c in suggested_cuts):
+                suggested_cuts.append({
+                    "id": f"cut_welcome_{int(c_start * 100)}",
+                    "start": c_start,
+                    "end": c_end,
+                    "text": sent_text,
+                    "reason": "Stripped redundant spoken welcome (replaced by deepDive-strong.mp3 spoken intro sting)"
+                })
+    return suggested_cuts
+
+
 def review_podcast_with_gemini(clean_id: str) -> dict:
     """
-    Sends dialogue transcript sections and music catalog to Gemini to detect pivotal transitions and recommend all 4 canonical stings.
+    Deterministically structures the Longform Podcast music stings & welcome cuts using spoken clip boundaries:
+    1. Strips redundant 'Welcome to the deep dive' / 'Today we are going on a massive deep dive' in Clip 0.
+    2. Embeds 'deepDive-strong.mp3' (~16.71s spoken 'Welcome to deepDive, I am Satosha, and I am Satoshi' + music) at the appropriate hook boundary in the opening clip.
+    3. Places alternating 'Bluesy Vibes' (5.5s) and 'Howling' (5.5s) at the end of EVERY clip and before the next clip starts.
+    4. Places 'deepDive-conclusion.mp3' (5.5s: 'I am Satosha, and I am Satoshi' + ~4s closing music) at the very end of the episode.
+    Also auto-saves the cuts and stings into podcast_edit.json so the timeline is ready immediately.
     """
     words, segments, full_text = extract_timed_words_from_transcription(clean_id)
     if not segments and not full_text:
         return {"success": False, "error": "No transcript available for this episode."}
 
-    stings = get_available_stings()
-    sting_names = [s["filename"] for s in stings]
+    audio_path = get_episode_audio_path(clean_id)
+    total_time = float(words[-1]["end"]) if words else (float(segments[-1].get("end", 600.0)) if segments else 600.0)
 
-    api_key = ""
-    settings = load_settings()
-    api_key = settings.get("gemini_api_key", "")
-    if not api_key:
-        ddma_sett = PROD_ROOT / "ddma" / "settings.json"
-        if ddma_sett.exists():
+    # Probe exact duration of deepDive-strong.mp3 (typically 16.71s)
+    stings_list = get_available_stings()
+    stings_map = {s["filename"]: Path(s["path"]) for s in stings_list}
+    strong_dur = 16.71
+    strong_path = stings_map.get("deepDive-strong.mp3")
+    if strong_path and strong_path.exists():
+        try:
+            ps = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(strong_path)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+            if ps.returncode == 0 and ps.stdout.strip():
+                strong_dur = round(float(ps.stdout.strip()), 2)
+        except Exception:
+            pass
+
+    # Check if a DDMA plan.json exists for this episode
+    plan_clips = []
+    for p_cand in [
+        PROD_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
+        SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "plan.json",
+        PROD_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
+    ]:
+        if p_cand.exists():
             try:
-                with open(ddma_sett, "r", encoding="utf-8") as f:
-                    api_key = json.load(f).get("gemini_api_key", "")
+                with open(p_cand, "r", encoding="utf-8") as pf:
+                    loaded = json.load(pf)
+                    if isinstance(loaded, list) and len(loaded) > 0:
+                        plan_clips = loaded
+                        break
             except Exception:
                 pass
-    if not api_key:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
 
-    summary_segments = []
-    # Opening teaser / hook segments (first 30 segments, up to ~75s)
-    summary_segments.append("--- [OPENING HOOK & INTRO] ---")
-    for s in segments[:30]:
-        summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
-    
-    # Mid-roll sample around 50%
-    if len(segments) > 60:
-        mid_idx = len(segments) // 2
-        summary_segments.append("--- [MID-ROLL TECHNICAL CHAPTERS] ---")
-        for s in segments[mid_idx-10:mid_idx+10]:
-            summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
-        
-    # Outro wrap-up sample (final 25 segments)
-    if len(segments) > 40:
-        summary_segments.append("--- [CONCLUDING SYNTHESIS & SIGN-OFF] ---")
-        for s in segments[-25:]:
-            summary_segments.append(f"[{s.get('start', 0.0):.1f}s - {s.get('end', 0.0):.1f}s]: {s.get('text', '').strip()}")
+    def get_words_between(st: float, et: float) -> list[dict]:
+        return [w for w in words if float(w["start"]) >= st - 0.05 and float(w["end"]) <= et + 0.05]
 
-    transcript_sample = "\n".join(summary_segments)
+    def get_tail_quote(et: float, window_s: float = 6.5) -> str:
+        ws = [w.get("word", "").strip() for w in words if et - window_s <= float(w["end"]) <= et + 0.15]
+        return " ".join(ws[-10:]).strip()
 
-    prompt = f"""You are the Executive Audio Director for the "Deep Dive with Gemini" podcast pipeline.
-Analyze the following timestamped dialogue transcript sections and recommend the optimal placement for our canonical music stings following our Tripartite episodic pacing invariant:
-
-Canonical Episodic Music Architecture:
-1. Master Show Opener Transition: "deepDive-conclusion.mp3" (or "deepDive-strong.mp3") placed right after the opening punchline / provocative premise (typically ~20s to ~45s) to launch the episode.
-2. Periodic Mid-Stings: Alternating "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3" and "Howling (Sting) - Gunnar Olsen.mp3" (5.5s, 0.5s crossfade) placed at chapter pivots between the spoken thesis hook and the deep deliberation (~every 2-3 minutes).
-3. Episode Finale Outro: "deepDive-conclusion.mp3" placed at the VERY END of the speech track right as the hosts sign off, so the episode concludes with music.
-
-Available Music Stings:
-{json.dumps(sting_names, indent=2)}
-
-Dialogue Sample:
-{transcript_sample}
-
-Rules:
-1. "at" MUST be an exact sentence-ending timestamp where a complete sentence finishes (ending with a period, question mark, or exclamation point). NEVER place a sting mid-sentence.
-2. "mode" should be "fade_2s_xfade_05" (or "gap_03" for clean gap).
-3. "duck_db" should be -14.
-
-Return ONLY a JSON object formatted as:
-{{
-  "recommendations": [
-    {{
-      "at": 29.68,
-      "music_file": "deepDive-conclusion.mp3",
-      "reason": "Master show opener transition right after opening thesis hook.",
-      "mode": "fade_2s_xfade_05",
-      "duration": 5.5,
-      "duck_db": -14
-    }},
-    {{
-      "at": 1124.48,
-      "music_file": "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
-      "reason": "Mid-sting transition between punchline hook and core technical deliberation.",
-      "mode": "fade_2s_xfade_05",
-      "duration": 5.5,
-      "duck_db": -14
-    }},
-    {{
-      "at": 2088.58,
-      "music_file": "Howling (Sting) - Gunnar Olsen.mp3",
-      "reason": "Dynamic mid-sting pivot between chapter punchline and deliberation.",
-      "mode": "fade_2s_xfade_05",
-      "duration": 5.5,
-      "duck_db": -14
-    }},
-    {{
-      "at": 3215.34,
-      "music_file": "deepDive-conclusion.mp3",
-      "reason": "Signature show finale concluding the episode with music at final words.",
-      "mode": "fade_2s_xfade_05",
-      "duration": 5.5,
-      "duck_db": -14
-    }}
-  ]
-}}"""
+    # Step 1: Detect spoken 'Clip N' cues from Whisper transcript if plan.json is not yet present
+    word_to_num = {
+        "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+        "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+        "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+        "nineteen": 19, "twenty": 20
+    }
+    raw_cues = []
+    for i, s in enumerate(segments):
+        t = s.get("text", "")
+        m = re.search(r"\bclip\s+(\w+)\b", t, re.IGNORECASE)
+        if m and "next clip" not in t.lower() and "final clip" not in t.lower():
+            w_val = m.group(1).lower()
+            c_num = int(w_val) if w_val.isdigit() else word_to_num.get(w_val)
+            if c_num is not None:
+                w_start = float(s.get("start", 0.0))
+                for w in s.get("words", []):
+                    if "clip" in w.get("word", "").lower():
+                        w_start = float(w["start"])
+                        break
+                intro_start = float(s["start"]) if (float(s["start"]) < w_start and (w_start - float(s["start"])) < 4.0) else w_start
+                raw_cues.append({"num": c_num, "start": intro_start, "text": t.strip()})
+    raw_cues.sort(key=lambda x: x["start"])
+    cues = []
+    seen_nums = set()
+    for rc in raw_cues:
+        if rc["num"] not in seen_nums:
+            cues.append(rc)
+            seen_nums.add(rc["num"])
 
     recommendations = []
-    if api_key and not api_key.startswith("AQ."):
-        try:
-            model_names = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-            for m in model_names:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
-                payload = {
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}
-                }
-                res = requests.post(url, json=payload, timeout=20)
-                if res.status_code == 200:
-                    data = res.json()
-                    candidate = data["candidates"][0]["content"]["parts"][0]["text"]
-                    parsed = json.loads(candidate)
-                    recommendations = parsed.get("recommendations", [])
-                    if recommendations:
-                        break
-        except Exception as ge:
-            print(f"[GEMINI REVIEW] API call failed: {ge}")
 
-    if not recommendations:
-        total_time = segments[-1].get("end", 600.0) if segments else 600.0
+    # Step 2: Determine Opener Sting ('deepDive-strong.mp3') placement in the opening clip
+    opener_at = None
+    opener_quote = ""
+    if plan_clips:
+        c0 = plan_clips[0]
+        c0_segs = [s for s in c0.get("segments", []) if s.get("type") == "audio"]
+        if c0_segs:
+            opener_at = round(float(c0_segs[0].get("end", 17.41)), 2)
+            opener_quote = c0_segs[0].get("text", "").strip()
+    if opener_at is None:
+        # Look for sentence boundary in [12s, 28s] right before 'Today we are going on a... deep dive' or after opening question
+        c0_words = get_words_between(0.0, 32.0)
+        raw_h_end = None
+        for w in c0_words:
+            if 12.0 <= float(w["end"]) <= 28.0 and any(w.get("word", "").strip().endswith(p) for p in [".", "?", "!"]):
+                raw_h_end = float(w["end"])
+                break
+        if raw_h_end is not None:
+            next_ws = [float(w["start"]) for w in words if float(w["start"]) > raw_h_end + 0.01]
+            next_st = next_ws[0] if next_ws else raw_h_end + 0.3
+            opener_at = resolve_acoustic_word_end(raw_h_end, next_st, audio_path)
+        else:
+            opener_at, opener_quote = find_best_sentence_boundary(segments, 20.0, window=12.0)
 
-        # 1. Intro hook: find complete sentence ending near 30s
-        intro_t, intro_txt = find_best_sentence_boundary(segments, 30.0, window=25.0)
+    if not opener_quote:
+        opener_quote = get_tail_quote(opener_at)
 
-        # 2. Bluesy Vibes: find complete sentence ending near 35% mark
-        p1, txt1 = find_best_sentence_boundary(segments, total_time * 0.35, window=45.0)
+    # Detect redundant welcome cuts ('Welcome to the deep dive' / 'Today we are going on a massive deep dive')
+    suggested_cuts = detect_redundant_welcome_cuts(words, segments, opener_at, audio_path)
 
-        # 3. Howling: find complete sentence ending near 65% mark
-        p2, txt2 = find_best_sentence_boundary(segments, total_time * 0.65, window=45.0)
+    recommendations.append({
+        "at": opener_at,
+        "music_file": "deepDive-strong.mp3",
+        "reason": f"Clip 0 Show Opener ('Welcome to deepDive, I am Satosha & Satoshi' + 10s music) after hook: '...{opener_quote[-48:]}'",
+        "mode": "fade_2s_xfade_10",
+        "duration": strong_dur,
+        "duck_db": -14
+    })
 
-        # 4. deepDive-conclusion: ALWAYS at the VERY END of the speech track
-        # Ends the episode with music rather than an abrupt audio cutoff!
-        last_seg = segments[-1] if segments else {}
-        outro_t = float(last_seg.get("end", total_time))
-        outro_txt = last_seg.get("text", "").strip()
+    # Step 3: Place alternating Bluesy Vibes / Howling at the end of EVERY clip and before the next clip starts
+    inter_clip_boundaries = []
+    if plan_clips and len(plan_clips) >= 2:
+        for idx in range(len(plan_clips) - 1):
+            cur_clip = plan_clips[idx]
+            nxt_clip = plan_clips[idx + 1]
+            c_num = cur_clip.get("num", idx)
+            nxt_num = nxt_clip.get("num", idx + 1)
+            nxt_title = nxt_clip.get("title", f"Clip {nxt_num}")
+            end_t = round(float(cur_clip.get("end", 0.0)), 2)
+            if end_t > opener_at + 5.0 and end_t < total_time - 5.0:
+                inter_clip_boundaries.append({
+                    "at": end_t,
+                    "from_clip": c_num,
+                    "to_clip": nxt_num,
+                    "to_title": nxt_title,
+                    "tail_quote": get_tail_quote(end_t)
+                })
+    elif len(cues) >= 2:
+        # Build boundaries directly from spoken 'Clip 1', 'Clip 2', ..., 'Clip N' markers
+        for idx, cue in enumerate(cues):
+            next_st = cue["start"]
+            if next_st <= opener_at + 8.0:
+                continue
+            w_prev = [w for w in words if float(w["start"]) < next_st - 0.02]
+            raw_et = round(float(w_prev[-1]["end"]), 2) if w_prev else round(next_st, 2)
+            et = resolve_acoustic_word_end(raw_et, next_st, audio_path)
+            from_c = 0 if idx == 0 else cues[idx - 1]["num"]
+            to_c = cue["num"]
+            if et > opener_at + 5.0 and et < total_time - 5.0:
+                inter_clip_boundaries.append({
+                    "at": et,
+                    "from_clip": from_c,
+                    "to_clip": to_c,
+                    "to_title": f"Clip {to_c}",
+                    "tail_quote": get_tail_quote(et)
+                })
 
-        recommendations = [
-            {
-                "at": intro_t,
-                "music_file": "deepDive-strong.mp3",
-                "reason": f"Signature intro curtain raiser after hook: '{intro_txt[:32]}...'",
-                "mode": "fade_2s_xfade_05",
-                "duration": 10.0,
-                "duck_db": -14
-            },
-            {
-                "at": p1,
-                "music_file": "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3",
-                "reason": f"Reflective chapter transition after sentence: '{txt1[:32]}...'",
-                "mode": "fade_2s_xfade_05",
-                "duration": 7.5,
-                "duck_db": -14
-            },
-            {
-                "at": p2,
-                "music_file": "Howling (Sting) - Gunnar Olsen.mp3",
-                "reason": f"High-energy pivot after sentence: '{txt2[:32]}...'",
-                "mode": "fade_2s_xfade_05",
-                "duration": 6.8,
-                "duck_db": -14
-            },
-            {
-                "at": outro_t,
-                "music_file": "deepDive-conclusion.mp3",
-                "reason": f"Signature show outro concluding episode with music at final words: '{outro_txt[:32]}'",
-                "mode": "fade_2s_xfade_05",
-                "duration": 15.0,
-                "duck_db": -14
-            }
-        ]
+    for b_idx, b in enumerate(inter_clip_boundaries):
+        sting_file = (
+            "Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3"
+            if b_idx % 2 == 0
+            else "Howling (Sting) - Gunnar Olsen.mp3"
+        )
+        recommendations.append({
+            "at": b["at"],
+            "music_file": sting_file,
+            "reason": f"End of Clip {b['from_clip']} → Before Clip {b['to_clip']} ({b['to_title']}): '...{b['tail_quote'][-42:]}'",
+            "mode": "fade_2s_xfade_10",
+            "duration": 5.5,
+            "duck_db": -14
+        })
 
-    return {"success": True, "recommendations": recommendations}
+    # Step 4: Place deepDive-conclusion.mp3 (5.5s: 'I am Satosha, and I am Satoshi' + ~4s music) at the very end
+    last_seg = segments[-1] if segments else {}
+    raw_outro_t = float(words[-1]["end"]) if words else float(last_seg.get("end", total_time))
+    outro_t = resolve_acoustic_word_end(raw_outro_t, None, audio_path)
+    outro_txt = get_tail_quote(outro_t) or last_seg.get("text", "").strip()
+
+    recommendations.append({
+        "at": outro_t,
+        "music_file": "deepDive-conclusion.mp3",
+        "reason": f"Episode Finale Sign-Off ('I am Satosha, and I am Satoshi' + 4s closing music) after final words: '...{outro_txt[-45:]}'",
+        "mode": "fade_2s_xfade_10",
+        "duration": 5.5,
+        "duck_db": -14
+    })
+
+    # Auto-save suggested cuts and canonical stings into podcast_edit.json so the timeline is ready out-of-the-box
+    edit_data = load_podcast_edit(clean_id)
+    existing_cuts = edit_data.get("cuts", [])
+    for sc in suggested_cuts:
+        if not any(abs(float(c.get("start", -99)) - sc["start"]) < 0.4 for c in existing_cuts):
+            existing_cuts.append(sc)
+    edit_data["cuts"] = existing_cuts
+    edit_data["stings"] = [
+        {
+            "id": f"sting_{idx}_{int(r['at'] * 10)}",
+            "at": r["at"],
+            "music_file": r["music_file"],
+            "mode": r["mode"],
+            "duck_db": r["duck_db"],
+            "duration": r["duration"],
+            "reason": r["reason"]
+        }
+        for idx, r in enumerate(recommendations)
+    ]
+    save_podcast_edit(clean_id, edit_data)
+
+    return {
+        "success": True,
+        "recommendations": recommendations,
+        "suggested_cuts": suggested_cuts,
+        "edit": edit_data
+    }
 
 def generate_sting_flow_preview(clean_id: str, sting_file: str, at_sec: float, pre_sec: float = 15.0, post_sec: float = 15.0) -> Path | None:
     """
     Generates a contextual preview around the sting at at_sec:
     - Front side: 0.2s silence gap, no crossfade.
-    - Tail of sting: fades out 2.0s, and crossfades 0.5s with incoming podcast speech (no silence addition).
-    - If outro conclusion sting: plays the final 18s of dialogue up to sentence end, 0.2s silence gap, and full conclusion sting fading out over 2.0s.
+    - Tail of sting: fades out 2.0s, and crossfades 1.0s into incoming podcast speech at 100% FULL VOLUME (strictly ZERO afade=t=in on human speech).
+    - Respects any cuts in podcast_edit.json (e.g., stripped 'Today we are going on a massive deep dive' after deepDive-strong.mp3).
+    - If outro conclusion sting: plays the final 18s of dialogue up to sentence end, 0.2s silence gap, and 5.5s conclusion sting ('I am Satosha, and I am Satoshi' + 4s closing music) fading out over 2.0s.
     """
     audio_path = get_episode_audio_path(clean_id)
     if not audio_path or not audio_path.exists():
@@ -1624,24 +1777,25 @@ def generate_sting_flow_preview(clean_id: str, sting_file: str, at_sec: float, p
     preview_dir = get_episode_podcast_dir(clean_id) / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     clean_stem = re.sub(r'[^a-zA-Z0-9_-]', '_', Path(sting_file).stem)
-    out_file = preview_dir / f"flow_{int(at_sec)}_{clean_stem}.mp3"
+    out_file = preview_dir / f"flow_{int(at_sec * 100)}_{clean_stem}.mp3"
 
     # Check if this is the outro conclusion sting at the very end of the speech track
     is_outro_ending = (at_sec >= total_dur - 3.0) or ("conclusion" in sting_file and at_sec >= total_dur - 45.0)
 
     if is_outro_ending:
-        # Previews the final 18 seconds of dialogue up to the final words, followed by 0.2s silence and full conclusion sting fading out over 2.0s!
+        # Previews the final 18 seconds of dialogue up to the final words, followed by 0.2s silence and 5.5s conclusion sting fading out over 2.0s!
         seg1_dur = min(18.0, at_sec)
         seg1_start = max(0.0, at_sec - seg1_dur)
         silence_front = 0.2
         sting_start_s = seg1_dur + silence_front
         sting_start_ms = int(sting_start_s * 1000)
 
-        fade_out_dur = min(2.0, sting_dur)
-        fade_out_st = max(0.0, sting_dur - fade_out_dur)
+        eff_outro_dur = min(5.5, sting_dur) if "conclusion" in sting_file else sting_dur
+        fade_out_dur = min(2.0, eff_outro_dur)
+        fade_out_st = max(0.0, eff_outro_dur - fade_out_dur)
 
         filter_str = (
-            f"[1:a]afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
+            f"[1:a]atrim=0:{eff_outro_dur:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
             f"[0:a][sting_delayed]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[out]"
         )
 
@@ -1663,16 +1817,50 @@ def generate_sting_flow_preview(clean_id: str, sting_file: str, at_sec: float, p
         return None
 
     # Mid-roll / Intro transition:
+    # Check if podcast_edit.json has cuts right around at_sec (e.g., stripped welcome sentence)
+    edit_data = load_podcast_edit(clean_id)
+    cuts = []
+    for c in edit_data.get("cuts", []):
+        try:
+            cs, ce = float(c.get("start", 0.0)), float(c.get("end", 0.0))
+            if ce > cs + 0.05:
+                cuts.append((cs, ce))
+        except Exception:
+            pass
+    cuts.sort(key=lambda x: x[0])
+
     seg1_start = max(0.0, at_sec - pre_sec)
     seg1_dur = max(0.5, at_sec - seg1_start)
-    seg2_start = min(total_dur, at_sec)
-    seg2_dur = max(0.5, min(total_dur, at_sec + post_sec) - seg2_start)
 
-    # User specification:
-    # 1. Front side of sting: 0.2s silence - no cross fade.
-    # 2. At the end of sting: fade out 2.0s and then cross fade 0.5s with podcast audio (no silence addition).
+    # Build post-sting speech intervals skipping any cut regions in [at_sec, at_sec + post_sec + 10]
+    post_cursor = min(total_dur, at_sec)
+    # Skip any tiny breath gap before first word after at_sec
+    post_slices = []
+    rem_dur = post_sec
+    for cs, ce in cuts:
+        if ce <= post_cursor:
+            continue
+        if cs > post_cursor:
+            chunk = min(rem_dur, cs - post_cursor)
+            if chunk > 0.08:
+                post_slices.append((post_cursor, chunk))
+                rem_dur -= chunk
+        post_cursor = max(post_cursor, ce)
+        if rem_dur <= 0.05:
+            break
+    if rem_dur > 0.05 and post_cursor < total_dur:
+        chunk = min(rem_dur, total_dur - post_cursor)
+        if chunk > 0.08:
+            post_slices.append((post_cursor, chunk))
+    if not post_slices:
+        post_slices = [(min(total_dur, at_sec), max(0.5, min(total_dur, at_sec + post_sec) - min(total_dur, at_sec)))]
+
+    # Canonical duration: full 16.71s for deepDive-strong.mp3, 5.5s for Bluesy Vibes / Howling / deepDive-conclusion
     silence_front = 0.2
-    eff_sting_dur = min(12.0, sting_dur) if sting_dur > 14.0 else sting_dur
+    if "strong" in sting_file:
+        eff_sting_dur = sting_dur
+    else:
+        eff_sting_dur = min(5.5, sting_dur)
 
     sting_start_s = seg1_dur + silence_front
     sting_start_ms = int(sting_start_s * 1000)
@@ -1680,23 +1868,39 @@ def generate_sting_flow_preview(clean_id: str, sting_file: str, at_sec: float, p
     fade_out_dur = min(2.0, eff_sting_dur)
     fade_out_st = max(0.0, eff_sting_dur - fade_out_dur)
 
-    crossfade_dur = 0.5
+    crossfade_dur = 1.0
     seg2_start_s = max(seg1_dur, sting_start_s + eff_sting_dur - crossfade_dur)
-    seg2_start_ms = int(seg2_start_s * 1000)
 
-    filter_str = (
-        f"[1:a]afade=t=in:ss=0:d={crossfade_dur:.3f},adelay={seg2_start_ms}|{seg2_start_ms}[s2];"
-        f"[2:a]atrim=0:{eff_sting_dur:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
-        f"[0:a][s2]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[speech];"
-        f"[speech][sting_delayed]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[out]"
+    inputs = ["-ss", f"{seg1_start:.3f}", "-t", f"{seg1_dur:.3f}", "-i", str(audio_path)]
+    post_labels = []
+    cur_delay_s = seg2_start_s
+    for idx_p, (ps, pd) in enumerate(post_slices):
+        inputs.extend(["-ss", f"{ps:.3f}", "-t", f"{pd:.3f}", "-i", str(audio_path)])
+        delay_ms = int(cur_delay_s * 1000)
+        # Strictly ZERO afade=t=in on human speech so incoming words enter at 100% full volume
+        post_labels.append((idx_p + 1, delay_ms, f"[spost{idx_p}]"))
+        cur_delay_s += pd
+
+    sting_in_idx = len(post_slices) + 1
+    inputs.extend(["-i", str(sting_path)])
+
+    filter_parts = []
+    mix_labels = ["[0:a]"]
+    for in_i, d_ms, lbl in post_labels:
+        filter_parts.append(f"[{in_i}:a]adelay={d_ms}|{d_ms}{lbl};")
+        mix_labels.append(lbl)
+    filter_parts.append(
+        f"[{sting_in_idx}:a]atrim=0:{eff_sting_dur:.3f},afade=t=out:st={fade_out_st:.3f}:d={fade_out_dur:.3f},adelay={sting_start_ms}|{sting_start_ms}[sting_delayed];"
+    )
+    mix_labels.append("[sting_delayed]")
+    filter_parts.append(
+        f"{''.join(mix_labels)}amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0:normalize=0[out]"
     )
 
     cmd = [
-        "ffmpeg", "-y",
-        "-ss", f"{seg1_start:.3f}", "-t", f"{seg1_dur:.3f}", "-i", str(audio_path),
-        "-ss", f"{seg2_start:.3f}", "-t", f"{seg2_dur:.3f}", "-i", str(audio_path),
-        "-i", str(sting_path),
-        "-filter_complex", filter_str,
+        "ffmpeg", "-y"
+    ] + inputs + [
+        "-filter_complex", "".join(filter_parts),
         "-map", "[out]",
         "-c:a", "libmp3lame", "-b:a", "128k",
         str(out_file)
@@ -1734,11 +1938,11 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
             return False, f"Cannot export: Podcast MP3 is not rendered yet ({msg})"
         mp3_path = Path(res_path)
 
-    # 3. Destination folder in Google Drive
+    # 3. Destination folder in Google Drive (dd_hub/audio)
     dest_str = custom_dest.strip()
     settings = load_settings()
     if not dest_str:
-        dest_str = settings.get("gdrive_pickup_path", "G:/My Drive/Podcast_Pickup")
+        dest_str = settings.get("gdrive_pickup_path", str(get_dd_hub_root() / "audio"))
 
     dest_dir = Path(dest_str)
     try:
@@ -1888,7 +2092,7 @@ def export_video_to_gdrive(clean_id: str, custom_dest: str = None) -> tuple[bool
     if not video_path.exists():
         return False, f"Video not found for episode {clean_id}. Please render the video master first."
 
-    default_dest = Path("G:/My Drive/Podcast_Video_Pickup")
+    default_dest = get_dd_hub_root() / "video"
     dest_dir = Path(custom_dest.strip()) if custom_dest and custom_dest.strip() else default_dest
 
     try:
@@ -3043,7 +3247,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             mp3_path = get_episode_podcast_mp3_path(clean_id)
             audio_path = get_episode_audio_path(clean_id)
             settings = load_settings()
-            gdrive_folder = settings.get("gdrive_pickup_path", "G:/My Drive/Podcast_Pickup")
+            gdrive_folder = settings.get("gdrive_pickup_path", str(get_dd_hub_root() / "audio"))
 
             audio_rel = None
             if audio_path:
