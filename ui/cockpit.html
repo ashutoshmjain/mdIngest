@@ -1524,18 +1524,19 @@
         </div>
 
         <div class="command-center">
-            <!-- Episode Number Assignment (Auto-Calculated) -->
-            <div class="ep-number-control">
-                <span class="ep-label">NEXT EP:</span>
-                <input type="text" class="ep-input" id="top-ep-num" value="# 248 (Auto)" readonly title="Auto-assigned when mined from Mempool into Block Template">
-            </div>
-
             <!-- Mine from Mempool to Template -->
             <button class="btn-cmd primary" onclick="triggerMine()" id="btn-lock" title="Mine selected Mempool draft into the Block Template">
                 <span>⚡</span> Mine
             </button>
-            <button class="btn-cmd" onclick="triggerDemoteSelected()" id="btn-demote" style="display:none; color: #b45309; border-color: #fde68a; background: #fffbeb;" title="Demote selected template episode back to Mempool">
-                <span>↩</span> Return to Mempool
+
+            <!-- Local mdBook Preview Server -->
+            <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve" title="Start mdBook Preview Server on Port 3000">
+                <span>📖</span> Preview
+            </button>
+
+            <!-- Publish to Remote -->
+            <button class="btn-cmd emerald" onclick="triggerPush()" id="btn-push" title="Commit and publish episode to remote repository">
+                <span>🚀</span> Publish
             </button>
 
             <!-- Settings -->
@@ -1555,10 +1556,8 @@
                 <button class="pane-close-btn" onclick="toggleLeftPane()" title="Collapse Ledger Sidebar (Click to close)">◀</button>
             </div>
 
-            <!-- New Episode Button (Opens Project Name & .py Selector Modal) -->
-            <button class="btn-new-ep" onclick="openModal('new-ep-modal')">
-                <span>+</span> New Episode (&lt;name&gt;.py)
-            </button>
+            <!-- Hidden file input for Unified Smart Drop Zone -->
+            <input type="file" id="unified-file-input" accept=".py,.md,.m4a,.mp3,.wav,.ogg,.aac" style="display: none;" onchange="handleUnifiedFileSelected(event)">
 
             <div class="tree-scroll-area" id="tree-scroll-area">
                 <!-- Dynamically populated with active Mempool drafts & Block Template episodes only -->
@@ -1586,55 +1585,16 @@
                     <button class="btn-cmd" onclick="openInEditor()" id="btn-edit-gvim" title="Open active article directly in gVim editor">
                         <span>✏️</span> Edit (gVim)
                     </button>
-                    <button class="btn-cmd" onclick="triggerUpdatePython()" id="btn-update-py" title="Update active article research in place from a Python payload (.py) without changing slug">
-                        <span>🐍</span> Update .py
-                    </button>
-                    <button class="btn-cmd" onclick="triggerUpdateMarkdown()" id="btn-update-md" title="Update active article research in place from a Markdown file (.md) without changing slug">
-                        <span>📝</span> Update .md
-                    </button>
-                    <input type="file" id="input-update-py" accept=".py" style="display: none;" onchange="handleUpdatePyFile(event)">
-                    <input type="file" id="input-update-md" accept=".md" style="display: none;" onchange="handleUpdateMdFile(event)">
-
-                    <button class="btn-cmd" onclick="toggleMdServe()" id="btn-serve">
-                        <span>📖</span> mdserve (Local)
-                    </button>
-                    <button class="btn-cmd emerald" onclick="triggerPush()" id="btn-push">
-                        <span>🚀</span> Push
-                    </button>
                     <button class="btn-cmd" onclick="openModal('prompt-modal')" title="Master Research Payload Prompt Template">
                         <span>📋</span> Prompt
                     </button>
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="copyCurrentMarkdown()">Copy MD</button>
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
 
                 <!-- LEVEL 2 SUB-TOOLBAR: PODCAST GENERATION -->
                 <div class="channel-actions" id="channel-actions-narrative" style="display: none; align-items: center; gap: 0.5rem;">
-                    <button class="btn-cmd danger" id="btn-top-cut" onclick="cutSelectedWords()" disabled title="Cut selected speech from podcast (Del)">
-                        <span>✂️</span> Cut Speech
+                    <button class="btn-cmd" style="background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800;" id="btn-top-beat-studio" onclick="toggleLongformBeatStudio()" title="Toggle Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio">
+                        <span>🔍</span> Beat Studio
                     </button>
-                    <button class="btn-cmd" id="btn-top-undo" onclick="undoLastCut()" disabled title="Undo last cut">
-                        <span>↩️</span> Undo
-                    </button>
-                    <button class="btn-cmd" id="btn-top-gemini" onclick="runGeminiReview()" title="Gemini Audio Director: Suggest stings & pacing">
-                        <span>🤖</span> Gemini Review
-                    </button>
-                    <button class="btn-cmd emerald" id="btn-top-render" onclick="renderPodcast()" title="Render Master Podcast (FFmpeg -16 LUFS)">
-                        <span>🎧</span> Render Podcast
-                    </button>
-                    <button class="btn-cmd" style="background: #f0f9ff; color: #0369a1; border-color: #bae6fd; font-weight: 800;" id="btn-top-beat-studio" onclick="toggleLongformBeatStudio()" title="Toggle Horizontal-Split Longform Beat-by-Beat Timeline & Manim Archetype Studio (389 Scenes)">
-                        <span>🔍</span> Beat Studio (389)
-                    </button>
-                    <button class="btn-cmd" style="background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; font-weight: 700;" id="btn-top-render-full-video" onclick="renderVideoPodcast('full')" title="Render Full 1080p Horizontal Video (54m) for YouTube & Spotify Video">
-                        <span>🎬</span> Render Full Video
-                    </button>
-                    <button class="btn-cmd" style="background: #f1f5f9; color: #475569; border-color: #cbd5e1; font-size: 0.74rem;" id="btn-top-render-preview-video" onclick="renderVideoPodcast('preview')" title="Render Quick 60s Test Preview (~10s render time)">
-                        <span>⚡</span> 60s Preview
-                    </button>
-                    <button class="btn-cmd" style="background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" id="btn-top-gdrive" onclick="exportToGoogleDrive()" title="Push podcast to Google Drive for meta-muse Spotify pickup">
-                        <span>📁</span> Push to Drive
-                    </button>
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshPodcastData()">Refresh</button>
                 </div>
 
                 <!-- LEVEL 2 SUB-TOOLBAR: REELS (VIDEO CHANNEL: DDMA 740x740 CLIPS) -->
@@ -1642,7 +1602,6 @@
                     <button class="btn-cmd primary" style="padding: 0.35rem 0.75rem; font-size: 0.74rem;" onclick="launchDdmaStudio()">
                         🚀 Open DDMA Studio
                     </button>
-                    <button class="btn-cmd" style="padding: 0.35rem 0.65rem; font-size: 0.74rem;" onclick="refreshCurrentEpisode()">Refresh</button>
                 </div>
             </div>
 
@@ -1955,22 +1914,25 @@
                         Research needs <strong>KaTeX</strong> to present mathematical equations which most platforms don't support, so we use <strong>mdBook</strong> to publish to the web—<a href="https://deepdive.shutri.com" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline; font-weight: 600;">deepDive</a> serves as the reference ledger.
                     </p>
                 </div>
-
-                <!-- Python Payload Dropzone -->
-                <div class="audio-card">
-                    <div class="studio-title" style="margin-bottom: 0.4rem;">
-                        <span>🐍 Python Payload Script</span>
-                        <span style="color: var(--accent-indigo);" id="ast-status-badge">Lossless AST</span>
+                <!-- Unified Smart Drop Zone + Sync dd_hub/inputs -->
+                <div class="audio-card" style="padding: 0.65rem 0.75rem;">
+                    <div class="unified-drop-zone"
+                         onclick="document.getElementById('unified-file-input').click()"
+                         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
+                         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
+                         ondrop="handleUnifiedDropEvent(event)"
+                         style="padding: 0.65rem 0.6rem; border: 2px dashed #c7d2fe; border-radius: 8px; background: #f8fafc; text-align: center; cursor: pointer; transition: all 0.15s ease; margin-bottom: 0.45rem;"
+                         title="Drop or click to ingest any .py payload, .md research, or .m4a/.mp3/.wav audio into dd_hub/inputs/">
+                        <div style="font-size: 1.15rem; line-height: 1; margin-bottom: 0.2rem;">📥</div>
+                        <div style="font-size: 0.76rem; font-weight: 800; color: #312e81;">Drop .py, .md, or Audio</div>
+                        <div style="font-size: 0.64rem; font-family: var(--font-mono); color: #64748b; margin-top: 0.1rem;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
                     </div>
-                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
-                        Upload raw Gemini / Python payload scripts (<code style="font-family: var(--font-mono);">.py</code>) to extract markdown with math delimiters intact.
-                    </p>
-                    <div class="btn-select-file" onclick="openModal('new-ep-modal')">
-                        <div style="font-size: 1.4rem; margin-bottom: 0.2rem;">⚡</div>
-                        <div style="font-weight: 700; font-size: 0.8rem; color: var(--text-dark-primary);">+ Create Draft from .py</div>
-                        <div style="font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-dark-muted);">Auto-extracts H1 and sanitizes KaTeX</div>
-                    </div>
+                    <button class="btn-cmd btn-sync-ddhub" onclick="syncDdHubInputs()" style="width: 100%; justify-content: center; padding: 0.42rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" title="Scan dd_hub/inputs/ for automated drops from send-py skill or NotebookLM">
+                        <span>⚡</span> Sync dd_hub/inputs
+                    </button>
                 </div>
+
+
 
                 <!-- AST & KaTeX Validation Inspector -->
                 <div class="audio-card">
@@ -2023,27 +1985,36 @@
                         Ingest NotebookLM audio, cut speech directly from the transcript, embed Gemini-curated music stings, and export to Google Drive for <strong>meta-muse</strong> (Spotify for Creators).
                     </p>
                 </div>
-
-                <!-- 1. Audio Track Section -->
-                <div class="audio-card">
-                    <div class="studio-title" style="margin-bottom: 0.5rem;">
-                        <span>🎙️ Audio Track</span>
-                        <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
+                <!-- Unified Smart Drop Zone + Sync dd_hub/inputs -->
+                <div class="audio-card" style="padding: 0.65rem 0.75rem;">
+                    <div class="unified-drop-zone"
+                         onclick="document.getElementById('unified-file-input').click()"
+                         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
+                         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
+                         ondrop="handleUnifiedDropEvent(event)"
+                         style="padding: 0.65rem 0.6rem; border: 2px dashed #c7d2fe; border-radius: 8px; background: #f8fafc; text-align: center; cursor: pointer; transition: all 0.15s ease; margin-bottom: 0.45rem;"
+                         title="Drop or click to ingest any .py payload, .md research, or .m4a/.mp3/.wav audio into dd_hub/inputs/">
+                        <div style="font-size: 1.15rem; line-height: 1; margin-bottom: 0.2rem;">📥</div>
+                        <div style="font-size: 0.76rem; font-weight: 800; color: #312e81;">Drop .py, .md, or Audio</div>
+                        <div style="font-size: 0.64rem; font-family: var(--font-mono); color: #64748b; margin-top: 0.1rem;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
                     </div>
+                    <button class="btn-cmd btn-sync-ddhub" onclick="syncDdHubInputs()" style="width: 100%; justify-content: center; padding: 0.42rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" title="Scan dd_hub/inputs/ for automated drops from send-py skill or NotebookLM">
+                        <span>⚡</span> Sync dd_hub/inputs
+                    </button>
+                </div>
 
-                    <!-- Dropzone / Audio Selector -->
-                    <div class="btn-select-file" id="audio-dropzone" onclick="document.getElementById('audio-file-input').click()">
-                        <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🎵</div>
-                        <div style="font-weight: 700; font-size: 0.82rem; color: var(--text-dark-primary);" id="audio-file-label">Drop Audio</div>
-                        <div style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted);">.mp3, .wav, .m4a (Gitignored)</div>
-                        <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a,.ogg,.aac" style="display: none;" onchange="handleAudioFileSelected(event)">
+                <!-- 1. Source Audio & Auto-Transcription Status -->
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>🎙️ Source Audio (dd_hub/inputs)</span>
+                        <span style="color: var(--accent-emerald);" id="audio-status-tag">No Audio</span>
                     </div>
 
                     <!-- Embedded Audio Player -->
                     <div class="audio-player-wrapper" id="audio-player-container" style="display: none;">
                         <audio id="native-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
                         <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.72rem; color: var(--text-dark-muted);">
-                            <span id="audio-filename-display">audio.mp3</span>
+                            <span id="audio-filename-display">audio.m4a</span>
                             <div style="display: flex; gap: 0.25rem;">
                                 <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.0)">1x</button>
                                 <button class="btn-cmd" style="padding: 0.15rem 0.4rem; font-size: 0.68rem;" onclick="setAudioSpeed(1.5)">1.5x</button>
@@ -2051,26 +2022,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- 2. Local Whisper Speech-to-Text Engine -->
-                <div class="audio-card">
-                    <div class="studio-title" style="margin-bottom: 0.5rem;">
-                        <span>⚡ Local Whisper STT</span>
-                        <select id="whisper-model-select" style="font-family: var(--font-mono); font-size: 0.7rem; padding: 2px 4px; border-radius: 4px; border: 1px solid var(--border-light); background: #ffffff;">
-                            <option value="large-v3-turbo" selected>large-v3-turbo (AVX-512 Turbo • Recommended)</option>
-                            <option value="small.en">small.en (DDMA Standard • Fast)</option>
-                            <option value="small">small (Multilingual • High Accuracy)</option>
-                            <option value="base.en">base.en (Fast English)</option>
-                            <option value="base">base (Standard)</option>
-                            <option value="medium.en">medium.en (High Precision)</option>
-                        </select>
-                    </div>
-
-                    <button class="btn-cmd primary" id="btn-transcribe" style="width: 100%; justify-content: center; padding: 0.55rem;" onclick="triggerWhisperTranscribe()">
-                        <span>⚡</span> Transcribe Audio (Word Timestamps)
-                    </button>
-                    <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px;"></div>
+                    <div id="transcribe-status-text" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dark-muted); text-align: center; min-height: 14px; margin-top: 0.25rem;"></div>
                 </div>
 
                 <!-- 3. Gemini Musical Director & Pacing -->
@@ -2090,31 +2042,7 @@
                         <span>⚡</span> Run Gemini Audio Review
                     </button>
 
-                    <!-- 4 Signature Canonical Stings Quick Flow Deck -->
-                    <div style="margin-bottom: 0.6rem; background: #f8fafc; border: 1px solid var(--border-light); border-radius: 6px; padding: 0.5rem;">
-                        <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-dark-secondary); margin-bottom: 0.35rem; display: flex; justify-content: space-between; align-items: center;">
-                            <span>🎯 4 Canonical Stings</span>
-                            <span style="font-size: 0.62rem; color: #4f46e5; font-weight: 600;">0.2s Front / 2s Fade + 1.0s Full-Vol XFade</span>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.35rem;">
-                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('deepDive-strong.mp3', this)" title="Signature Intro Curtain Raiser">
-                                <span>🎺 deepDive-strong</span>
-                                <span style="font-size: 0.58rem; background: #e0e7ff; color: #3730a3; padding: 1px 3px; border-radius: 3px;">Intro</span>
-                            </button>
-                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('Bluesy Vibes (Sting) - Doug Maxwell_Media Right Productions.mp3', this)" title="Reflective Technical Chapter">
-                                <span>🎷 Bluesy Vibes</span>
-                                <span style="font-size: 0.58rem; background: #fef3c7; color: #92400e; padding: 1px 3px; border-radius: 3px;">Reflect</span>
-                            </button>
-                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('Howling (Sting) - Gunnar Olsen.mp3', this)" title="Dynamic Driving Pivot">
-                                <span>🎸 Howling</span>
-                                <span style="font-size: 0.58rem; background: #fee2e2; color: #991b1b; padding: 1px 3px; border-radius: 3px;">Pivot</span>
-                            </button>
-                            <button type="button" class="btn-cmd flow-play-btn" style="font-size: 0.65rem; padding: 0.25rem 0.4rem; justify-content: space-between; background: #ffffff;" onclick="previewCanonicalFlow('deepDive-conclusion.mp3', this)" title="Signature Show Outro Synthesis">
-                                <span>🎹 deepDive-concl.</span>
-                                <span style="font-size: 0.58rem; background: #d1fae5; color: #065f46; padding: 1px 3px; border-radius: 3px;">Outro</span>
-                            </button>
-                        </div>
-                    </div>
+
 
                     <div id="gemini-recs-container" style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 240px; overflow-y: auto;">
                         <div style="font-size: 0.7rem; color: var(--text-dark-muted); text-align: center; font-style: italic; padding: 0.5rem 0;">
@@ -2149,17 +2077,16 @@
                         <audio id="podcast-master-audio-player" style="width: 100%; height: 32px;" controls preload="metadata"></audio>
                     </div>
 
-                    <!-- Google Drive Export for meta-muse (Audio) -->
+                    <!-- Google Drive Export for meta-muse (dd_hub/audio) -->
                     <div style="border-top: 1px dashed var(--border-light); padding-top: 0.5rem;">
-                        <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); display: block; margin-bottom: 0.25rem;">
-                            📁 Audio Pickup Folder (for Brownie / Spotify):
-                        </label>
-                        <input type="text" id="gdrive-pickup-input" value="G:/My Drive/Podcast_Pickup" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.4rem; background: #ffffff;">
+                        <div style="font-size: 0.66rem; font-family: var(--font-mono); color: var(--text-dark-muted); margin-bottom: 0.35rem;">
+                            📁 Outbox: <strong>dd_hub/audio/</strong> (Spotify &rarr; RSS)
+                        </div>
                         <button class="btn-cmd" id="btn-export-gdrive-deck" style="width: 100%; justify-content: center; padding: 0.45rem; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" onclick="exportToGoogleDrive()">
-                            <span>📁</span> Push Audio to Google Drive
+                            <span>📁</span> Push Audio to dd_hub/audio
                         </button>
                         <div id="gdrive-mempool-warning" style="display: none; font-size: 0.65rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.3rem 0.45rem; margin-top: 0.35rem; line-height: 1.35;">
-                            ⚠️ Episode is in Mempool. Click "⚡ Mine" to assign an episode number before pushing to Google Drive.
+                            ⚠️ Episode is in Mempool. Click "⚡ Mine" to assign an episode number before pushing to dd_hub.
                         </div>
                     </div>
                 </div>
@@ -2216,14 +2143,13 @@
                         <video id="podcast-video-master-player" style="width: 100%; aspect-ratio: 16/9; border-radius: 4px; background: #000;" controls preload="metadata"></video>
                     </div>
 
-                    <!-- Google Drive Pickup for Video Distribution -->
+                    <!-- Google Drive Pickup for Video Distribution (dd_hub/video) -->
                     <div style="border-top: 1px dashed var(--border-light); padding-top: 0.5rem;">
-                        <label style="font-size: 0.7rem; font-weight: 700; color: var(--text-dark-secondary); display: block; margin-bottom: 0.25rem;">
-                            📁 Video Pickup Folder (for YouTube / Video Pipeline):
-                        </label>
-                        <input type="text" id="gdrive-video-pickup-input" value="G:/My Drive/pickup_longform" style="width: 100%; padding: 0.35rem 0.5rem; font-family: var(--font-mono); font-size: 0.68rem; border: 1px solid var(--border-light); border-radius: 4px; margin-bottom: 0.4rem; background: #ffffff;">
+                        <div style="font-size: 0.66rem; font-family: var(--font-mono); color: var(--text-dark-muted); margin-bottom: 0.35rem;">
+                            📁 Outbox: <strong>dd_hub/video/</strong> (YouTube &bull; TikTok &bull; Slopcast)
+                        </div>
                         <button class="btn-cmd" id="btn-export-gdrive-video-deck" style="width: 100%; justify-content: center; padding: 0.45rem; background: #fdf4ff; color: #86198f; border-color: #f5d0fe;" onclick="exportVideoToGoogleDrive()">
-                            <span>📁</span> Push Video to Google Drive
+                            <span>📁</span> Push Video to dd_hub/video
                         </button>
                         <div id="gdrive-video-export-status" style="font-family: var(--font-mono); font-size: 0.65rem; text-align: center; margin-top: 0.35rem; min-height: 12px;"></div>
                     </div>
@@ -2596,13 +2522,13 @@ if __name__ == '__main__':
                         serveBtn.style.background = '#dcfce7';
                         serveBtn.style.color = '#166534';
                         serveBtn.style.borderColor = '#86efac';
-                        serveBtn.innerHTML = '<span>🟢</span> mdserve:3000';
+                        serveBtn.innerHTML = '<span>🟢</span> Preview:3000';
                         serveBtn.title = 'mdBook is Running (Click to Stop)';
                     } else {
                         serveBtn.style.background = '';
                         serveBtn.style.color = '';
                         serveBtn.style.borderColor = '';
-                        serveBtn.innerHTML = '<span>📖</span> mdserve (Local)';
+                        serveBtn.innerHTML = '<span>📖</span> Preview';
                         serveBtn.title = 'Start mdBook Preview Server on Port 3000';
                     }
                 }
@@ -3032,7 +2958,7 @@ if __name__ == '__main__':
                         </div>
                         <div class="infographic-card-footer" title="${escapeHtml(vidLabel)}">
                             <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px;">${escapeHtml(vidLabel)}</span>
-                            <span style="color: var(--accent-amber); font-weight: 700;">#${idx + 1}</span>
+                            <span style="color: var(--accent-amber); font-weight: 700;">#${typeof vid === "object" && vid.num !== undefined ? vid.num : idx}</span>
                         </div>
                     </div>
                 `;
@@ -4902,14 +4828,14 @@ if __name__ == '__main__':
                     btn.style.background = '#dcfce7';
                     btn.style.color = '#166534';
                     btn.style.borderColor = '#86efac';
-                    btn.innerHTML = '<span>🟢</span> mdserve:3000';
+                    btn.innerHTML = '<span>🟢</span> Preview:3000';
                     btn.title = 'mdBook is Running (Click to Stop)';
                     showToast('🟢 mdBook serve running on http://localhost:3000');
                 } else {
                     btn.style.background = '';
                     btn.style.color = '';
                     btn.style.borderColor = '';
-                    btn.innerHTML = '<span>📖</span> mdserve (Local)';
+                    btn.innerHTML = '<span>📖</span> Preview';
                     btn.title = 'Start mdBook Preview Server on Port 3000';
                     showToast('🛑 mdBook serve stopped');
                 }
@@ -5186,29 +5112,144 @@ if __name__ == '__main__':
                 // Render Narrative Tab with fresh audio & transcript data
                 renderNarrativeTab(selectedEpisode, data);
 
-                // Handle transcription background status
+                // Handle auto-transcription background status
+                const btnTrans = document.getElementById('btn-transcribe');
                 if (data.job_status === 'processing') {
-                    statusText.innerText = `⏳ ${data.job_progress || 'Transcribing...'}`;
-                    document.getElementById('btn-transcribe').disabled = true;
+                    if (statusText) statusText.innerText = `⏳ ${data.job_progress || 'Auto-transcribing with faster-whisper large-v3-turbo...'}`;
+                    if (btnTrans) btnTrans.disabled = true;
                     if (!audioPollTimer) {
                         audioPollTimer = setTimeout(() => {
                             audioPollTimer = null;
                             loadAudioStatus(filename);
+                            syncPodcastStudio(filename);
                         }, 2500);
                     }
                 } else if (data.job_status === 'done') {
-                    statusText.innerText = '✅ Transcription complete!';
-                    document.getElementById('btn-transcribe').disabled = false;
+                    if (statusText) statusText.innerText = '✅ Word transcript & stings ready!';
+                    if (btnTrans) btnTrans.disabled = false;
                 } else if (data.job_status === 'error') {
-                    statusText.innerText = `❌ Error: ${data.job_error || 'Failed'}`;
-                    document.getElementById('btn-transcribe').disabled = false;
+                    if (statusText) statusText.innerText = `❌ Error: ${data.job_error || 'Failed'}`;
+                    if (btnTrans) btnTrans.disabled = false;
                 } else {
-                    statusText.innerText = '';
-                    document.getElementById('btn-transcribe').disabled = false;
+                    if (statusText) statusText.innerText = data.has_transcript ? '✓ Word Transcript Ready (large-v3-turbo)' : '';
+                    if (btnTrans) btnTrans.disabled = false;
                 }
             } catch (err) {
                 console.error("Failed to load audio status:", err);
             }
+        }
+
+        async function syncDdHubInputs() {
+            const btns = document.querySelectorAll('.btn-sync-ddhub');
+            btns.forEach(btn => {
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳</span> Syncing dd_hub/inputs...';
+            });
+            try {
+                const res = await fetch('/api/dd_hub/sync_inputs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ ${data.message}`);
+                    await fetchStatus();
+                    if (data.latest_filename) {
+                        loadEpisode(data.latest_filename);
+                    } else if (selectedEpisode) {
+                        loadEpisode(selectedEpisode.filename, true);
+                    }
+                } else {
+                    showToast(`❌ Sync failed: ${data.error || 'Unknown error'}`);
+                }
+            } catch (err) {
+                showToast(`❌ Sync error: ${err.message}`);
+            } finally {
+                btns.forEach(btn => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>⚡</span> Sync dd_hub/inputs';
+                });
+            }
+        }
+
+        function handleUnifiedDropEvent(event) {
+            event.preventDefault();
+            document.querySelectorAll('.unified-drop-zone').forEach(zone => {
+                zone.style.borderColor = '#c7d2fe';
+                zone.style.background = '#f8fafc';
+            });
+            const files = event.dataTransfer?.files;
+            if (files && files.length > 0) {
+                processUnifiedDroppedFile(files[0]);
+            }
+        }
+
+        function handleUnifiedFileSelected(event) {
+            const file = event.target.files?.[0];
+            if (file) {
+                processUnifiedDroppedFile(file);
+                event.target.value = '';
+            }
+        }
+
+        async function processUnifiedDroppedFile(file) {
+            if (!file) return;
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            const isResearch = (ext === 'py' || ext === 'md');
+            const isAudio = ['m4a', 'mp3', 'wav', 'ogg', 'aac'].includes(ext);
+
+            if (!isResearch && !isAudio) {
+                showToast(`❌ Unsupported file type: .${ext}`);
+                return;
+            }
+
+            let slugChoice = '';
+            if (isResearch) {
+                const stem = file.name.replace(/\.[^.]+$/, '');
+                const defaultSlug = (stem && !['payload', 'extract', 'final_research', 'research'].includes(stem.toLowerCase()))
+                    ? stem.toLowerCase().replace(/[^a-z0-9_-]+/g, '-')
+                    : (selectedEpisode ? selectedEpisode.filename.replace('.md', '').replace(/^_/, '') : '');
+                const prompted = prompt(
+                    `Ingesting Research Payload (${file.name}) into dd_hub/inputs/<slug>/payload.py\n\n` +
+                    `Enter draft slug or episode number (leave blank to auto-derive from H1 title):`,
+                    defaultSlug
+                );
+                if (prompted === null) return;
+                slugChoice = prompted.trim();
+            }
+
+            showToast(`📥 Ingesting ${file.name} to dd_hub/inputs...`);
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const dataUrl = e.target.result || '';
+                const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+                try {
+                    const res = await fetch('/api/dd_hub/unified_drop', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            orig_filename: file.name,
+                            active_filename: selectedEpisode ? selectedEpisode.filename : '',
+                            slug: slugChoice,
+                            base64_data: base64Data
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast(`✅ ${data.message}`);
+                        await fetchStatus();
+                        if (data.filename) {
+                            loadEpisode(data.filename);
+                        }
+                    } else {
+                        showToast(`❌ Drop failed: ${data.error || 'Server error'}`);
+                    }
+                } catch (err) {
+                    showToast(`❌ Drop error: ${err.message}`);
+                }
+            };
+            reader.readAsDataURL(file);
         }
 
         async function handleAudioFileSelected(event) {
@@ -5471,7 +5512,7 @@ if __name__ == '__main__':
                                 </div>
                                 <div class="infographic-card-footer">
                                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${escapeHtml(clip.label || clip.name)}</span>
-                                    <span style="color: var(--accent-amber); font-weight: 700;">Clip #${idx + 1}</span>
+                                    <span style="color: var(--accent-amber); font-weight: 700;">Clip #${clip.num !== undefined ? clip.num : idx}</span>
                                 </div>
                             </div>
                         `).join('');

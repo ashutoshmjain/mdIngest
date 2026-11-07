@@ -333,8 +333,7 @@ _ep_videos_cache: dict[str, tuple[float, list[dict]]] = {}
 
 def find_episode_videos(slug_or_num: str) -> list[dict]:
     """
-    Discovers video clips across canonical DDMA episodes store (src/ddma/docs/episodes/)
-    and fallback directories across both deepDive and sibling ddma workspaces.
+    Discovers ONLY the single latest canonical compiled master `<clean_id>-<num>.mp4` per clip number.
     Cached for 2.0s to eliminate redundant disk queries when loading tabs.
     """
     clean_id = str(slug_or_num).replace('.md', '').lstrip('_')
@@ -379,15 +378,38 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
         if assets_clips_dir.exists():
             candidates.extend(assets_clips_dir.glob(f"{clean_id}-*.mp4"))
 
-    seen = set()
-    final_clips = []
+    # Map clip_num -> title from plan.json if available
+    clip_titles = {}
+    for plan_cand in [
+        SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "plan.json",
+        PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
+        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
+    ]:
+        if plan_cand.exists():
+            try:
+                p_data = json.loads(plan_cand.read_text(encoding="utf-8-sig"))
+                parts = p_data if isinstance(p_data, list) else p_data.get("parts", [])
+                for pt in parts:
+                    if isinstance(pt, dict) and pt.get("num") is not None and pt.get("title"):
+                        clip_titles[int(pt["num"])] = str(pt["title"]).strip()
+                if clip_titles:
+                    break
+            except Exception:
+                pass
+
+    canonical_pattern = re.compile(rf"^_?{re.escape(clean_id)}-(\d+)\.mp4$")
+    by_clip_num = {}
     for path in candidates:
         name = path.name
-        if name in seen or "-original.mp4" in name or "-mosaic-" in name:
+        m = canonical_pattern.match(name)
+        if not m:
             continue
-        seen.add(name)
-        clip_label = name.replace('.mp4', '').replace('_', ' ')
-        
+        c_num = int(m.group(1))
+        if c_num in by_clip_num:
+            continue
+        c_title = clip_titles.get(c_num, "")
+        clip_label = f"{clean_id}-{c_num} • {c_title}" if c_title else f"{clean_id}-{c_num}"
+
         # Build canonical streaming URL
         if "docs" in str(path) and "episodes" in str(path):
             url = f"/media/ddma/docs/episodes/{clean_id}/clips/{name}"
@@ -398,18 +420,15 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
         else:
             url = f"/vid/{name}"
 
-        final_clips.append({
+        by_clip_num[c_num] = {
             "name": name,
+            "num": c_num,
             "url": url,
             "label": clip_label,
             "size_bytes": path.stat().st_size if path.exists() else 0
-        })
+        }
 
-    def sort_key(clip):
-        nums = re.findall(r'\d+', clip["name"])
-        return [int(n) for n in nums] if nums else [clip["name"]]
-
-    final_clips.sort(key=sort_key)
+    final_clips = [by_clip_num[k] for k in sorted(by_clip_num.keys())]
     _ep_videos_cache[clean_id] = (now, final_clips)
     return final_clips
 
@@ -462,10 +481,12 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
                 except Exception:
                     pass
 
-        # Copy clips
+        canonical_pattern = re.compile(rf"^{re.escape(clean_id)}-(\d+)\.mp4$")
+
+        # Copy ONLY canonical `<clean_id>-<num>.mp4` compiled master clips
         if ddma_clips_dir.exists():
             for src_clip in ddma_clips_dir.glob("*.mp4"):
-                if "-original.mp4" in src_clip.name or "-mosaic-" in src_clip.name or "-infographic.mp4" in src_clip.name or "-draft.mp4" in src_clip.name:
+                if not canonical_pattern.match(src_clip.name):
                     continue
                 dest_clip = deepdive_clips_dir / src_clip.name
                 if not dest_clip.exists() or dest_clip.stat().st_size != src_clip.stat().st_size or src_clip.stat().st_mtime > dest_clip.stat().st_mtime:
@@ -475,28 +496,41 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
                     except Exception:
                         pass
 
+    canonical_pattern = re.compile(rf"^{re.escape(clean_id)}-(\d+)\.mp4$")
+    # Remove any non-canonical files (e.g. *-mosaic.mp4, *-infographic.mp4, *-draft.mp4) from deepdive_clips_dir
+    if deepdive_clips_dir.exists():
+        for stray in list(deepdive_clips_dir.glob("*.mp4")):
+            if not canonical_pattern.match(stray.name):
+                try:
+                    stray.unlink()
+                except Exception:
+                    pass
+
     # Invalidate video cache
     if clean_id in _ep_videos_cache:
         del _ep_videos_cache[clean_id]
 
-    # 2. Read plan.json for part titles
+    # 2. Read plan.json for part titles (supports both list and dict formats, including Clip 0)
     plan_data = {}
     dest_plan = deepdive_ep_dir / "plan.json"
     if dest_plan.exists():
         try:
-            with open(dest_plan, "r", encoding="utf-8") as pf:
+            with open(dest_plan, "r", encoding="utf-8-sig") as pf:
                 p_json = json.load(pf)
-                for part in p_json.get("parts", []):
-                    p_num = part.get("num")
+                parts_list = p_json if isinstance(p_json, list) else p_json.get("parts", [])
+                for part in parts_list:
+                    if not isinstance(part, dict):
+                        continue
+                    p_num = part.get("num") if part.get("num") is not None else part.get("part_number")
                     p_title = part.get("title", "")
                     if p_num is not None:
                         plan_data[str(p_num)] = p_title
         except Exception:
             pass
 
-    # 3. Gather all published clips in deepDive
+    # 3. Gather all published canonical clips in deepDive
     all_clips = sorted(
-        list(deepdive_clips_dir.glob("*.mp4")),
+        [p for p in deepdive_clips_dir.glob("*.mp4") if canonical_pattern.match(p.name)],
         key=lambda p: [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', p.name)]
     )
     if not all_clips:
@@ -506,10 +540,10 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
     cards_html = []
     for clip_path in all_clips:
         c_name = clip_path.name
-        if "-original.mp4" in c_name or "-mosaic-" in c_name or "-infographic.mp4" in c_name or "-draft.mp4" in c_name:
+        m = canonical_pattern.match(c_name)
+        if not m:
             continue
-        m = re.search(r'-(\d+)\.mp4$', c_name)
-        part_num = m.group(1) if m else ""
+        part_num = m.group(1)
         label = f"{clean_id}-{part_num}"
         if part_num in plan_data and plan_data[part_num]:
             label += f" {plan_data[part_num]}"
@@ -810,16 +844,26 @@ def get_episode_podcast_meta_path(clean_id: str) -> Path:
     return get_episode_podcast_dir(clean_id) / "podcast_meta.json"
 
 def get_episode_transcription_json_path(clean_id: str) -> Path | None:
-    """Discovers full acoustic transcription.json containing word-level timestamps."""
+    """Discovers full acoustic transcription.json containing word-level timestamps, including dd_hub/episodes/<ep>."""
+    hub_root = get_dd_hub_root()
     candidates = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
         PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
         PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
+        hub_root / "episodes" / str(clean_id) / "transcription.json",
     ]
     for c in candidates:
-        if c.exists() and c.stat().st_size > 0:
-            return c
+        try:
+            if c.exists() and c.stat().st_size > 0:
+                # Ensure local src copy exists if found in dd_hub
+                local_src = SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id) / "transcription.json"
+                if c != local_src and not local_src.exists():
+                    local_src.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(str(c), str(local_src))
+                return c
+        except Exception:
+            pass
     return None
 
 _FASTER_WHISPER_CACHE = {}
@@ -2854,11 +2898,13 @@ def build_fast_indices():
             except Exception:
                 pass
 
-    # Fast bulk video counts
-    vid_counts = {}
-    def add_vid(ep_id):
+    # Fast bulk video counts (deduplicated per canonical `<ep>-<num>.mp4`)
+    vid_sets = {}
+    def add_vid(ep_id, clip_num_str=None):
         clean = str(ep_id).lstrip('_')
-        vid_counts[clean] = vid_counts.get(clean, 0) + 1
+        if clean not in vid_sets:
+            vid_sets[clean] = set()
+        vid_sets[clean].add(str(clip_num_str) if clip_num_str is not None else f"vid_{len(vid_sets[clean])}")
 
     # Canonical deepDive clips
     canonical_eps = SRC_DIR / 'ddma' / 'docs' / 'episodes'
@@ -2868,8 +2914,9 @@ def build_fast_indices():
                 clips_dir = canonical_eps / ep_name / 'clips'
                 if clips_dir.exists():
                     for c in os.listdir(clips_dir):
-                        if c.endswith('.mp4') and '-original.mp4' not in c and '-mosaic-' not in c:
-                            add_vid(ep_name)
+                        m_c = re.match(rf"^_?{re.escape(str(ep_name).lstrip('_'))}-(\d+)\.mp4$", c)
+                        if m_c:
+                            add_vid(ep_name, m_c.group(1))
         except Exception:
             pass
 
@@ -2884,19 +2931,26 @@ def build_fast_indices():
                         p_clips = proj_dir / proj_name / 'clips'
                         if p_clips.exists():
                             for c in os.listdir(p_clips):
-                                if c.endswith('.mp4') and '-original.mp4' not in c and '-mosaic-' not in c:
-                                    add_vid(ep_id)
+                                m_c = re.match(rf"^_?{re.escape(str(ep_id).lstrip('_'))}-(\d+)\.mp4$", c)
+                                if m_c:
+                                    add_vid(ep_id, m_c.group(1))
             except Exception:
                 pass
+
+    vid_counts = {k: len(v) for k, v in vid_sets.items()}
 
     # Legacy vid dir clips
     if VID_DIR.exists():
         try:
             for fname in os.listdir(VID_DIR):
                 if fname.endswith('.mp4'):
-                    m = re.match(r'^_?(\d+)-', fname)
+                    m = re.match(r'^_?(\d+)-(\d+)\.mp4$', fname)
                     if m:
-                        add_vid(m.group(1))
+                        ep_k = m.group(1)
+                        if ep_k not in vid_sets:
+                            vid_sets[ep_k] = set()
+                        vid_sets[ep_k].add(m.group(2))
+                        vid_counts[ep_k] = len(vid_sets[ep_k])
         except Exception:
             pass
 
@@ -3073,6 +3127,386 @@ def sync_summary_file(mempool_items, template_items):
     with open(SUMMARY_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(new_lines) + "\n")
 
+
+def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = None, model_name: str | None = None, force: bool = False) -> tuple[bool, str]:
+    """
+    Automatically runs faster-whisper (large-v3-turbo) word-timestamp transcription in a background thread,
+    saves to src/ddma/docs/episodes/<id>/, ddma/projects/episode_<id>/, and dd_hub/episodes/<id>/,
+    and automatically runs review_podcast_with_gemini(clean_id) + seed_ddma_project_if_missing(clean_id).
+    """
+    clean_id = str(clean_id).replace(".md", "").lstrip("_")
+    if not clean_id:
+        return False, "Missing episode clean_id"
+
+    cur_job = transcription_jobs.get(clean_id, {})
+    if cur_job.get("status") == "processing":
+        return True, f"Transcription already running for {clean_id}"
+
+    if not force and get_episode_transcription_json_path(clean_id):
+        return True, f"Transcription already exists for {clean_id}"
+
+    apath = audio_path or get_episode_audio_path(clean_id)
+    if not apath or not apath.exists():
+        return False, f"No audio file found for episode {clean_id}"
+
+    settings = load_settings()
+    mname = model_name or settings.get("whisper_model", "large-v3-turbo") or "large-v3-turbo"
+
+    def _auto_worker(cid: str, audio_p: Path, mdl: str):
+        transcription_jobs[cid] = {"status": "processing", "progress": f"Auto-transcribing {audio_p.name} with faster-whisper ({mdl})..."}
+        try:
+            result = run_faster_whisper_transcription(audio_p, model_name=mdl, word_timestamps=True)
+            text_out = result.get("text", "").strip()
+
+            # 1. Save plain transcript.txt
+            t_path = get_episode_transcript_path(cid)
+            with open(t_path, "w", encoding="utf-8") as f:
+                f.write(text_out)
+
+            # 2. Save streamlined narrative.md
+            ep_title = ""
+            for possible_file in [SRC_DIR / f"{cid}.md", SRC_DIR / f"_{cid}.md"]:
+                if possible_file.exists():
+                    try:
+                        with open(possible_file, "r", encoding="utf-8") as pf:
+                            m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
+                            if m:
+                                ep_title = m.group(1).strip()
+                                break
+                    except Exception:
+                        pass
+            cfg = load_settings()
+            ln_addr = cfg.get("lightning_address", "shutosha@primal.net")
+            streamlined_text, _ = smart_streamline_narrative(text_out, title=ep_title, ep_num=cid, lightning_addr=ln_addr)
+            n_path = get_episode_narrative_path(cid)
+            with open(n_path, "w", encoding="utf-8") as nf:
+                nf.write(streamlined_text)
+
+            # 3. Save full acoustic transcription.json in src/ddma/docs/episodes/<cid>/
+            src_trans_json = SRC_DIR / "ddma" / "docs" / "episodes" / cid / "transcription.json"
+            src_trans_json.parent.mkdir(parents=True, exist_ok=True)
+            with open(src_trans_json, "w", encoding="utf-8") as jf:
+                json.dump(result, jf, indent=4)
+
+            # 4. Save to dd_hub/episodes/<cid>/transcription.json
+            try:
+                hub_ep_dir = get_dd_hub_root() / "episodes" / str(cid)
+                hub_ep_dir.mkdir(parents=True, exist_ok=True)
+                with open(hub_ep_dir / "transcription.json", "w", encoding="utf-8") as hjf:
+                    json.dump(result, hjf, indent=4)
+            except Exception as he:
+                print(f"[DD_HUB] Warning saving transcription.json to dd_hub: {he}")
+
+            # 5. Sync directly into DDMA projects folder & auto-seed DDMA project + Gemini podcast stings
+            for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+                proj_dir = ddma_root / "projects" / f"episode_{cid}"
+                if proj_dir.exists():
+                    with open(proj_dir / "transcription.json", "w", encoding="utf-8") as pjf:
+                        json.dump(result, pjf, indent=4)
+                    with open(proj_dir / "transcript.txt", "w", encoding="utf-8") as ptf:
+                        ptf.write(text_out)
+
+            transcription_jobs[cid]["progress"] = "Auto-structuring podcast stings & seeding DDMA clips..."
+            try:
+                review_podcast_with_gemini(cid)
+            except Exception as rev_e:
+                print(f"[AUTO-INGEST] review_podcast_with_gemini warning for {cid}: {rev_e}")
+
+            try:
+                seed_ddma_project_if_missing(cid)
+            except Exception as seed_e:
+                print(f"[AUTO-INGEST] seed_ddma_project_if_missing warning for {cid}: {seed_e}")
+
+            transcription_jobs[cid] = {
+                "status": "done",
+                "progress": "Auto-transcription, podcast stings & DDMA clips ready!",
+                "text": text_out
+            }
+        except Exception as e:
+            transcription_jobs[cid] = {"status": "error", "progress": "Transcription failed", "error": str(e)}
+
+    threading.Thread(target=_auto_worker, args=(clean_id, apath, mname), daemon=True).start()
+    return True, f"Auto-transcription started with faster-whisper ({mname})"
+
+
+def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_python: bool = True, title_override: str = "") -> dict:
+    """
+    Saves raw payload to dd_hub/inputs/<slug>/payload.py and creates or updates either:
+    - src/<num>.md (if slug_or_id is digits or already in Block Template)
+    - src/_<slug>.md (if Mempool draft)
+    """
+    settings = load_settings()
+    word_limit = settings.get("title_word_limit", 5)
+    raw_md, _, _ = extract_python_payload(raw_text) if is_python else (raw_text, len(raw_text), len(raw_text))
+    sanitized_md, clean_title, _ = sanitize_katex_markdown(raw_md, title_override or None, word_limit)
+    sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
+
+    clean_slug = str(slug_or_id).replace(".md", "").lstrip("_").strip()
+    if not clean_slug:
+        clean_slug = re.sub(r'[^a-zA-Z0-9_-]', '-', clean_title.lower()).strip('-') or "draft"
+
+    # Save to dd_hub/inputs/<clean_slug>/payload.py
+    try:
+        hub_in_dir = get_dd_hub_root() / "inputs" / clean_slug
+        hub_in_dir.mkdir(parents=True, exist_ok=True)
+        payload_file = hub_in_dir / "payload.py"
+        if is_python:
+            payload_file.write_text(raw_text, encoding="utf-8")
+        else:
+            escaped = raw_text.replace('"""', '\"\"\"')
+            payload_file.write_text(f'raw_markdown = """{escaped}"""\n', encoding="utf-8")
+    except Exception as he:
+        print(f"[DD_HUB] Warning saving payload.py to dd_hub/inputs/{clean_slug}: {he}")
+
+    mempool, template, _, _ = parse_summary_structure()
+    is_numbered = clean_slug.isdigit() or any(t["filename"] == f"{clean_slug}.md" for t in template)
+
+    if is_numbered:
+        filename = f"{clean_slug}.md"
+        formatted_title = f"{clean_slug} : {clean_title}"
+    else:
+        filename = f"_{clean_slug}.md"
+        formatted_title = clean_title
+
+    sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
+    if "<!-- SIDEBAR_TITLE:" not in sanitized_md:
+        full_content = f"# {formatted_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n"
+    else:
+        full_content = f"# {formatted_title}\n\n{sanitized_md}\n"
+
+    file_path = SRC_DIR / filename
+    file_path.write_text(full_content, encoding="utf-8")
+
+    if is_numbered:
+        existing = next((t for t in template if t["filename"] == filename), None)
+        if existing:
+            existing["title"] = formatted_title
+        else:
+            template.insert(0, {"title": formatted_title, "filename": filename, "number": int(clean_slug) if clean_slug.isdigit() else clean_slug})
+    else:
+        existing = next((m for m in mempool if m["filename"] == filename), None)
+        if existing:
+            existing["title"] = formatted_title
+        else:
+            mempool.insert(0, {"title": formatted_title, "filename": filename, "slug": clean_slug})
+
+    sync_summary_file(mempool, template)
+
+    def bg_build():
+        try:
+            subprocess.run(["mdbook", "build"], cwd=str(PROD_ROOT), capture_output=True)
+        except Exception:
+            pass
+    threading.Thread(target=bg_build, daemon=True).start()
+
+    return {
+        "success": True,
+        "filename": filename,
+        "clean_id": clean_slug,
+        "title": formatted_title,
+        "clean_title": clean_title,
+        "is_draft": not is_numbered
+    }
+
+
+def sync_dd_hub_inputs() -> dict:
+    """
+    Scans dd_hub/inputs/<slug>/ for any automated drops (e.g. from the send-py skill or NotebookLM audio):
+    - Ingests new or updated payload.py / *.py / *.md into Mempool or Block Template.
+    - Copies new audio files (*.m4a, *.mp3, *.wav) into the episode folder and auto-triggers
+      faster-whisper large-v3-turbo transcription + Gemini podcast sting review + DDMA clip seeding.
+    """
+    hub_inputs = get_dd_hub_root() / "inputs"
+    if not hub_inputs.exists():
+        return {"success": False, "error": f"dd_hub/inputs not found at {hub_inputs}"}
+
+    ingested_payloads = []
+    ingested_audios = []
+    latest_filename = None
+
+    for sub in sorted(hub_inputs.iterdir(), key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True):
+        if not sub.is_dir():
+            continue
+        slug = sub.name.strip()
+        if not slug or slug.startswith("."):
+            continue
+
+        # Check for payload.py or *.py / *.md
+        py_candidates = list(sub.glob("payload.py")) or sorted(sub.glob("*.py"))
+        md_candidates = sorted(sub.glob("*.md"))
+        payload_src = py_candidates[0] if py_candidates else (md_candidates[0] if md_candidates else None)
+
+        target_md = SRC_DIR / (f"{slug}.md" if slug.isdigit() else f"_{slug}.md")
+        if not target_md.exists() and (SRC_DIR / f"{slug}.md").exists():
+            target_md = SRC_DIR / f"{slug}.md"
+
+        if payload_src and payload_src.exists():
+            # Ingest if target_md doesn't exist yet or payload_src is newer than target_md
+            should_ingest = (not target_md.exists()) or (payload_src.stat().st_mtime > target_md.stat().st_mtime + 2.0)
+            if should_ingest:
+                try:
+                    raw_txt = payload_src.read_text(encoding="utf-8")
+                    res_p = _ingest_research_payload_to_episode(slug, raw_txt, is_python=(payload_src.suffix.lower() == ".py"))
+                    if res_p.get("success"):
+                        ingested_payloads.append({"slug": slug, "filename": res_p["filename"], "title": res_p["title"]})
+                        if not latest_filename:
+                            latest_filename = res_p["filename"]
+                except Exception as pe:
+                    print(f"[SYNC_INPUTS] Payload ingest error for {slug}: {pe}")
+
+        # Check for audio files (*.m4a, *.mp3, *.wav)
+        for ext in [".m4a", ".mp3", ".wav", ".ogg", ".aac"]:
+            aud_matches = sorted(sub.glob(f"*{ext}"))
+            if aud_matches:
+                src_aud = aud_matches[0]
+                dest_dir = SRC_DIR / "ddma" / "docs" / "episodes" / slug
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_aud = dest_dir / f"{slug}{ext}"
+                if not dest_aud.exists() or src_aud.stat().st_size != dest_aud.stat().st_size:
+                    shutil.copy2(str(src_aud), str(dest_aud))
+                    ingested_audios.append({"slug": slug, "audio": dest_aud.name})
+                if not get_episode_transcription_json_path(slug):
+                    start_auto_transcription_pipeline(slug, audio_path=dest_aud)
+                    if not any(a["slug"] == slug for a in ingested_audios):
+                        ingested_audios.append({"slug": slug, "audio": dest_aud.name})
+                if not latest_filename:
+                    latest_filename = f"{slug}.md" if (SRC_DIR / f"{slug}.md").exists() else f"_{slug}.md"
+                break
+
+    return {
+        "success": True,
+        "ingested_payloads": ingested_payloads,
+        "ingested_audios": ingested_audios,
+        "latest_filename": latest_filename,
+        "message": f"Synced dd_hub/inputs: {len(ingested_payloads)} payload(s), {len(ingested_audios)} audio track(s)."
+    }
+
+
+def handle_unified_drop(data: dict) -> dict:
+    """
+    Unified Smart Drop handler for .py, .md, and audio (.m4a, .mp3, .wav) files:
+    - Automatically saves inputs to dd_hub/inputs/<slug_or_ep>/
+    - Assigns a slug (for new research payloads) or episode number (mining Mempool draft if needed when audio is dropped)
+    - Automatically triggers faster-whisper large-v3-turbo transcription + Gemini audio review on audio drop.
+    """
+    orig_filename = str(data.get("orig_filename", "")).strip()
+    active_filename = str(data.get("active_filename", "")).strip()
+    slug_override = str(data.get("slug", "")).strip()
+    ext = Path(orig_filename).suffix.lower()
+
+    # CASE 1: Research Payload (.py or .md)
+    if ext in (".py", ".md"):
+        text_content = data.get("text_content", "")
+        if not text_content and data.get("base64_data"):
+            text_content = base64.b64decode(data["base64_data"]).decode("utf-8", errors="replace")
+        if not text_content.strip():
+            return {"success": False, "error": "Dropped file is empty"}
+
+        is_py = (ext == ".py")
+        target_slug = slug_override
+        if not target_slug:
+            stem = Path(orig_filename).stem
+            if stem and stem.lower() not in ("payload", "extract", "final_research", "research", "script", "new"):
+                target_slug = re.sub(r'[^a-zA-Z0-9_-]', '-', stem.lower()).strip('-')
+            elif active_filename:
+                target_slug = active_filename.replace(".md", "").lstrip("_")
+
+        res = _ingest_research_payload_to_episode(target_slug, text_content, is_python=is_py)
+        res["drop_type"] = "research"
+        res["message"] = f"Saved to dd_hub/inputs/{res['clean_id']}/payload.py & ingested {res['filename']}"
+        return res
+
+    # CASE 2: Audio File (.m4a, .mp3, .wav, .ogg, .aac)
+    if ext in (".m4a", ".mp3", ".wav", ".ogg", ".aac"):
+        b64_data = data.get("base64_data", "")
+        if not b64_data:
+            return {"success": False, "error": "Missing audio base64_data"}
+        raw_bytes = base64.b64decode(b64_data)
+
+        # Determine episode number / ID:
+        # 1. If filename is digits (e.g. 250.m4a), use 250.
+        # 2. If active episode is a Mempool draft (_slug.md), auto-mine it to next_episode_number!
+        # 3. Otherwise use active episode number or next_episode_number.
+        stem = Path(orig_filename).stem.strip()
+        ep_match = re.match(r'^(\d+)$', stem)
+        mempool, template, _, next_num = parse_summary_structure()
+
+        target_ep_id = ""
+        target_md_filename = active_filename
+
+        if ep_match:
+            target_ep_id = ep_match.group(1)
+            target_md_filename = f"{target_ep_id}.md"
+        elif active_filename and active_filename.startswith("_"):
+            # Auto-mine Mempool draft to next episode number when audio is dropped!
+            target_ep_id = str(next_num)
+            src_path = SRC_DIR / active_filename
+            dest_filename = f"{target_ep_id}.md"
+            dest_path = SRC_DIR / dest_filename
+            if src_path.exists():
+                settings = load_settings()
+                word_limit = settings.get("title_word_limit", 5)
+                existing_text = src_path.read_text(encoding="utf-8")
+                sanitized_md, clean_title, _ = sanitize_katex_markdown(existing_text, "", word_limit)
+                sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
+                formatted_title = f"{target_ep_id} : {clean_title}"
+                sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
+                full_content = f"# {formatted_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n" if "<!-- SIDEBAR_TITLE:" not in sanitized_md else f"# {formatted_title}\n\n{sanitized_md}\n"
+                dest_path.write_text(full_content, encoding="utf-8")
+                if src_path != dest_path:
+                    src_path.unlink()
+                old_slug = active_filename.replace(".md", "").lstrip("_")
+                # Also copy payload.py from dd_hub/inputs/<old_slug> to dd_hub/inputs/<target_ep_id>
+                try:
+                    old_hub_in = get_dd_hub_root() / "inputs" / old_slug
+                    new_hub_in = get_dd_hub_root() / "inputs" / target_ep_id
+                    if old_hub_in.exists() and old_hub_in != new_hub_in:
+                        new_hub_in.mkdir(parents=True, exist_ok=True)
+                        for item in old_hub_in.iterdir():
+                            if item.is_file():
+                                shutil.copy2(str(item), str(new_hub_in / item.name))
+                except Exception:
+                    pass
+                mempool = [m for m in mempool if m["filename"] != active_filename]
+                template.insert(0, {"title": formatted_title, "filename": dest_filename, "number": int(target_ep_id)})
+                sync_summary_file(mempool, template)
+                target_md_filename = dest_filename
+        elif active_filename:
+            target_ep_id = active_filename.replace(".md", "").lstrip("_")
+            target_md_filename = active_filename
+        else:
+            target_ep_id = str(next_num)
+            target_md_filename = f"{target_ep_id}.md"
+
+        # Save to dd_hub/inputs/<target_ep_id>/<target_ep_id><ext>
+        try:
+            hub_in_dir = get_dd_hub_root() / "inputs" / target_ep_id
+            hub_in_dir.mkdir(parents=True, exist_ok=True)
+            hub_audio_file = hub_in_dir / f"{target_ep_id}{ext}"
+            hub_audio_file.write_bytes(raw_bytes)
+        except Exception as he:
+            print(f"[DD_HUB] Warning saving audio to dd_hub/inputs/{target_ep_id}: {he}")
+
+        # Save to local episode directory
+        ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / target_ep_id
+        ep_dir.mkdir(parents=True, exist_ok=True)
+        local_audio_file = ep_dir / f"{target_ep_id}{ext}"
+        local_audio_file.write_bytes(raw_bytes)
+
+        # Immediately trigger auto-transcription + Gemini review + DDMA seeding
+        start_auto_transcription_pipeline(target_ep_id, audio_path=local_audio_file, force=True)
+
+        return {
+            "success": True,
+            "drop_type": "audio",
+            "clean_id": target_ep_id,
+            "filename": target_md_filename,
+            "audio_filename": local_audio_file.name,
+            "message": f"Saved to dd_hub/inputs/{target_ep_id}/{target_ep_id}{ext} & started Whisper large-v3-turbo transcription!"
+        }
+
+    return {"success": False, "error": f"Unsupported file extension: {ext}"}
+
 class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(INGEST_DIR), **kwargs)
@@ -3182,6 +3616,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 narrative_text, _ = smart_streamline_narrative(transcript_text, title=ep_title, ep_num=clean_id, lightning_addr=ln_addr)
 
             job = transcription_jobs.get(clean_id, {"status": "idle", "progress": ""})
+            if audio_path and audio_path.exists() and not get_episode_transcription_json_path(clean_id) and job.get("status") not in ("processing", "done"):
+                start_auto_transcription_pipeline(clean_id, audio_path=audio_path)
+                job = transcription_jobs.get(clean_id, {"status": "processing", "progress": "Auto-transcribing with faster-whisper large-v3-turbo..."})
 
             audio_rel_url = None
             if audio_path:
@@ -4034,63 +4471,18 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             default_model = settings.get("whisper_model", "large-v3-turbo")
             model_name = data.get("model", default_model)
 
-            audio_path = get_episode_audio_path(clean_id)
-            if not audio_path or not audio_path.exists():
-                self.send_json({"success": False, "error": "No audio file found for this episode."})
-                return
+            ok, msg = start_auto_transcription_pipeline(clean_id, model_name=model_name, force=True)
+            self.send_json({"success": ok, "message": msg if ok else "", "error": "" if ok else msg})
+            return
 
-            def transcribe_worker(cid, apath, mname):
-                transcription_jobs[cid] = {"status": "processing", "progress": f"Loading faster-whisper ({mname})..."}
-                try:
-                    transcription_jobs[cid]["progress"] = f"Transcribing audio with faster-whisper {mname} (word_timestamps=True)..."
-                    result = run_faster_whisper_transcription(apath, model_name=mname, word_timestamps=True)
-                    text = result.get("text", "").strip()
+        if path == "/api/dd_hub/sync_inputs":
+            res = sync_dd_hub_inputs()
+            self.send_json(res)
+            return
 
-                    # 1. Save plain transcript.txt
-                    t_path = get_episode_transcript_path(cid)
-                    with open(t_path, "w", encoding="utf-8") as f:
-                        f.write(text)
-
-                    # 2. Save streamlined narrative.md
-                    ep_title = ""
-                    for possible_file in [SRC_DIR / f"{cid}.md", SRC_DIR / f"_{cid}.md"]:
-                        if possible_file.exists():
-                            try:
-                                with open(possible_file, "r", encoding="utf-8") as pf:
-                                    m = re.search(r"^#\s+(.*)$", pf.read(), re.MULTILINE)
-                                    if m:
-                                        ep_title = m.group(1).strip()
-                                        break
-                            except Exception:
-                                pass
-                    settings = load_settings()
-                    ln_addr = settings.get("lightning_address", "shutosha@primal.net")
-                    streamlined_text, _ = smart_streamline_narrative(text, title=ep_title, ep_num=cid, lightning_addr=ln_addr)
-                    n_path = get_episode_narrative_path(cid)
-                    with open(n_path, "w", encoding="utf-8") as nf:
-                        nf.write(streamlined_text)
-
-                    # 3. Save full acoustic transcription.json in src/ddma/docs/episodes/<cid>/
-                    src_trans_json = SRC_DIR / "ddma" / "docs" / "episodes" / cid / "transcription.json"
-                    src_trans_json.parent.mkdir(parents=True, exist_ok=True)
-                    with open(src_trans_json, "w", encoding="utf-8") as jf:
-                        json.dump(result, jf, indent=4)
-
-                    # 4. Sync directly into DDMA projects folder if project exists
-                    for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                        proj_dir = ddma_root / "projects" / f"episode_{cid}"
-                        if proj_dir.exists():
-                            with open(proj_dir / "transcription.json", "w", encoding="utf-8") as pjf:
-                                json.dump(result, pjf, indent=4)
-                            with open(proj_dir / "transcript.txt", "w", encoding="utf-8") as ptf:
-                                ptf.write(text)
-
-                    transcription_jobs[cid] = {"status": "done", "progress": "Transcription complete with word timestamps!", "text": text}
-                except Exception as e:
-                    transcription_jobs[cid] = {"status": "error", "progress": "Transcription failed", "error": str(e)}
-
-            threading.Thread(target=transcribe_worker, args=(clean_id, audio_path, model_name), daemon=True).start()
-            self.send_json({"success": True, "message": f"Transcription started with Whisper ({model_name}) with word-level timestamps."})
+        if path == "/api/dd_hub/unified_drop":
+            res = handle_unified_drop(data)
+            self.send_json(res)
             return
 
         if path == "/api/transcript/streamline":
