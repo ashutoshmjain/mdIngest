@@ -462,14 +462,13 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
 
     # 1. Discover sibling ddma directory
     sibling_ddma = None
-    for d in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-        if d.exists() and (d / "docs" / "episodes" / clean_id).exists():
+    for d in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+        if d.exists() and ((d / "clips").exists() or (d / "projects" / f"episode_{clean_id}").exists() or (d / "docs" / "episodes" / clean_id).exists()):
             sibling_ddma = d
             break
 
     synced_clips = []
     if sibling_ddma:
-        ddma_clips_dir = sibling_ddma / "docs" / "episodes" / clean_id / "clips"
         ddma_plan_file = sibling_ddma / "docs" / "episodes" / clean_id / "plan.json"
 
         # Copy plan.json if newer or missing (single source of truth: projects/<ep>/plan.json)
@@ -505,21 +504,32 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
                 except Exception:
                     pass
 
-
         canonical_pattern = re.compile(rf"^{re.escape(clean_id)}-(\d+)\.mp4$")
 
-        # Copy ONLY canonical `<clean_id>-<num>.mp4` compiled master clips
-        if ddma_clips_dir.exists():
-            for src_clip in ddma_clips_dir.glob("*.mp4"):
+        # Copy ONLY canonical `<clean_id>-<num>.mp4` compiled master clips from all possible ddma clip folders
+        possible_clip_dirs = [
+            sibling_ddma / "clips",
+            sibling_ddma / "docs" / "episodes" / clean_id / "clips",
+            PROJECT_ROOT / "ddma" / "clips",
+        ]
+        seen_dirs = set()
+        for d_dir in possible_clip_dirs:
+            resolved_d = d_dir.resolve()
+            if resolved_d in seen_dirs or not d_dir.exists():
+                continue
+            seen_dirs.add(resolved_d)
+            for src_clip in d_dir.glob(f"{clean_id}-*.mp4"):
                 if not canonical_pattern.match(src_clip.name):
                     continue
                 dest_clip = deepdive_clips_dir / src_clip.name
                 if not dest_clip.exists() or dest_clip.stat().st_size != src_clip.stat().st_size or src_clip.stat().st_mtime > dest_clip.stat().st_mtime:
                     try:
                         shutil.copy2(src_clip, dest_clip)
-                        synced_clips.append(src_clip.name)
-                    except Exception:
-                        pass
+                        if src_clip.name not in synced_clips:
+                            synced_clips.append(src_clip.name)
+                            print(f"[SYNC] Synced active master clip: {src_clip.name} -> {dest_clip}")
+                    except Exception as ce:
+                        print(f"[SYNC] Error copying clip {src_clip.name}: {ce}")
 
     canonical_pattern = re.compile(rf"^{re.escape(clean_id)}-(\d+)\.mp4$")
     # Remove any non-canonical files (e.g. *-mosaic.mp4, *-infographic.mp4, *-draft.mp4) from deepdive_clips_dir
