@@ -284,6 +284,35 @@ async function runE2ETests() {
         });
 
         // -------------------------------------------------------------
+        // Test 9: Reels Media Grid Audio Toggle Invariant
+        // -------------------------------------------------------------
+        await runTest('Reels Media Grid Audio Toggle Invariant', async (p) => {
+            await p.click('#tab-btn-media');
+            await p.waitForSelector('#media-clips-grid-deck .infographic-card', { timeout: 3000 });
+            
+            // Click mute toggle via genuine DOM click to trigger audio unmuting without throwing null track error
+            const firstToggleBtn = await p.$('#media-clips-grid-deck .infographic-audio-toggle');
+            if (!firstToggleBtn) throw new Error('No audio toggle in reels media grid');
+
+            const initialText = await p.$eval('#media-clips-grid-deck .infographic-audio-toggle', el => el.innerText);
+            if (initialText !== '🔇') throw new Error(`Initial toggle button text expected 🔇 but got: ${initialText}`);
+
+            // First click: un-mutes
+            await firstToggleBtn.click();
+            await p.waitForFunction(() => {
+                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
+                return b && b.innerText === '🔊';
+            }, { timeout: 3000 });
+
+            // Second click: mutes
+            await firstToggleBtn.click();
+            await p.waitForFunction(() => {
+                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
+                return b && b.innerText === '🔇';
+            }, { timeout: 3000 });
+        });
+
+        // -------------------------------------------------------------
         // Test 10: DDMA Auto-Seeding & URL Project Targeting
         // -------------------------------------------------------------
         await runTest('DDMA Auto-Seeding & URL Project Targeting', async (p) => {

@@ -3693,14 +3693,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             words = len(raw_text.split())
 
             clean_id = fn.replace(".md", "").lstrip("_")
-            try:
-                sync_episode_clips_and_markdown(clean_id)
-            except Exception as se:
-                print(f"Auto-sync warning for {clean_id}: {se}")
-
-            file_path = SRC_DIR / fn
-            with open(file_path, "r", encoding="utf-8") as f:
-                raw_text = f.read()
             has_cover = find_episode_cover(clean_id)
             vids = find_episode_videos(clean_id)
 

@@ -1,0 +1,6 @@
+faster-whisper==1.2.1
+av==14.2.0
+openai-whisper
+numpy
+requests
+pillow

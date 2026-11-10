@@ -4685,10 +4685,10 @@ if __name__ == '__main__':
         window.toggleInfographicAudio = function(btn) {
             const card = btn.closest('.infographic-card');
             const vid = card.querySelector('video');
-            const track = btn.closest('.infographic-carousel-track');
+            const container = btn.closest('.infographic-carousel-track, .media-grid-container') || document;
 
             if (vid.paused || vid.muted) {
-                track.querySelectorAll('video').forEach(v => {
+                container.querySelectorAll('video').forEach(v => {
                     v.pause();
                     v.muted = true;
                     const toggle = v.parentElement.querySelector('.infographic-audio-toggle');
@@ -4696,9 +4696,8 @@ if __name__ == '__main__':
                 });
                 vid.muted = false;
                 vid.volume = 1.0;
-                vid.play().then(() => {
-                    btn.innerText = '🔊';
-                }).catch(err => console.error("Video playback error:", err));
+                btn.innerText = '🔊';
+                vid.play().catch(err => console.error("Video playback error:", err));
             } else {
                 vid.pause();
                 vid.muted = true;
