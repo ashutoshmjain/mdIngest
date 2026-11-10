@@ -4728,7 +4728,7 @@ if __name__ == '__main__':
             }
         }
 
-        async function submitNewEpisode() {
+        async function submitNewEpisode(overwrite = false) {
             const slug = document.getElementById('new-draft-slug').value.trim() || 'new_draft';
             const title = document.getElementById('new-draft-title').value.trim();
 
@@ -4743,36 +4743,54 @@ if __name__ == '__main__':
                 body: JSON.stringify({
                     slug: slug,
                     title: title,
-                    content: stagedPayloadText
+                    content: stagedPayloadText,
+                    overwrite: overwrite
                 })
             });
 
             const data = await res.json();
+            if (data.exists && !overwrite) {
+                if (confirm(`Draft "${data.filename}" already exists. Overwrite it?`)) {
+                    return await submitNewEpisode(true);
+                }
+                showToast('Creation cancelled; existing draft preserved.');
+                return;
+            }
             if (data.success) {
                 closeModals();
                 showToast(`✅ Created Mempool draft: src/${data.filename}`);
                 await fetchStatus();
                 loadEpisode(data.filename);
+            } else {
+                showToast(`Creation failed: ${data.error || 'Unknown error'}`);
             }
         }
 
-        async function triggerMine() {
+        async function triggerMine(targetNumOverride = null, overwrite = false) {
             if (!selectedEpisode || !selectedEpisode.is_draft) {
                 showToast('Please select a Mempool draft to mine!');
                 return;
             }
 
-            const targetNum = currentStatus.next_episode_number;
+            const targetNum = targetNumOverride || currentStatus.next_episode_number;
             const res = await fetch('/api/template/mine', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     filename: selectedEpisode.filename,
-                    number: targetNum
+                    number: targetNum,
+                    overwrite: overwrite
                 })
             });
 
             const data = await res.json();
+            if (data.exists && !overwrite) {
+                if (confirm(`Episode "${data.filename}" already exists. Overwrite it?`)) {
+                    return await triggerMine(targetNum, true);
+                }
+                showToast(`Mining cancelled; ${data.filename} preserved.`);
+                return;
+            }
             if (data.success) {
                 showToast(`⚡ Mined into Block Template as #${data.episode_number}!`);
                 await fetchStatus();
@@ -4791,17 +4809,24 @@ if __name__ == '__main__':
             await demoteTemplateToMempool(selectedEpisode.filename, selectedEpisode.title || selectedEpisode.filename);
         }
 
-        async function demoteTemplateToMempool(filename, title) {
-            if (!confirm(`Return "${title}" back to Mempool drafts?`)) {
+        async function demoteTemplateToMempool(filename, title, overwrite = false) {
+            if (!overwrite && !confirm(`Return "${title}" back to Mempool drafts?`)) {
                 return;
             }
             try {
                 const res = await fetch('/api/template/demote_to_mempool', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ filename })
+                    body: JSON.stringify({ filename, overwrite })
                 });
                 const data = await res.json();
+                if (data.exists && !overwrite) {
+                    if (confirm(`Draft "${data.mempool_filename}" already exists in Mempool. Overwrite it?`)) {
+                        return await demoteTemplateToMempool(filename, title, true);
+                    }
+                    showToast(`Demote cancelled; ${data.mempool_filename} preserved.`);
+                    return;
+                }
                 if (data.success) {
                     showToast(`↩ Returned to Mempool: ${data.mempool_filename}`);
                     await fetchStatus();
@@ -4926,16 +4951,28 @@ if __name__ == '__main__':
             reader.onload = async (e) => {
                 const content = e.target.result;
                 try {
-                    const res = await fetch('/api/episode/update_content', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            filename: selectedEpisode.filename,
-                            content: content,
-                            is_python: true
-                        })
-                    });
-                    const data = await res.json();
+                    const sendUpdate = async (overwrite = false) => {
+                        const res = await fetch('/api/episode/update_content', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                filename: selectedEpisode.filename,
+                                content: content,
+                                is_python: true,
+                                overwrite: overwrite
+                            })
+                        });
+                        return await res.json();
+                    };
+                    let data = await sendUpdate(false);
+                    if (data.exists) {
+                        if (confirm(`File "${selectedEpisode.filename}" already exists. Overwrite its content?`)) {
+                            data = await sendUpdate(true);
+                        } else {
+                            showToast('Update cancelled; existing file preserved.');
+                            return;
+                        }
+                    }
                     if (data.success) {
                         showToast(`✅ Updated research from ${file.name} (Slug & media preserved!)`);
                         await fetchStatus();
@@ -4970,16 +5007,28 @@ if __name__ == '__main__':
             reader.onload = async (e) => {
                 const content = e.target.result;
                 try {
-                    const res = await fetch('/api/episode/update_content', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({
-                            filename: selectedEpisode.filename,
-                            content: content,
-                            is_python: false
-                        })
-                    });
-                    const data = await res.json();
+                    const sendUpdate = async (overwrite = false) => {
+                        const res = await fetch('/api/episode/update_content', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                filename: selectedEpisode.filename,
+                                content: content,
+                                is_python: false,
+                                overwrite: overwrite
+                            })
+                        });
+                        return await res.json();
+                    };
+                    let data = await sendUpdate(false);
+                    if (data.exists) {
+                        if (confirm(`File "${selectedEpisode.filename}" already exists. Overwrite its content?`)) {
+                            data = await sendUpdate(true);
+                        } else {
+                            showToast('Update cancelled; existing file preserved.');
+                            return;
+                        }
+                    }
                     if (data.success) {
                         showToast(`✅ Updated research from ${file.name} (Slug & media preserved!)`);
                         await fetchStatus();

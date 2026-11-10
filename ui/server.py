@@ -472,14 +472,39 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
         ddma_clips_dir = sibling_ddma / "docs" / "episodes" / clean_id / "clips"
         ddma_plan_file = sibling_ddma / "docs" / "episodes" / clean_id / "plan.json"
 
-        # Copy plan.json if newer or missing
-        if ddma_plan_file.exists():
-            dest_plan = deepdive_ep_dir / "plan.json"
+        # Copy plan.json if newer or missing (single source of truth: projects/<ep>/plan.json)
+        proj_plan_file = sibling_ddma / "projects" / f"episode_{clean_id}" / "plan.json"
+        if not proj_plan_file.exists():
+            proj_plan_file = sibling_ddma / "projects" / clean_id / "plan.json"
+        
+        dest_plan = deepdive_ep_dir / "plan.json"
+        if proj_plan_file.exists():
+            try:
+                shutil.copy2(proj_plan_file, dest_plan)
+                if ddma_plan_file.parent.exists():
+                    shutil.copy2(proj_plan_file, ddma_plan_file)
+            except Exception:
+                pass
+        elif ddma_plan_file.exists():
             if not dest_plan.exists() or dest_plan.stat().st_size != ddma_plan_file.stat().st_size:
                 try:
                     shutil.copy2(ddma_plan_file, dest_plan)
                 except Exception:
                     pass
+
+        # Sync to dd_hub vault on publish
+        hub_root_str = os.environ.get("DD_HUB_ROOT", r"G:\My Drive\dd_hub")
+        hub_root = Path(hub_root_str)
+        if hub_root.exists():
+            hub_plan = hub_root / "episodes" / clean_id / "plan.json"
+            src_sync = proj_plan_file if proj_plan_file.exists() else (dest_plan if dest_plan.exists() else None)
+            if src_sync:
+                try:
+                    hub_plan.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_sync, hub_plan)
+                except Exception:
+                    pass
+
 
         canonical_pattern = re.compile(rf"^{re.escape(clean_id)}-(\d+)\.mp4$")
 
@@ -654,8 +679,8 @@ def get_episode_audio_path(clean_id: str) -> Path | None:
     for d in possible_dirs:
         if not d.exists():
             continue
-        for ext in [".mp3", ".wav", ".m4a", ".ogg", ".aac"]:
-            for stem in [f"audio{ext}", f"{clean_id}{ext}", f"podcast_{clean_id}{ext}", f"notebooklm{ext}"]:
+        for ext in [".m4a", ".wav", ".mp3", ".ogg", ".aac"]:
+            for stem in [f"audio{ext}", f"{clean_id}{ext}", f"notebooklm{ext}", f"podcast_{clean_id}{ext}"]:
                 f = d / stem
                 if f.exists():
                     return f
@@ -2719,8 +2744,14 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
         proj_dir = root_dir / "projects" / project_id
         proj_dir.mkdir(parents=True, exist_ok=True)
 
-        audio_ext = audio_path.suffix if audio_path else ".m4a"
-        dest_audio_name = f"{clean_id}{audio_ext}"
+        # Prioritize raw continuous .m4a/.wav input over mastered podcast .mp3
+        if (proj_dir / f"{clean_id}.m4a").exists():
+            dest_audio_name = f"{clean_id}.m4a"
+        elif (proj_dir / f"{clean_id}.wav").exists():
+            dest_audio_name = f"{clean_id}.wav"
+        else:
+            audio_ext = audio_path.suffix if audio_path else ".m4a"
+            dest_audio_name = f"{clean_id}{audio_ext}"
         dest_audio_path = proj_dir / dest_audio_name
 
         # Copy audio if missing
@@ -2730,8 +2761,16 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
             except Exception as ce:
                 print(f"[DDMA SEED] Error copying audio: {ce}")
 
-        # Write project_info.json
+        # Write or update project_info.json (preserve existing canonical .m4a)
         info_path = proj_dir / "project_info.json"
+        if info_path.exists():
+            try:
+                with open(info_path, "r", encoding="utf-8") as inf:
+                    existing = json.load(inf)
+                if existing.get("audio_filename", "").endswith((".m4a", ".wav")):
+                    dest_audio_name = existing["audio_filename"]
+            except Exception:
+                pass
         project_info = {
             "id": project_id,
             "name": f"Episode {clean_id}",
@@ -3126,6 +3165,97 @@ def sync_summary_file(mempool_items, template_items):
 
     with open(SUMMARY_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(new_lines) + "\n")
+
+    try:
+        regenerate_episodes_manifest()
+    except Exception as me:
+        print(f"[WARN] Failed to regenerate episodes.json: {me}")
+
+
+def regenerate_episodes_manifest():
+    """
+    Regenerates both copies of episodes.json (`ddma/docs/episodes.json` and `src/ddma/docs/episodes.json`)
+    from published episodes in SUMMARY.md (Template) and existing episode folders, setting isDefault=True
+    on the latest episode.
+    """
+    manifest_paths = [
+        PROJECT_ROOT / "ddma" / "docs" / "episodes.json",
+        SRC_DIR / "ddma" / "docs" / "episodes.json",
+    ]
+    existing_by_id = {}
+    for mp in manifest_paths:
+        if mp.exists():
+            try:
+                with open(mp, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and (item.get("id") or item.get("number")):
+                            eid = str(item.get("id") or item.get("number"))
+                            existing_by_id[eid] = item
+            except Exception:
+                pass
+
+    _, template_items, _, _ = parse_summary_structure()
+    for t in template_items:
+        num = t.get("number")
+        if not num:
+            fn_stem = str(t.get("filename", "")).replace(".md", "")
+            if fn_stem.isdigit():
+                num = int(fn_stem)
+        if not num:
+            continue
+        eid = str(num)
+        has_ep_dir = (
+            (SRC_DIR / "ddma" / "docs" / "episodes" / eid / "plan.json").exists()
+            or (PROJECT_ROOT / "ddma" / "docs" / "episodes" / eid / "plan.json").exists()
+            or (PROJECT_ROOT / "ddma" / "projects" / f"episode_{eid}" / "plan.json").exists()
+        )
+        if not has_ep_dir and eid not in existing_by_id:
+            continue
+        raw_title = str(t.get("title", "")).strip()
+        clean_title = re.sub(r'^\d+\s*:\s*', '', raw_title).strip() or f"Episode {eid}"
+        prev = existing_by_id.get(eid, {})
+        existing_by_id[eid] = {
+            "id": eid,
+            "number": int(num),
+            "title": clean_title,
+            "fullTitle": f"Episode {eid}: {clean_title}",
+            "planPath": f"episodes/{eid}/plan.json",
+            "clipsDir": f"episodes/{eid}/clips",
+            "links": prev.get("links", {}),
+            "isDefault": False
+        }
+
+    for eid, item in list(existing_by_id.items()):
+        try:
+            vid_items = find_episode_videos(eid)
+            avail_nums = sorted([v["num"] for v in vid_items if v.get("num") is not None])
+            if avail_nums:
+                item["availableClips"] = avail_nums
+        except Exception:
+            pass
+
+    if not existing_by_id:
+        return []
+
+    sorted_eps = sorted(
+        existing_by_id.values(),
+        key=lambda x: int(x.get("number") or (int(x["id"]) if str(x.get("id", "")).isdigit() else 0))
+    )
+    for item in sorted_eps:
+        item["isDefault"] = False
+    sorted_eps[-1]["isDefault"] = True
+
+    for mp in manifest_paths:
+        try:
+            mp.parent.mkdir(parents=True, exist_ok=True)
+            with open(mp, "w", encoding="utf-8") as f:
+                json.dump(sorted_eps, f, indent=2)
+        except Exception as e:
+            print(f"[WARN] Could not write {mp}: {e}")
+
+    return sorted_eps
 
 
 def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = None, model_name: str | None = None, force: bool = False) -> tuple[bool, str]:
@@ -4016,6 +4146,15 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 slug = slug.lstrip('_')
                 filename = f"_{slug}.md"
                 file_path = SRC_DIR / filename
+                if file_path.exists() and not data.get("overwrite", False):
+                    self.send_json({
+                        "success": False,
+                        "exists": True,
+                        "filename": filename,
+                        "error": f"Destination draft {filename} already exists. Pass overwrite=true to overwrite."
+                    }, status=409)
+                    return
+
                 sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
                 full_content = f"# {clean_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n"
 
@@ -4080,6 +4219,16 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             if not src_path.exists():
                 self.send_error(404, f"Source file {src_filename} not found")
+                return
+
+            if dest_path.exists() and not data.get("overwrite", False):
+                self.send_json({
+                    "success": False,
+                    "exists": True,
+                    "episode_number": target_number,
+                    "filename": target_filename,
+                    "error": f"Destination episode {target_filename} already exists. Pass overwrite=true to overwrite."
+                }, status=409)
                 return
 
             with open(src_path, "r", encoding="utf-8") as f:
@@ -4188,6 +4337,15 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 slug = f"draft-{filename.replace('.md', '')}"
             mempool_filename = f"_{slug}.md"
             dest_path = SRC_DIR / mempool_filename
+
+            if dest_path.exists() and not data.get("overwrite", False):
+                self.send_json({
+                    "success": False,
+                    "exists": True,
+                    "mempool_filename": mempool_filename,
+                    "error": f"Destination draft {mempool_filename} already exists. Pass overwrite=true to overwrite."
+                }, status=409)
+                return
 
             # Read existing markdown and update header to not include episode number
             with open(src_path, "r", encoding="utf-8") as f:
@@ -4347,6 +4505,15 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             file_path = SRC_DIR / filename
             if not file_path.exists():
                 self.send_error(404, f"File {filename} not found")
+                return
+
+            if file_path.exists() and not data.get("overwrite", False):
+                self.send_json({
+                    "success": False,
+                    "exists": True,
+                    "filename": filename,
+                    "error": f"Destination file {filename} already exists. Pass overwrite=true to overwrite."
+                }, status=409)
                 return
 
             try:
@@ -4764,6 +4931,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/git/push":
             ep_num = data.get("number", "update")
+            try:
+                regenerate_episodes_manifest()
+            except Exception as me:
+                print(f"Manifest regeneration warning before push: {me}")
             if ep_num and ep_num != "update":
                 try:
                     sync_episode_clips_and_markdown(ep_num)

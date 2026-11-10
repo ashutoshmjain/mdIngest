@@ -82,9 +82,9 @@ async function runE2ETests() {
             const title = await p.title();
             if (!title.includes('md² Ingest')) throw new Error(`Unexpected page title: "${title}"`);
 
-            await p.waitForSelector('#tree-scroll-area', { timeout: 4000 });
-            const topEpNum = await p.$eval('#top-ep-num', el => el.value);
-            if (!topEpNum.includes('#')) throw new Error(`Next episode number not initialized: ${topEpNum}`);
+            await p.waitForSelector('#tree-scroll-area .ep-card', { timeout: 6000 });
+            const treeText = (await p.$eval('#tree-scroll-area', el => el.innerText)).toLowerCase();
+            if (!treeText || !treeText.includes('block template')) throw new Error(`Ledger tree not initialized: ${treeText}`);
         });
 
         // -------------------------------------------------------------
@@ -124,11 +124,11 @@ async function runE2ETests() {
                 throw new Error(`Research deck mismatch: title="${rightTitle}", active=${isAstDeckActive}`);
             }
 
-            // In Narrative tab -> Right deck should show Audio Studio & Whisper
+            // In Narrative tab -> Right deck should show Audio/Podcast Studio & Whisper
             await p.click('#tab-btn-narrative');
             rightTitle = (await p.$eval('#right-pane-dynamic-title', el => el.innerText)).toLowerCase();
             let isNarrativeDeckActive = await p.$eval('#right-deck-narrative', el => el.classList.contains('active'));
-            if (!rightTitle.includes('audio') || !isNarrativeDeckActive) {
+            if ((!rightTitle.includes('audio') && !rightTitle.includes('podcast')) || !isNarrativeDeckActive) {
                 throw new Error(`Narrative deck mismatch: title="${rightTitle}", active=${isNarrativeDeckActive}`);
             }
 
@@ -195,6 +195,8 @@ async function runE2ETests() {
         // -------------------------------------------------------------
         await runTest('AI Paragraph Streamliner & Promotion Quote Isolation', async (p) => {
             await p.click('#tab-btn-narrative');
+            const nostrTabBtn = await p.$('#btn-submode-nostr');
+            if (nostrTabBtn) await nostrTabBtn.click();
             
             // Check streamline action button exists
             const streamlineBtn = await p.$('#btn-streamline-ai');
@@ -315,6 +317,167 @@ async function runE2ETests() {
             }
             if (!statusResp.curator_url.includes('project=episode_247')) {
                 throw new Error(`DDMA status curator_url missing project parameter: ${statusResp.curator_url}`);
+            }
+        });
+
+        // -------------------------------------------------------------
+        // Test 11: Overwrite Guards (Mine, Demote, Update Content, Mempool Create)
+        // -------------------------------------------------------------
+        await runTest('Overwrite Guards: Mine onto 249 refused, 249.md untouched, draft preserved', async (p) => {
+            const path = require('path');
+            const srcDir = path.resolve(__dirname, '..', '..', 'src');
+            const ep249Path = path.join(srcDir, '249.md');
+            if (!fs.existsSync(ep249Path)) {
+                throw new Error('src/249.md does not exist for overwrite guard verification');
+            }
+            const orig249Content = fs.readFileSync(ep249Path, 'utf8');
+            const origSummary = fs.readFileSync(path.join(srcDir, 'SUMMARY.md'), 'utf8');
+
+            const testSlug = 'e2e_overwrite_guard_test';
+            const draftFilename = `_${testSlug}.md`;
+            const draftPath = path.join(srcDir, draftFilename);
+
+            try {
+                // 1. Create temporary draft via /api/mempool/create
+                const create1 = await p.evaluate(async (slug) => {
+                    const r = await fetch('/api/mempool/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            slug,
+                            title: 'Overwrite Guard Test',
+                            content: 'raw_markdown = "# Overwrite Guard Test\\n\\nDraft content for testing."',
+                            overwrite: true
+                        })
+                    });
+                    return { status: r.status, body: await r.json() };
+                }, testSlug);
+                if (!create1.body.success || !fs.existsSync(draftPath)) {
+                    throw new Error(`Failed to create test draft: ${JSON.stringify(create1)}`);
+                }
+
+                // 2. Test /api/mempool/create overwrite refusal without overwrite flag
+                const createRefused = await p.evaluate(async (slug) => {
+                    const r = await fetch('/api/mempool/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            slug,
+                            title: 'Should Not Overwrite',
+                            content: 'raw_markdown = "# Should Not Overwrite\\n\\nBad content."'
+                        })
+                    });
+                    return { status: r.status, body: await r.json() };
+                }, testSlug);
+                if (createRefused.status !== 409 || createRefused.body.success !== false || !createRefused.body.exists) {
+                    throw new Error(`mempool/create did not refuse existing draft: ${JSON.stringify(createRefused)}`);
+                }
+
+                // 3. Test UI + API Mine onto 249 -> refused when confirm is dismissed, 249.md untouched, draft still present
+                await p.evaluate(async (fn) => {
+                    await fetchStatus();
+                    await loadEpisode(fn);
+                }, draftFilename);
+
+                let confirmMessage = null;
+                await p.evaluate(() => {
+                    window._origConfirm = window.confirm;
+                    window.confirm = (msg) => {
+                        window._lastConfirmMsg = msg;
+                        return false; // Refuse overwrite in confirm dialog
+                    };
+                });
+
+                await p.evaluate(async () => {
+                    await triggerMine(249, false);
+                });
+
+                confirmMessage = await p.evaluate(() => {
+                    const msg = window._lastConfirmMsg;
+                    window.confirm = window._origConfirm;
+                    return msg;
+                });
+
+                if (!confirmMessage || !confirmMessage.includes('249.md')) {
+                    throw new Error(`Expected UI confirm dialog mentioning 249.md, got: ${confirmMessage}`);
+                }
+
+                const after249Content = fs.readFileSync(ep249Path, 'utf8');
+                if (after249Content !== orig249Content) {
+                    throw new Error('Published 249.md was modified despite overwrite refusal!');
+                }
+                if (!fs.existsSync(draftPath)) {
+                    throw new Error(`Draft ${draftFilename} was deleted despite overwrite refusal!`);
+                }
+
+                // 4. Test /api/episode/update_content refusal without overwrite flag
+                const updateRefused = await p.evaluate(async () => {
+                    const r = await fetch('/api/episode/update_content', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: '249.md',
+                            content: '# Mutated Content\n\nShould be refused.',
+                            is_python: false
+                        })
+                    });
+                    return { status: r.status, body: await r.json() };
+                });
+                if (updateRefused.status !== 409 || updateRefused.body.success !== false || !updateRefused.body.exists) {
+                    throw new Error(`update_content did not refuse overwrite on 249.md: ${JSON.stringify(updateRefused)}`);
+                }
+                if (fs.readFileSync(ep249Path, 'utf8') !== orig249Content) {
+                    throw new Error('249.md was modified by update_content without overwrite=true!');
+                }
+
+                // 5. Test /api/template/demote_to_mempool refusal when destination mempool draft already exists
+                // Create a conflicting draft matching 249's demote slug first
+                const demoteProbe = await p.evaluate(async (fn) => {
+                    // Temporarily create the draft that 249 would demote to, or test demote collision
+                    return fn;
+                }, draftFilename);
+                // Rename/copy draft to match 249's demote target slug to verify demote guard
+                const summaryLines = origSummary.split('\n');
+                const line249 = summaryLines.find(l => l.includes('(249.md)')) || '';
+                const mTitle = line249.match(/\[(?:\d+\s*:\s*)?([^\]]+)\]\(249\.md\)/);
+                const rawTitle249 = mTitle ? mTitle[1].trim() : 'what-is-reality';
+                const slug249 = rawTitle249.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+                const collisionDraftPath = path.join(srcDir, `_${slug249}.md`);
+                const collisionExistedBefore = fs.existsSync(collisionDraftPath);
+                if (!collisionExistedBefore) {
+                    fs.writeFileSync(collisionDraftPath, '# Existing Collision Draft\n', 'utf8');
+                }
+                try {
+                    const demoteRefused = await p.evaluate(async () => {
+                        const r = await fetch('/api/template/demote_to_mempool', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ filename: '249.md' })
+                        });
+                        return { status: r.status, body: await r.json() };
+                    });
+                    if (demoteRefused.status !== 409 || demoteRefused.body.success !== false || !demoteRefused.body.exists) {
+                        throw new Error(`demote_to_mempool did not refuse when destination draft exists: ${JSON.stringify(demoteRefused)}`);
+                    }
+                    if (!fs.existsSync(ep249Path) || fs.readFileSync(ep249Path, 'utf8') !== orig249Content) {
+                        throw new Error('249.md was removed or modified during refused demote!');
+                    }
+                } finally {
+                    if (!collisionExistedBefore && fs.existsSync(collisionDraftPath)) {
+                        fs.unlinkSync(collisionDraftPath);
+                    }
+                }
+            } finally {
+                // Clean up test draft
+                await p.evaluate(async (fn) => {
+                    await fetch('/api/mempool/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: fn })
+                    });
+                }, draftFilename);
+                if (fs.existsSync(draftPath)) fs.unlinkSync(draftPath);
+                fs.writeFileSync(path.join(srcDir, 'SUMMARY.md'), origSummary, 'utf8');
             }
         });
 
