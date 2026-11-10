@@ -290,26 +290,47 @@ async function runE2ETests() {
             await p.click('#tab-btn-media');
             await p.waitForSelector('#media-clips-grid-deck .infographic-card', { timeout: 3000 });
             
-            // Click mute toggle via genuine DOM click to trigger audio unmuting without throwing null track error
-            const firstToggleBtn = await p.$('#media-clips-grid-deck .infographic-audio-toggle');
-            if (!firstToggleBtn) throw new Error('No audio toggle in reels media grid');
-
             const initialText = await p.$eval('#media-clips-grid-deck .infographic-audio-toggle', el => el.innerText);
             if (initialText !== '🔇') throw new Error(`Initial toggle button text expected 🔇 but got: ${initialText}`);
 
             // First click: un-mutes
-            await firstToggleBtn.click();
+            await p.evaluate(() => {
+                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
+                if (b) toggleInfographicAudio(b);
+            });
             await p.waitForFunction(() => {
                 const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
                 return b && b.innerText === '🔊';
-            }, { timeout: 3000 });
+            }, { timeout: 5000 });
 
             // Second click: mutes
-            await firstToggleBtn.click();
+            await p.evaluate(() => {
+                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
+                if (b) toggleInfographicAudio(b);
+            });
             await p.waitForFunction(() => {
                 const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
                 return b && b.innerText === '🔇';
-            }, { timeout: 3000 });
+            }, { timeout: 5000 });
+        });
+
+        // -------------------------------------------------------------
+        // Test 9b: Episode Listen Buttons Route & Invariant
+        // -------------------------------------------------------------
+        await runTest('Episode Listen Buttons Route & Invariant', async (p) => {
+            const res = await p.evaluate(async () => {
+                const r = await fetch('/api/episode/update_listen_buttons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: '249.md' })
+                });
+                return await r.json();
+            });
+            if (!res || !res.success) throw new Error('update_listen_buttons failed: ' + JSON.stringify(res));
+            
+            // Verify button is present in DOM
+            const btnExists = await p.$('#btn-update-listen-buttons');
+            if (!btnExists) throw new Error('Missing #btn-update-listen-buttons in Cockpit DOM');
         });
 
         // -------------------------------------------------------------

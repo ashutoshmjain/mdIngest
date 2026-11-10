@@ -2252,6 +2252,18 @@
 
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.4rem;">
+                        <span>🎧 Episode Listen Buttons</span>
+                    </div>
+                    <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
+                        Updates the Spotify, Apple Podcasts, and Fountain.fm buttons in the episode markdown from podcast_urls.json.
+                    </p>
+                    <button class="btn-cmd" id="btn-update-listen-buttons" style="width: 100%; justify-content: center; padding: 0.6rem; font-weight: 700; margin-top: 0.4rem;" onclick="triggerUpdateListenButtons()">
+                        🎧 Update Listen Buttons
+                    </button>
+                </div>
+
+                <div class="audio-card">
+                    <div class="studio-title" style="margin-bottom: 0.4rem;">
                         <span>🚀 Launch DDMA Studio</span>
                     </div>
                     <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
@@ -5636,6 +5648,30 @@ if __name__ == '__main__':
             // Fallback: If browser popup blocker completely disallowed window.open, navigate current window
             if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
                 window.location.href = targetUrl;
+            }
+        }
+
+        async function triggerUpdateListenButtons() {
+            const epNum = selectedEpisode ? selectedEpisode.filename.replace('.md', '') : '';
+            if (!epNum) {
+                showToast('⚠️ Please select an episode first.');
+                return;
+            }
+            showToast(`🎧 Updating listen buttons for episode ${epNum}...`);
+            try {
+                const res = await fetch('/api/episode/update_listen_buttons', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: `${epNum}.md` })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`✅ ${data.message}`);
+                } else {
+                    showToast(`⚠️ Error: ${data.error || 'Failed to update listen buttons'}`);
+                }
+            } catch (err) {
+                showToast(`❌ Network error: ${err.message}`);
             }
         }
 

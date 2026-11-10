@@ -101,13 +101,15 @@ def kill_mdserve():
             pass
 
 def load_settings():
+    settings = {}
     if SETTINGS_FILE.exists():
         try:
             with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                settings = json.load(f)
         except Exception:
             pass
-    return {
+
+    defaults = {
         "spotify_url": "https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE",
         "apple_podcasts_url": "https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251",
         "youtube_music_url": "https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe",
@@ -119,6 +121,28 @@ def load_settings():
         "title_word_limit": 5,
         "port": 8088
     }
+
+    # Overlay defaults with file settings
+    merged = {**defaults, **settings}
+
+    # Environment overrides take priority
+    if os.environ.get("GEMINI_API_KEY"):
+        merged["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
+    if os.environ.get("MOSAIC_API_KEY"):
+        merged["mosaic_api_key"] = os.environ.get("MOSAIC_API_KEY")
+    if os.environ.get("DD_HUB_ROOT"):
+        merged["dd_hub_root"] = os.environ.get("DD_HUB_ROOT")
+    if os.environ.get("GDRIVE_PICKUP_PATH"):
+        merged["gdrive_pickup_path"] = os.environ.get("GDRIVE_PICKUP_PATH")
+    if os.environ.get("GDRIVE_VIDEO_PICKUP_PATH"):
+        merged["gdrive_video_pickup_path"] = os.environ.get("GDRIVE_VIDEO_PICKUP_PATH")
+    if os.environ.get("INGEST_PORT"):
+        try:
+            merged["port"] = int(os.environ.get("INGEST_PORT"))
+        except ValueError:
+            pass
+
+    return merged
 
 def save_settings(settings_data):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -4931,6 +4955,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(result)
             return
 
+        if path == "/api/episode/update_listen_buttons":
+            fn = data.get("filename", "") or data.get("clean_id", "") or data.get("number", "")
+            clean_id = str(fn).replace(".md", "").lstrip("_")
+            if not clean_id:
+                self.send_json({"success": False, "error": "Missing episode identifier."})
+                return
+            try:
+                from update_listen_buttons import update_episode_listen_buttons
+                success = update_episode_listen_buttons(clean_id)
+                self.send_json({"success": success, "clean_id": clean_id, "message": f"Updated listen buttons for {clean_id}"})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)})
+            return
+
         if path == "/api/git/push":
             ep_num = data.get("number", "update")
             try:
@@ -4943,7 +4981,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 except Exception as se:
                     print(f"Auto-sync before push warning for {ep_num}: {se}")
             try:
-                subprocess.run(["git", "add", "src/", "book.toml", "ingest/settings.json"], cwd=str(PROD_ROOT), check=True)
+                subprocess.run(["git", "add", "src/", "book.toml"], cwd=str(PROD_ROOT), check=True)
                 subprocess.run(["git", "commit", "-m", f"publish: episode {ep_num} via md² cockpit"], cwd=str(PROD_ROOT), check=True)
                 subprocess.run(["git", "push"], cwd=str(PROD_ROOT), check=True)
                 self.send_json({"success": True, "message": "Pushed to remote repository successfully!"})

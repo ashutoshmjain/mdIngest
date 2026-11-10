@@ -105,7 +105,7 @@ def update_episode_listen_buttons(ep_num: str) -> bool:
 
     if updated_text == raw_text:
         print(f"[INFO] Episode {clean_ep} listen buttons already up to date. No write performed.")
-        return False
+        return True
 
     md_path.write_text(updated_text, encoding="utf-8")
     print(f"[SUCCESS] Updated listen buttons in {md_path}")
