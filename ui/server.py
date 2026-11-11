@@ -4959,14 +4959,14 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             fn = data.get("filename", "") or data.get("clean_id", "") or data.get("number", "")
             clean_id = str(fn).replace(".md", "").lstrip("_")
             if not clean_id:
-                self.send_json({"success": False, "error": "Missing episode identifier."})
+                self.send_json({"success": False, "error": "Missing episode identifier."}, status=400)
                 return
             try:
                 from update_listen_buttons import update_episode_listen_buttons
                 success = update_episode_listen_buttons(clean_id)
                 self.send_json({"success": success, "clean_id": clean_id, "message": f"Updated listen buttons for {clean_id}"})
             except Exception as e:
-                self.send_json({"success": False, "error": str(e)})
+                self.send_json({"success": False, "error": str(e)}, status=500)
             return
 
         if path == "/api/git/push":
