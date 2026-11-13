@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deepDive Workspace</title>
+<style>
+  :root { --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --muted: #64748b; --accent: #4338ca; --accent-bg: #eef2ff; --line: #e2e8f0; --ok: #15803d; --err: #b91c1c; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 2rem 1rem 4rem; }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.5rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 0.95rem; margin: 0 0 0.7rem; }
+  label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--muted); margin: 0.6rem 0 0.25rem; }
+  input[type=text], input[type=number] { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; font-family: ui-monospace, monospace; }
+  input[type=number] { font-family: inherit; }
+  .row { display: flex; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; }
+  button, .btn { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; text-decoration: none; }
+  button.secondary { background: var(--accent-bg); color: var(--accent); }
+  button:disabled { opacity: 0.55; cursor: wait; }
+  .kv { font-size: 0.8rem; margin-top: 0.45rem; word-break: break-all; }
+  .kv b { color: var(--muted); font-weight: 700; }
+  .status { font-size: 0.82rem; margin-top: 0.6rem; min-height: 1.2em; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  #landing-drop-zone { padding: 1rem; border: 2px dashed #c7d2fe; border-radius: 10px; background: #f8fafc; text-align: center; cursor: pointer; margin-top: 0.5rem; }
+  .fine { font-size: 0.72rem; color: var(--muted); margin-top: 0.7rem; }
+  a.inline { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏠 deepDive Workspace</h1>
+  <p class="sub">One plan + one settings source on Google Drive, read by every environment. This page is the shell — the work happens in the apps below.</p>
+
+  <div class="card" id="workspace-card">
+    <h2>Workspace</h2>
+    <label for="workspace-url">Workspace URL (Google Drive folder — same on every environment)</label>
+    <input type="text" id="workspace-url" spellcheck="false" placeholder="https://drive.google.com/drive/folders/<folder-id>">
+    <div class="kv"><b>Folder ID:</b> <span id="workspace-folder-id">—</span></div>
+    <div class="kv"><b>Local path:</b> <span id="workspace-local-path">—</span></div>
+    <div class="kv"><b>Talking to:</b> <span id="workspace-env">—</span></div>
+    <div class="row">
+      <button id="btn-test-workspace" class="secondary" onclick="testWorkspace()">Test</button>
+      <button id="btn-save-workspace" onclick="saveWorkspaceUrl()">Save URL</button>
+    </div>
+    <div class="status" id="workspace-status"></div>
+    <div class="fine">Saving writes the URL to settings via <code>/api/settings</code>. While the vault is reachable, the <em>effective</em> workspace stays the vault's — the values re-read below always show what is actually in force.</div>
+  </div>
+
+  <div class="card" id="launcher-card">
+    <h2>Apps</h2>
+    <div class="row">
+      <a class="btn secondary" href="/cockpit.html">Open mdIngest Cockpit</a>
+      <button onclick="launchDdMa()">Launch DDMA</button>
+    </div>
+    <div class="status" id="launcher-status"></div>
+  </div>
+
+  <div class="card" id="drop-card">
+    <h2>Inputs — one drop point</h2>
+    <p class="fine" style="margin-top:0">The Python payload + the base audio land in <code>dd_hub/inputs/&lt;ep&gt;/</code>, where the cockpit's triggers already read them.</p>
+    <label for="landing-ep">Episode number (new or existing)</label>
+    <input type="number" id="landing-ep" min="1" placeholder="e.g. 250">
+    <div id="landing-drop-zone"
+         onclick="document.getElementById('landing-file-input').click()"
+         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
+         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
+         ondrop="handleLandingDropEvent(event)"
+         title="Drop to ingest any .py payload or .m4a/.mp3/.wav audio into dd_hub/inputs/">
+      <div style="font-size: 1.15rem; line-height: 1;">📥</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop .py or Audio</div>
+      <div style="font-size: 0.68rem; color: #64748b;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
+    </div>
+    <input type="file" id="landing-file-input" accept=".py,.md,.m4a,.mp3,.wav,.ogg,.aac" style="display:none" onchange="handleLandingFileSelected(event)">
+    <div class="row">
+      <button class="secondary" id="btn-sync-landing" onclick="syncLandingInputs()">⚡ Sync dd_hub/inputs</button>
+    </div>
+    <div class="status" id="drop-status"></div>
+  </div>
+
+  <p class="fine">Research + podcast work continues in the <a class="inline" href="/cockpit.html">cockpit</a>. No input drop UI lives there anymore — this page is the only drop point.</p>
+</div>
+
+<script>
+const DEFAULT_WORKSPACE_URL = "https://drive.google.com/drive/folders/1TTutE1z5ukqqZZcP65JLf8s0MsaGQ3kN";
+
+function setStatus(id, msg, kind) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+function folderIdFromUrl(url) {
+  const m = String(url || '').match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
+async function loadWorkspace() {
+  try {
+    const res = await fetch('/api/settings');
+    const s = await res.json();
+    const urlInput = document.getElementById('workspace-url');
+    urlInput.value = s.workspace_url || DEFAULT_WORKSPACE_URL;
+    document.getElementById('workspace-folder-id').textContent = folderIdFromUrl(urlInput.value) || '—';
+    await testWorkspace(true);
+  } catch (err) {
+    setStatus('workspace-status', 'Could not load settings: ' + err.message, 'err');
+  }
+}
+
+async function testWorkspace(quiet) {
+  const url = document.getElementById('workspace-url').value.trim() || DEFAULT_WORKSPACE_URL;
+  document.getElementById('workspace-folder-id').textContent = folderIdFromUrl(url) || '(unparseable)';
+  if (!quiet) setStatus('workspace-status', 'Testing workspace…');
+  try {
+    const res = await fetch('/api/workspace/test?url=' + encodeURIComponent(url));
+    const data = await res.json();
+    document.getElementById('workspace-local-path').textContent =
+      (data.local_path || '—') + (data.readable ? '  (readable ✓)' : '  (NOT readable)');
+    document.getElementById('workspace-env').textContent =
+      window.location.host + '  →  ' + (data.local_path || 'unresolved');
+    if (data.ok) {
+      setStatus('workspace-status', '✓ ' + data.message, 'ok');
+    } else {
+      setStatus('workspace-status', '✗ ' + data.message, 'err');
+    }
+    return data;
+  } catch (err) {
+    setStatus('workspace-status', '✗ Test failed: ' + err.message, 'err');
+    return { ok: false };
+  }
+}
+
+async function saveWorkspaceUrl() {
+  const url = document.getElementById('workspace-url').value.trim();
+  if (!folderIdFromUrl(url)) {
+    setStatus('workspace-status', '✗ Not a Google Drive folder URL — nothing saved.', 'err');
+    return;
+  }
+  try {
+    const cur = await (await fetch('/api/settings')).json();
+    cur.workspace_url = url;
+    const res = await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur)
+    });
+    const data = await res.json();
+    if (data.success) {
+      setStatus('workspace-status', 'Saved. Re-reading what is actually in force…', 'ok');
+      await loadWorkspace();
+    } else {
+      setStatus('workspace-status', '✗ Save failed.', 'err');
+    }
+  } catch (err) {
+    setStatus('workspace-status', '✗ Save failed: ' + err.message, 'err');
+  }
+}
+
+async function launchDdMa() {
+  setStatus('launcher-status', 'Launching DDMA…');
+  try {
+    const res = await fetch('/api/ddma/launch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+    });
+    const data = await res.json();
+    if (data.success && data.curator_url) {
+      const el = document.getElementById('launcher-status');
+      el.className = 'status ok';
+      el.innerHTML = '';
+      el.appendChild(document.createTextNode('✓ DDMA ready: '));
+      const a = document.createElement('a');
+      a.href = data.curator_url;
+      a.textContent = data.curator_url;
+      a.className = 'inline';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      el.appendChild(a);
+    } else {
+      setStatus('launcher-status', '✗ Launch failed: ' + (data.error || 'unknown error'), 'err');
+    }
+  } catch (err) {
+    setStatus('launcher-status', '✗ Launch failed: ' + err.message, 'err');
+  }
+}
+
+function handleLandingDropEvent(event) {
+  event.preventDefault();
+  const zone = document.getElementById('landing-drop-zone');
+  zone.style.borderColor = '#c7d2fe';
+  zone.style.background = '#f8fafc';
+  const files = event.dataTransfer && event.dataTransfer.files;
+  if (files && files.length > 0) processLandingFile(files[0]);
+}
+
+function handleLandingFileSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (file) {
+    processLandingFile(file);
+    event.target.value = '';
+  }
+}
+
+async function processLandingFile(file) {
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const isResearch = (ext === 'py' || ext === 'md');
+  const isAudio = ['m4a', 'mp3', 'wav', 'ogg', 'aac'].includes(ext);
+  if (!isResearch && !isAudio) {
+    setStatus('drop-status', '❌ Unsupported file type: .' + ext, 'err');
+    return;
+  }
+  const ep = (document.getElementById('landing-ep').value || '').trim();
+  if (!ep) {
+    setStatus('drop-status', 'Enter the episode number first.', 'err');
+    return;
+  }
+  let sendFile = file;
+  let slugChoice = '';
+  if (isResearch) {
+    slugChoice = ep;
+  } else {
+    // The drop endpoint routes digit-named audio to that episode; rename so the
+    // target is always the episode typed above, whatever the file was called.
+    const stem = file.name.replace(/\.[^.]+$/, '');
+    if (!/^\d+$/.test(stem)) {
+      sendFile = new File([file], ep + '.' + ext, { type: file.type });
+    }
+  }
+  setStatus('drop-status', '📥 Ingesting ' + file.name + ' to dd_hub/inputs/' + ep + '…');
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const dataUrl = e.target.result || '';
+    const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    try {
+      const res = await fetch('/api/dd_hub/unified_drop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orig_filename: sendFile.name,
+          active_filename: ep + '.md',
+          slug: slugChoice,
+          base64_data: base64Data
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('drop-status', '✅ ' + data.message, 'ok');
+      } else {
+        setStatus('drop-status', '❌ Drop failed: ' + (data.error || 'Server error'), 'err');
+      }
+    } catch (err) {
+      setStatus('drop-status', '❌ Drop error: ' + err.message, 'err');
+    }
+  };
+  reader.readAsDataURL(sendFile);
+}
+
+async function syncLandingInputs() {
+  const btn = document.getElementById('btn-sync-landing');
+  btn.disabled = true;
+  setStatus('drop-status', '⏳ Syncing dd_hub/inputs…');
+  try {
+    const res = await fetch('/api/dd_hub/sync_inputs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+    });
+    const data = await res.json();
+    if (data.success) {
+      setStatus('drop-status', '✅ ' + data.message, 'ok');
+    } else {
+      setStatus('drop-status', '❌ Sync failed: ' + (data.error || 'Unknown error'), 'err');
+    }
+  } catch (err) {
+    setStatus('drop-status', '❌ Sync error: ' + err.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+loadWorkspace();
+</script>
+</body>
+</html>

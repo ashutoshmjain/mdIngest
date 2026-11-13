@@ -3703,7 +3703,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = url.path
 
         if path == "/" or path == "/index.html":
-            self.path = "/cockpit.html"
+            self.path = "/landing.html"
             return super().do_GET()
 
         if path == "/api/status":
@@ -4027,6 +4027,49 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/settings":
             self.send_json(load_settings())
+            return
+
+        if path == "/api/workspace/test":
+            params = parse_qs(url.query)
+            raw_url = params.get("url", [""])[0].strip()
+            m = re.search(r"/folders/([A-Za-z0-9_-]+)", raw_url)
+            if not m:
+                self.send_json({"success": False, "ok": False,
+                                "message": "Not a Google Drive folder URL (expected …/drive/folders/<folder-id>)."})
+                return
+            folder_id = m.group(1)
+            settings = load_settings()
+            cfg_id = ""
+            cfg_url = str(settings.get("workspace_url", "") or "")
+            cm = re.search(r"/folders/([A-Za-z0-9_-]+)", cfg_url)
+            if cm:
+                cfg_id = cm.group(1)
+            hub_root = get_dd_hub_root()
+            local_path = str(hub_root)
+            readable = False
+            has_marker = False
+            try:
+                readable = hub_root.exists() and hub_root.is_dir()
+                has_marker = readable and ((hub_root / "vault" / "settings.json").exists() or (hub_root / "episodes").exists())
+            except Exception:
+                pass
+            ok = bool(folder_id) and readable
+            if ok and cfg_id and folder_id != cfg_id:
+                msg = (f"URL parses and the local workspace is readable at {local_path}, "
+                       f"but its folder ID does not match the configured workspace ({cfg_id}). "
+                       "Saving would switch workspaces.")
+            elif ok:
+                msg = (f"Workspace resolves and is readable at {local_path}. "
+                       + ("Folder ID matches the configured workspace." if cfg_id else ""))
+            elif not readable:
+                msg = f"URL parses (folder {folder_id}) but the local path {local_path} is not reachable. Mount dd_hub / set DD_HUB_ROOT."
+            else:
+                msg = "Workspace URL not usable."
+                ok = False
+            self.send_json({"success": True, "ok": ok, "folder_id": folder_id,
+                            "matches_configured": bool(cfg_id) and folder_id == cfg_id,
+                            "local_path": local_path, "readable": readable,
+                            "has_marker": has_marker, "message": msg})
             return
 
         # Media Streaming routes for video clips and cover images

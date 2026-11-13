@@ -1556,8 +1556,7 @@
                 <button class="pane-close-btn" onclick="toggleLeftPane()" title="Collapse Ledger Sidebar (Click to close)">◀</button>
             </div>
 
-            <!-- Hidden file input for Unified Smart Drop Zone -->
-            <input type="file" id="unified-file-input" accept=".py,.md,.m4a,.mp3,.wav,.ogg,.aac" style="display: none;" onchange="handleUnifiedFileSelected(event)">
+
 
             <div class="tree-scroll-area" id="tree-scroll-area">
                 <!-- Dynamically populated with active Mempool drafts & Block Template episodes only -->
@@ -1916,20 +1915,12 @@
                 </div>
                 <!-- Unified Smart Drop Zone + Sync dd_hub/inputs -->
                 <div class="audio-card" style="padding: 0.65rem 0.75rem;">
-                    <div class="unified-drop-zone"
-                         onclick="document.getElementById('unified-file-input').click()"
-                         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
-                         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
-                         ondrop="handleUnifiedDropEvent(event)"
-                         style="padding: 0.65rem 0.6rem; border: 2px dashed #c7d2fe; border-radius: 8px; background: #f8fafc; text-align: center; cursor: pointer; transition: all 0.15s ease; margin-bottom: 0.45rem;"
-                         title="Drop or click to ingest any .py payload, .md research, or .m4a/.mp3/.wav audio into dd_hub/inputs/">
-                        <div style="font-size: 1.15rem; line-height: 1; margin-bottom: 0.2rem;">📥</div>
-                        <div style="font-size: 0.76rem; font-weight: 800; color: #312e81;">Drop .py, .md, or Audio</div>
-                        <div style="font-size: 0.64rem; font-family: var(--font-mono); color: #64748b; margin-top: 0.1rem;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
-                    </div>
                     <button class="btn-cmd btn-sync-ddhub" onclick="syncDdHubInputs()" style="width: 100%; justify-content: center; padding: 0.42rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" title="Scan dd_hub/inputs/ for automated drops from send-py skill or NotebookLM">
                         <span>⚡</span> Sync dd_hub/inputs
                     </button>
+                    <div style="text-align: center; margin-top: 0.35rem; font-size: 0.68rem;">
+                        <a href="/" style="color: var(--accent-amber-dark, #4338ca);">Drop new inputs on the home page →</a>
+                    </div>
                 </div>
 
 
@@ -1987,20 +1978,12 @@
                 </div>
                 <!-- Unified Smart Drop Zone + Sync dd_hub/inputs -->
                 <div class="audio-card" style="padding: 0.65rem 0.75rem;">
-                    <div class="unified-drop-zone"
-                         onclick="document.getElementById('unified-file-input').click()"
-                         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
-                         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
-                         ondrop="handleUnifiedDropEvent(event)"
-                         style="padding: 0.65rem 0.6rem; border: 2px dashed #c7d2fe; border-radius: 8px; background: #f8fafc; text-align: center; cursor: pointer; transition: all 0.15s ease; margin-bottom: 0.45rem;"
-                         title="Drop or click to ingest any .py payload, .md research, or .m4a/.mp3/.wav audio into dd_hub/inputs/">
-                        <div style="font-size: 1.15rem; line-height: 1; margin-bottom: 0.2rem;">📥</div>
-                        <div style="font-size: 0.76rem; font-weight: 800; color: #312e81;">Drop .py, .md, or Audio</div>
-                        <div style="font-size: 0.64rem; font-family: var(--font-mono); color: #64748b; margin-top: 0.1rem;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
-                    </div>
                     <button class="btn-cmd btn-sync-ddhub" onclick="syncDdHubInputs()" style="width: 100%; justify-content: center; padding: 0.42rem 0.5rem; font-size: 0.72rem; font-weight: 700; background: #eef2ff; color: #4338ca; border-color: #c7d2fe;" title="Scan dd_hub/inputs/ for automated drops from send-py skill or NotebookLM">
                         <span>⚡</span> Sync dd_hub/inputs
                     </button>
+                    <div style="text-align: center; margin-top: 0.35rem; font-size: 0.68rem;">
+                        <a href="/" style="color: var(--accent-amber-dark, #4338ca);">Drop new inputs on the home page →</a>
+                    </div>
                 </div>
 
                 <!-- 1. Source Audio & Auto-Transcription Status -->
@@ -5231,85 +5214,6 @@ if __name__ == '__main__':
                     btn.innerHTML = '<span>⚡</span> Sync dd_hub/inputs';
                 });
             }
-        }
-
-        function handleUnifiedDropEvent(event) {
-            event.preventDefault();
-            document.querySelectorAll('.unified-drop-zone').forEach(zone => {
-                zone.style.borderColor = '#c7d2fe';
-                zone.style.background = '#f8fafc';
-            });
-            const files = event.dataTransfer?.files;
-            if (files && files.length > 0) {
-                processUnifiedDroppedFile(files[0]);
-            }
-        }
-
-        function handleUnifiedFileSelected(event) {
-            const file = event.target.files?.[0];
-            if (file) {
-                processUnifiedDroppedFile(file);
-                event.target.value = '';
-            }
-        }
-
-        async function processUnifiedDroppedFile(file) {
-            if (!file) return;
-            const ext = (file.name.split('.').pop() || '').toLowerCase();
-            const isResearch = (ext === 'py' || ext === 'md');
-            const isAudio = ['m4a', 'mp3', 'wav', 'ogg', 'aac'].includes(ext);
-
-            if (!isResearch && !isAudio) {
-                showToast(`❌ Unsupported file type: .${ext}`);
-                return;
-            }
-
-            let slugChoice = '';
-            if (isResearch) {
-                const stem = file.name.replace(/\.[^.]+$/, '');
-                const defaultSlug = (stem && !['payload', 'extract', 'final_research', 'research'].includes(stem.toLowerCase()))
-                    ? stem.toLowerCase().replace(/[^a-z0-9_-]+/g, '-')
-                    : (selectedEpisode ? selectedEpisode.filename.replace('.md', '').replace(/^_/, '') : '');
-                const prompted = prompt(
-                    `Ingesting Research Payload (${file.name}) into dd_hub/inputs/<slug>/payload.py\n\n` +
-                    `Enter draft slug or episode number (leave blank to auto-derive from H1 title):`,
-                    defaultSlug
-                );
-                if (prompted === null) return;
-                slugChoice = prompted.trim();
-            }
-
-            showToast(`📥 Ingesting ${file.name} to dd_hub/inputs...`);
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const dataUrl = e.target.result || '';
-                const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
-                try {
-                    const res = await fetch('/api/dd_hub/unified_drop', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            orig_filename: file.name,
-                            active_filename: selectedEpisode ? selectedEpisode.filename : '',
-                            slug: slugChoice,
-                            base64_data: base64Data
-                        })
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        showToast(`✅ ${data.message}`);
-                        await fetchStatus();
-                        if (data.filename) {
-                            loadEpisode(data.filename);
-                        }
-                    } else {
-                        showToast(`❌ Drop failed: ${data.error || 'Server error'}`);
-                    }
-                } catch (err) {
-                    showToast(`❌ Drop error: ${err.message}`);
-                }
-            };
-            reader.readAsDataURL(file);
         }
 
         async function handleAudioFileSelected(event) {

@@ -76,8 +76,8 @@ async function runE2ETests() {
         // Test 1: Initial Cockpit Boot & Ledger Tree
         // -------------------------------------------------------------
         await runTest('Initial Page Boot & Status Rendering', async (p) => {
-            const res = await p.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 8000 });
-            if (!res || !res.ok()) throw new Error(`HTTP ${res ? res.status() : 'no response'} from ${BASE_URL}`);
+            const res = await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            if (!res || !res.ok()) throw new Error(`HTTP ${res ? res.status() : 'no response'} from ${BASE_URL}/cockpit.html`);
 
             const title = await p.title();
             if (!title.includes('md² Ingest')) throw new Error(`Unexpected page title: "${title}"`);
@@ -85,6 +85,133 @@ async function runE2ETests() {
             await p.waitForSelector('#tree-scroll-area .ep-card', { timeout: 6000 });
             const treeText = (await p.$eval('#tree-scroll-area', el => el.innerText)).toLowerCase();
             if (!treeText || !treeText.includes('block template')) throw new Error(`Ledger tree not initialized: ${treeText}`);
+        });
+
+
+        // -------------------------------------------------------------
+        // Test 1b: Landing Page — workspace URL prefilled + resolved path
+        // -------------------------------------------------------------
+        await runTest('Landing Page: workspace URL prefilled + resolved path', async (p) => {
+            const res = await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            if (!res || !res.ok()) throw new Error(`HTTP ${res ? res.status() : 'no response'} from ${BASE_URL}/`);
+            const title = await p.title();
+            if (!title.includes('Workspace')) throw new Error(`Unexpected landing title: "${title}"`);
+            const urlVal = await p.$eval('#workspace-url', el => el.value);
+            if (!urlVal.includes('drive.google.com/drive/folders/')) throw new Error(`URL not prefilled: "${urlVal}"`);
+            await p.waitForFunction(
+                () => (document.getElementById('workspace-local-path').textContent || '').length > 1,
+                { timeout: 8000 });
+            const lp = await p.$eval('#workspace-local-path', el => el.textContent);
+            if (!lp.includes('dd_hub')) throw new Error(`resolved path missing dd_hub: "${lp}"`);
+            if (!lp.includes('readable')) throw new Error(`readability not shown: "${lp}"`);
+        });
+
+        // -------------------------------------------------------------
+        // Test 1c: Landing workspace Test button — good passes, bad refused
+        // -------------------------------------------------------------
+        await runTest('Landing Workspace Test: good passes, bad refused', async (p) => {
+            await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            await p.click('#btn-test-workspace');
+            await p.waitForFunction(
+                () => /✓|✗/.test(document.getElementById('workspace-status').textContent || ''),
+                { timeout: 8000 });
+            const goodMsg = await p.$eval('#workspace-status', el => el.textContent);
+            if (!goodMsg.includes('✓')) throw new Error(`good URL not accepted: "${goodMsg}"`);
+            await p.$eval('#workspace-url', el => { el.value = 'https://example.com/not-a-drive-url'; });
+            await p.click('#btn-test-workspace');
+            await p.waitForFunction(
+                () => /✗/.test(document.getElementById('workspace-status').textContent || ''),
+                { timeout: 8000 });
+            const badMsg = await p.$eval('#workspace-status', el => el.textContent);
+            if (!badMsg.includes('✗')) throw new Error(`bad URL not refused: "${badMsg}"`);
+        });
+
+        // -------------------------------------------------------------
+        // Test 1d: Cockpit decluttered — no drop zones, Sync stays
+        // -------------------------------------------------------------
+        await runTest('Cockpit decluttered: no drop zones, Sync stays', async (p) => {
+            await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            const zones = await p.$$eval('.unified-drop-zone', els => els.length);
+            if (zones !== 0) throw new Error(`${zones} drop zone(s) remain in cockpit`);
+            const syncs = await p.$$eval('.btn-sync-ddhub', els => els.length);
+            if (syncs < 1) throw new Error('Sync dd_hub/inputs buttons are gone from cockpit');
+            const homeLink = await p.$eval('a[href="/"]', el => el.textContent);
+            if (!homeLink) throw new Error('no home-page link in cockpit');
+        });
+
+        // -------------------------------------------------------------
+        // Test 1e: Landing launcher — mdIngest link + DDMA launch URL
+        // -------------------------------------------------------------
+        await runTest('Landing launcher: mdIngest link + DDMA launch', async (p) => {
+            await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            const href = await p.$eval('#launcher-card a', el => el.getAttribute('href'));
+            if (href !== '/cockpit.html') throw new Error(`mdIngest link wrong: "${href}"`);
+            const launchResp = await p.evaluate(async () => {
+                const r = await fetch('/api/ddma/launch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: '247.md' })
+                });
+                return await r.json();
+            });
+            if (!launchResp.success) throw new Error(`DDMA launch failed: ${launchResp.error || 'unknown'}`);
+            if (!String(launchResp.curator_url).includes('project=episode_247')) {
+                throw new Error(`curator URL wrong: ${launchResp.curator_url}`);
+            }
+        });
+
+        // -------------------------------------------------------------
+        // Test 1f: Landing drop — payload for new episode lands in hub inputs
+        // -------------------------------------------------------------
+        await runTest('Landing drop: payload for ep 997 lands in hub inputs', async (p) => {
+            const fs2 = require('fs');
+            const os2 = require('os');
+            const path2 = require('path');
+            const srcDir = path2.resolve(__dirname, '..', '..', 'src');
+            const summaryPath = path2.join(srcDir, 'SUMMARY.md');
+            const origSummary = fs2.readFileSync(summaryPath, 'utf8');
+            const draft997 = path2.join(srcDir, '997.md');
+            const draftExisted = fs2.existsSync(draft997);
+            let hubRoot = '';
+            const tmpPayload = path2.join(os2.tmpdir(), 'landing-drop-997.py');
+            fs2.writeFileSync(tmpPayload, 'raw_markdown = """# Landing Drop Probe\n\nProbe content for Phase 4 landing drop test."""\n', 'utf8');
+            try {
+                await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+                await p.$eval('#landing-ep', el => { el.value = '997'; });
+                const fileInput = await p.$('#landing-file-input');
+                await fileInput.uploadFile(tmpPayload);
+                await p.waitForFunction(
+                    () => /✅|❌/.test(document.getElementById('drop-status').textContent || ''),
+                    { timeout: 15000 });
+                const msg = await p.$eval('#drop-status', el => el.textContent);
+                if (!msg.includes('✅')) throw new Error(`drop not accepted: "${msg}"`);
+                hubRoot = await p.evaluate(async () => {
+                    const r = await fetch('/api/status');
+                    const j = await r.json();
+                    return (j.settings && j.settings.dd_hub_root) || '';
+                });
+                const hub997 = path2.join(hubRoot, 'inputs', '997', 'payload.py');
+                if (!fs2.existsSync(hub997)) throw new Error(`hub payload missing: ${hub997}`);
+                const status2 = await p.evaluate(async () => {
+                    const r = await fetch('/api/status');
+                    return await r.json();
+                });
+                const hay = JSON.stringify(status2.mempool || []).concat(JSON.stringify(status2.template || []));
+                if (!hay.includes('997')) throw new Error('ep 997 not visible to cockpit status after drop');
+            } finally {
+                try {
+                    const hubBase = hubRoot || path2.join('G:', 'My Drive', 'dd_hub');
+                    const hubIn = path2.join(hubBase, 'inputs', '997');
+                    if (fs2.existsSync(hubIn)) fs2.rmSync(hubIn, { recursive: true, force: true });
+                } catch (e) { /* hub cleanup best-effort */ }
+                try {
+                    if (!draftExisted && fs2.existsSync(draft997)) fs2.unlinkSync(draft997);
+                    fs2.writeFileSync(summaryPath, origSummary, 'utf8');
+                } catch (e) { /* src cleanup best-effort */ }
+                try { fs2.unlinkSync(tmpPayload); } catch (e) { /* noop */ }
+                // Leave the shared page on the cockpit: downstream tests assume it.
+                await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            }
         });
 
         // -------------------------------------------------------------
@@ -293,25 +420,21 @@ async function runE2ETests() {
             const initialText = await p.$eval('#media-clips-grid-deck .infographic-audio-toggle', el => el.innerText);
             if (initialText !== '🔇') throw new Error(`Initial toggle button text expected 🔇 but got: ${initialText}`);
 
+            // NOTE: the media tab re-fetches + re-renders the grid on every click, so the
+            // button is tracked by element handle — re-querying can land on a fresh
+            // (still-muted) node while the clicked one already flipped.
+            const tgl = async (want) => {
+                const h = await p.$('#media-clips-grid-deck .infographic-audio-toggle');
+                if (!h) throw new Error('No audio toggle found in media clips grid deck');
+                await h.evaluate((b) => { toggleInfographicAudio(b); });
+                await p.waitForFunction((b, w) => b && b.innerText === w, { timeout: 5000 }, h, want);
+            };
+
             // First click: un-mutes
-            await p.evaluate(() => {
-                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
-                if (b) toggleInfographicAudio(b);
-            });
-            await p.waitForFunction(() => {
-                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
-                return b && b.innerText === '🔊';
-            }, { timeout: 5000 });
+            await tgl('🔊');
 
             // Second click: mutes
-            await p.evaluate(() => {
-                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
-                if (b) toggleInfographicAudio(b);
-            });
-            await p.waitForFunction(() => {
-                const b = document.querySelector('#media-clips-grid-deck .infographic-audio-toggle');
-                return b && b.innerText === '🔇';
-            }, { timeout: 5000 });
+            await tgl('🔇');
         });
 
         // -------------------------------------------------------------
