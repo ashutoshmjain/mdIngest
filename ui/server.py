@@ -49,6 +49,7 @@ VID_DIR.mkdir(parents=True, exist_ok=True)
 # Global tracker for mdbook serve background process
 mdserve_process = None
 ddma_curator_process = None
+beats_studio_process = None
 
 def is_ddma_curator_running() -> bool:
     """Checks if DDMA Curator server is running on port 8000."""
@@ -59,6 +60,18 @@ def is_ddma_curator_running() -> bool:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(0.04)
             return s.connect_ex(('127.0.0.1', 8000)) == 0
+    except Exception:
+        return False
+
+def is_beats_studio_running() -> bool:
+    """Checks if Beats Studio server is running on port 8001."""
+    global beats_studio_process
+    if beats_studio_process and beats_studio_process.poll() is None:
+        return True
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.04)
+            return s.connect_ex(('127.0.0.1', 8001)) == 0
     except Exception:
         return False
 
@@ -3949,55 +3962,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(404, f"Rendered podcast MP4 not found for episode {clean_id}")
             return
 
-        if path == "/api/podcast/longform_index":
-            params = parse_qs(url.query)
-            fn = params.get("filename", ["248"])[0]
-            clean_id = fn.replace(".md", "").lstrip("_") or "248"
-            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                if d.exists() and str(d.resolve()) not in sys.path:
-                    sys.path.insert(0, str(d.resolve()))
-            try:
-                import importlib
-                import archetype_studio
-                importlib.reload(archetype_studio)
-                idx_data = archetype_studio.get_longform_timeline_index(clean_id)
-                mp4_path = get_episode_podcast_video_path(clean_id)
-                idx_data["has_video"] = mp4_path.exists()
-                idx_data["video_url"] = f"/api/podcast/video?filename={clean_id}"
-                self.send_json(idx_data)
-            except Exception as e:
-                self.send_json({"error": str(e)}, status=500)
-            return
-
-        if path == "/api/podcast/longform_beats":
-            params = parse_qs(url.query)
-            fn = params.get("filename", ["248"])[0]
-            clean_id = fn.replace(".md", "").lstrip("_") or "248"
-            clip_num = int(params.get("clip_num", ["1"])[0])
-            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                if d.exists() and str(d.resolve()) not in sys.path:
-                    sys.path.insert(0, str(d.resolve()))
-            try:
-                import importlib
-                import archetype_studio
-                importlib.reload(archetype_studio)
-                b_data = archetype_studio.get_longform_chapter_beats(clean_id, clip_num)
-                self.send_json(b_data)
-            except Exception as e:
-                self.send_json({"error": str(e)}, status=500)
-            return
-
-        if path == "/api/podcast/beat_video":
-            params = parse_qs(url.query)
-            clip_num = int(params.get("clip_num", ["1"])[0])
-            cls_name = params.get("class_name", [""])[0].strip()
-            media_root = PROJECT_ROOT.parent / "media" / "videos" / f"clip_{clip_num:02d}_gemini_scenes" / "740p15" / f"{cls_name}.mp4"
-            if media_root.exists():
-                self.serve_media_file(media_root)
-            else:
-                self.send_error(404, f"Beat MP4 not found: {cls_name}")
-            return
-
         if path == "/api/podcast/sting":
             params = parse_qs(url.query)
             sting_file = params.get("file", [""])[0]
@@ -5007,7 +4971,44 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "success": True,
                 "project_id": project_id,
                 "curator_url": curator_target_url,
-                "message": f"DDMA Project {project_id} ready and launched on {curator_target_url}"
+                "message": f"DDMA Project {project_id} ready and launched on {curator_target_url}",
+            })
+            return
+
+        if path == "/api/beats/launch":
+            global beats_studio_process
+            fn = data.get("filename", "")
+            clean_id = fn.replace(".md", "").lstrip("_") if fn else ""
+            if not clean_id:
+                _, template, _, next_num = parse_summary_structure()
+                if template:
+                    clean_id = str(template[0].get("number") or template[0]["filename"].replace(".md", "").lstrip("_"))
+                else:
+                    clean_id = str(next_num - 1)
+
+            beats_target_url = f"http://127.0.0.1:8001/beats.html?ep={clean_id}"
+
+            ddma_dir = PROJECT_ROOT.parent / "ddma"
+            if not ddma_dir.exists():
+                ddma_dir = PROJECT_ROOT / "ddma"
+            beats_script = ddma_dir / "beats_server.py"
+
+            if not is_beats_studio_running() and beats_script.exists():
+                try:
+                    beats_studio_process = subprocess.Popen(
+                        [sys.executable, str(beats_script)],
+                        cwd=str(ddma_dir),
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
+                except Exception as e:
+                    self.send_json({"success": False, "error": str(e)})
+                    return
+
+            self.send_json({
+                "success": True,
+                "beats_url": beats_target_url,
+                "message": f"Beats Studio ready and launched on {beats_target_url}"
             })
             return
 
@@ -5205,65 +5206,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
             success, msg = export_video_to_gdrive(clean_id, custom_dest)
             self.send_json({"success": success, "message": msg})
-            return
-
-        if path == "/api/podcast/update_longform_beat":
-            clean_id = str(data.get("clean_id", "248")).replace(".md", "").lstrip("_") or "248"
-            clip_num = int(data.get("clip_num", 1))
-            beat_index = int(data.get("beat_index", 1))
-            class_name = str(data.get("class_name", "")).strip()
-            user_directive = str(data.get("user_directive", "")).strip()
-            spoken_text = str(data.get("spoken_text", "")).strip()
-            custom_code = data.get("custom_code")
-            duration = float(data.get("duration", 7.5))
-
-            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                if d.exists() and str(d.resolve()) not in sys.path:
-                    sys.path.insert(0, str(d.resolve()))
-            try:
-                import importlib
-                import archetype_studio
-                importlib.reload(archetype_studio)
-                res = archetype_studio.update_single_scene_with_ai(
-                    clip_num=clip_num,
-                    beat_index=beat_index,
-                    class_name=class_name,
-                    user_directive=user_directive,
-                    spoken_text=spoken_text,
-                    custom_code=custom_code,
-                    duration=duration,
-                )
-                ch_beats = archetype_studio.get_longform_chapter_beats(clean_id, clip_num)
-                res["chapter_data"] = ch_beats
-                res["beat_video_url"] = f"/api/podcast/beat_video?clip_num={clip_num}&class_name={class_name}&t={int(time.time())}"
-                self.send_json(res)
-            except Exception as e:
-                self.send_json({"success": False, "error": str(e)}, status=500)
-            return
-
-        if path == "/api/podcast/patch_longform_chapter":
-            clean_id = str(data.get("clean_id", "248")).replace(".md", "").lstrip("_") or "248"
-            clip_num = int(data.get("clip_num", 1))
-
-            ddma_dir = None
-            for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
-                if d.exists():
-                    ddma_dir = d
-                    break
-            if not ddma_dir:
-                self.send_json({"success": False, "error": "ddma directory not found"}, status=500)
-                return
-
-            try:
-                cmd = [sys.executable, "render_longform_parallel.py", "--patch", str(clip_num)]
-                res = subprocess.run(cmd, cwd=str(ddma_dir), capture_output=True, text=True, timeout=120)
-                if res.returncode == 0:
-                    self.send_json({"success": True, "message": f"Successfully patched Part {clip_num} into Master MP4!"})
-                else:
-                    err_msg = res.stderr[-500:] if res.stderr else res.stdout[-500:]
-                    self.send_json({"success": False, "error": f"Patch failed: {err_msg}"}, status=500)
-            except Exception as ex:
-                self.send_json({"success": False, "error": str(ex)}, status=500)
             return
 
         self.send_error(404, "Endpoint not found")

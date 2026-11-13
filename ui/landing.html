@@ -54,6 +54,7 @@
     <div class="row">
       <a class="btn secondary" href="/cockpit.html">Open mdIngest Cockpit</a>
       <button onclick="launchDdMa()">Launch DDMA</button>
+      <button onclick="launchBeats()">Launch Beats Studio</button>
     </div>
     <div class="status" id="launcher-status"></div>
   </div>
@@ -172,6 +173,33 @@ async function launchDdMa() {
       const a = document.createElement('a');
       a.href = data.curator_url;
       a.textContent = data.curator_url;
+      a.className = 'inline';
+      a.target = '_blank';
+      a.rel = 'noopener';
+      el.appendChild(a);
+    } else {
+      setStatus('launcher-status', '✗ Launch failed: ' + (data.error || 'unknown error'), 'err');
+    }
+  } catch (err) {
+    setStatus('launcher-status', '✗ Launch failed: ' + err.message, 'err');
+  }
+}
+
+async function launchBeats() {
+  setStatus('launcher-status', 'Launching Beats Studio…');
+  try {
+    const res = await fetch('/api/beats/launch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
+    });
+    const data = await res.json();
+    if (data.success && data.beats_url) {
+      const el = document.getElementById('launcher-status');
+      el.className = 'status ok';
+      el.innerHTML = '';
+      el.appendChild(document.createTextNode('✓ Beats Studio ready: '));
+      const a = document.createElement('a');
+      a.href = data.beats_url;
+      a.textContent = data.beats_url;
       a.className = 'inline';
       a.target = '_blank';
       a.rel = 'noopener';
