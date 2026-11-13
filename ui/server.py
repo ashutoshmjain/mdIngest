@@ -102,12 +102,21 @@ def kill_mdserve():
 
 def load_settings():
     settings = {}
-    if SETTINGS_FILE.exists():
+    vault_file = get_dd_hub_root() / "vault" / "settings.json"
+    if vault_file.exists():
         try:
-            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            with open(vault_file, "r", encoding="utf-8") as f:
                 settings = json.load(f)
         except Exception:
             pass
+    else:
+        print(f"WARNING: vault settings.json not found at {vault_file} (dd_hub unreachable?) -- falling back to local settings.json.")
+        if SETTINGS_FILE.exists():
+            try:
+                with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                    settings = json.load(f)
+            except Exception:
+                pass
 
     defaults = {
         "spotify_url": "https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE",
@@ -516,8 +525,7 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
                     pass
 
         # Sync to dd_hub vault on publish
-        hub_root_str = os.environ.get("DD_HUB_ROOT", r"G:\My Drive\dd_hub")
-        hub_root = Path(hub_root_str)
+        hub_root = get_dd_hub_root()
         if hub_root.exists():
             hub_plan = hub_root / "episodes" / clean_id / "plan.json"
             src_sync = proj_plan_file if proj_plan_file.exists() else (dest_plan if dest_plan.exists() else None)
@@ -679,12 +687,23 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
 # Active transcription jobs: { clean_id: { "status": "idle"|"processing"|"done"|"error", "progress": str, "error": str } }
 transcription_jobs = {}
 
+def _read_settings_file(path):
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
 def get_dd_hub_root() -> Path:
     """Resolves the canonical dd_hub root across Local Windows, Antigravity Cloud VM, and GCP Docker."""
     env_hub = os.environ.get("DD_HUB_ROOT")
     if env_hub and Path(env_hub).exists():
         return Path(env_hub)
-    settings = load_settings()
+    settings = _read_settings_file(SETTINGS_FILE)
     cfg_hub = settings.get("dd_hub_root")
     if cfg_hub and Path(cfg_hub).exists():
         return Path(cfg_hub)
@@ -698,6 +717,7 @@ def get_dd_hub_root() -> Path:
                 return cand
         except Exception:
             pass
+    print("WARNING: DD_HUB_ROOT is unset and no dd_hub directory exists at any known location -- using default G:\\My Drive\\dd_hub which DOES NOT EXIST. Vault/plan reads will fail and hub syncs will be skipped.")
     return Path(r"G:\My Drive\dd_hub")
 
 def get_episode_audio_path(clean_id: str) -> Path | None:
