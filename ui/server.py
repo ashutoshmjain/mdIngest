@@ -2738,12 +2738,16 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
         except Exception:
             pass
 
-    # Build or extract Whisper segments for transcription.json
+    # Build or extract Whisper segments for transcription.json.
+    # One-transcription rule: read the podcast stage's base transcription
+    # (src copy first via discovery, else the hub copy) \u2014 the seed NEVER
+    # transcribes. Canonical writer is the unified-drop / auto-transcription
+    # path (src/ddma/docs/episodes/<id>/ + dd_hub/episodes/<id>/).
     segments = []
-    src_trans_json = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "transcription.json"
-    if src_trans_json.exists():
+    trans_json = get_episode_transcription_json_path(clean_id)
+    if trans_json is not None:
         try:
-            with open(src_trans_json, "r", encoding="utf-8") as tj:
+            with open(trans_json, "r", encoding="utf-8") as tj:
                 t_obj = json.load(tj)
                 segments = t_obj.get("segments", [])
                 if not transcript_text:
@@ -2751,22 +2755,13 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
         except Exception:
             pass
 
-    # If true acoustic segments with words are missing, transcribe with Whisper (word_timestamps=True)
+    # No base transcription anywhere: fail LOUDLY instead of transcribing.
     has_valid_words = bool(segments and any(s.get("words") for s in segments))
-    if not has_valid_words and audio_path and audio_path.exists():
-        try:
-            settings = load_settings()
-            mname = settings.get("whisper_model", "large-v3-turbo")
-            res_obj = run_faster_whisper_transcription(audio_path, model_name=mname, word_timestamps=True)
-            segments = res_obj.get("segments", [])
-            transcript_text = res_obj.get("text", "").strip() or transcript_text
-            
-            # Save acoustic transcription.json in src
-            src_trans_json.parent.mkdir(parents=True, exist_ok=True)
-            with open(src_trans_json, "w", encoding="utf-8") as tj:
-                json.dump(res_obj, tj, indent=4)
-        except Exception as we:
-            print(f"[DDMA SEED] faster-whisper acoustic alignment fallback: {we}")
+    if not has_valid_words and not transcript_text:
+        raise RuntimeError(
+            f"no base transcription for episode {clean_id} \u2014 run the podcast stage first "
+            f"(expected transcription.json in src/ddma/docs/episodes/{clean_id}/ "
+            f"or dd_hub/episodes/{clean_id}/)")
 
     if not segments and transcript_text:
         # Emergency fallback: Synthesize segments from transcript sentences distributed over audio_duration
@@ -2886,6 +2881,8 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
                         sys.executable, str(cli_script), "plan",
                         "--audio", str(dest_audio_path),
                         "--transcription", str(trans_json_dest),
+                        "--episode-title", episode_title,
+
                         "--max-duration", "165.0",
                         "--min-duration", "90.0",
                         "--out", str(plan_json_dest)
@@ -4946,8 +4943,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 else:
                     clean_id = str(next_num - 1)
 
-            # Auto-seed project in DDMA (zero re-transcription, strict <= 165s clips)
-            project_id = seed_ddma_project_if_missing(clean_id)
+            # Auto-seed project in DDMA (zero re-transcription, strict <= 165s clips).
+
+            # A seed with no base transcription raises; return it promptly as JSON.
+
+            try:
+
+                project_id = seed_ddma_project_if_missing(clean_id)
+
+            except Exception as seed_e:
+
+                self.send_json({"success": False, "error": str(seed_e)})
+
+                return
+
             curator_target_url = f"http://localhost:8000/curator.html?project={project_id}"
 
             ddma_dir = PROJECT_ROOT.parent / "ddma"

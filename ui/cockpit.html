@@ -2685,6 +2685,24 @@ if __name__ == '__main__':
                     act.style.display = (t === tabName) ? 'flex' : 'none';
                 }
             });
+            
+
+            // Article-only commands: Preview/Publish apply to the Article
+
+            // tab; hide them on Podcast/Reels. The header (with the tab
+
+            // switcher) stays visible so the user can always switch back.
+
+            const showArticleCmds = (tabName === 'research') ? '' : 'none';
+
+            const serveBtn = document.getElementById('btn-serve');
+
+            if (serveBtn) serveBtn.style.display = showArticleCmds;
+
+            const pushBtn = document.getElementById('btn-push');
+
+            if (pushBtn) pushBtn.style.display = showArticleCmds;
+
 
             // Update Right Pane Dynamic Header Title
             const titleEl = document.getElementById('right-pane-dynamic-title');

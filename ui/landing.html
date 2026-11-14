@@ -64,6 +64,8 @@
     <p class="fine" style="margin-top:0">The Python payload + the base audio land in <code>dd_hub/inputs/&lt;ep&gt;/</code>, where the cockpit's triggers already read them.</p>
     <label for="landing-ep">Episode number (new or existing)</label>
     <input type="number" id="landing-ep" min="1" placeholder="e.g. 250">
+    <label for="landing-slug" style="margin-top:0.5rem">Slug (optional — named input folder)</label>
+    <input type="text" id="landing-slug" placeholder="e.g. my-topic (saves to inputs/my-topic/)">
     <div id="landing-drop-zone"
          onclick="document.getElementById('landing-file-input').click()"
          ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
@@ -239,14 +241,25 @@ async function processLandingFile(file) {
     return;
   }
   const ep = (document.getElementById('landing-ep').value || '').trim();
-  if (!ep) {
+  const slugField = ((document.getElementById('landing-slug') || {}).value || '').trim();
+  if (!ep && !slugField) {
     setStatus('drop-status', 'Enter the episode number first.', 'err');
     return;
   }
+  if (slugField && (slugField.includes('/') || slugField.includes('\\') || slugField.startsWith('.'))) {
+    setStatus('drop-status', 'Invalid slug: no path separators or leading dots.', 'err');
+    return;
+  }
+  const slug = slugField || '';
+  if (!ep && !isResearch) {
+    setStatus('drop-status', 'Enter the episode number first.', 'err');
+    return;
+  }
+  const epForName = ep || slug;
   let sendFile = file;
-  let slugChoice = '';
+  let slugChoice = slug;
   if (isResearch) {
-    slugChoice = ep;
+    if (!slugChoice) slugChoice = ep;
   } else {
     // The drop endpoint routes digit-named audio to that episode; rename so the
     // target is always the episode typed above, whatever the file was called.
@@ -255,7 +268,9 @@ async function processLandingFile(file) {
       sendFile = new File([file], ep + '.' + ext, { type: file.type });
     }
   }
-  setStatus('drop-status', '📥 Ingesting ' + file.name + ' to dd_hub/inputs/' + ep + '…');
+  // Audio drops ignore slug server-side (they route by episode number); show the real target.
+  const targetFolder = isAudio ? ep : (slugChoice || epForName);
+  setStatus('drop-status', '📥 Ingesting ' + file.name + ' to dd_hub/inputs/' + targetFolder + '…');
   const reader = new FileReader();
   reader.onload = async function(e) {
     const dataUrl = e.target.result || '';
@@ -266,14 +281,14 @@ async function processLandingFile(file) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orig_filename: sendFile.name,
-          active_filename: ep + '.md',
+          active_filename: epForName + '.md',
           slug: slugChoice,
           base64_data: base64Data
         })
       });
       const data = await res.json();
       if (data.success) {
-        setStatus('drop-status', '✅ ' + data.message, 'ok');
+        setStatus('drop-status', '✅ Saved to inputs/' + targetFolder + '/ — ' + data.message, 'ok');
       } else {
         setStatus('drop-status', '❌ Drop failed: ' + (data.error || 'Server error'), 'err');
       }

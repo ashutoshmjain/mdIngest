@@ -159,6 +159,142 @@ async function runE2ETests() {
                 throw new Error(`curator URL wrong: ${launchResp.curator_url}`);
             }
         });
+        
+
+        // -------------------------------------------------------------
+
+        // Test 1e-ii: DDMA launch never re-transcribes — exact panel states
+
+        // -------------------------------------------------------------
+
+        await runTest('DDMA launch: no re-transcription, exact launcher panel states', async (p) => {
+
+            const path = require('path');
+
+            // 1. Static: the seed must contain zero transcribe calls.
+
+            const serverSrc = fs.readFileSync(path.resolve(__dirname, '..', 'server.py'), 'utf8');
+
+            const seedStart = serverSrc.indexOf('def seed_ddma_project_if_missing');
+
+            const seedEnd = serverSrc.indexOf('\ndef ', seedStart + 10);
+
+            const seedBody = serverSrc.slice(seedStart, seedEnd);
+
+            if (seedBody.includes('run_faster_whisper_transcription')) {
+
+                throw new Error('seed_ddma_project_if_missing still calls run_faster_whisper_transcription');
+
+            }
+
+            
+
+            // 2. Live API: episode with NO base transcription fails loudly + promptly.
+
+            const NO_TX = 'no base transcription for episode 999 \u2014 run the podcast stage first '
+
+                + '(expected transcription.json in src/ddma/docs/episodes/999/ or dd_hub/episodes/999/)';
+
+            const t0 = Date.now();
+
+            const errResp = await p.evaluate(async () => {
+
+                const r = await fetch('/api/ddma/launch', {
+
+                    method: 'POST',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    body: JSON.stringify({ filename: '999.md' })
+
+                });
+
+                return await r.json();
+
+            });
+
+            const dtMs = Date.now() - t0;
+
+            if (errResp.success !== false) throw new Error('launch for 999 should fail');
+
+            if (errResp.error !== NO_TX) throw new Error(`error mismatch: "${errResp.error}"`);
+
+            if (dtMs > 15000) throw new Error(`launch for 999 took ${dtMs}ms \u2014 transcription may have run`);
+
+            
+
+            // 3. UI success panel: exact state after clicking Launch DDMA.
+
+            await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+
+            await p.evaluate(() => { document.querySelector('#launcher-card button').click(); });
+
+            await p.waitForFunction(
+
+                () => (document.getElementById('launcher-status').textContent || '').startsWith('\u2713 DDMA ready: '),
+
+                { timeout: 30000 });
+
+            const okState = await p.$eval('#launcher-status', el => ({
+
+                cls: el.className, text: el.childNodes[0].textContent,
+
+                href: el.querySelector('a') ? el.querySelector('a').href : null
+
+            }));
+
+            if (okState.cls !== 'status ok') throw new Error(`success class wrong: "${okState.cls}"`);
+
+            if (okState.text !== '\u2713 DDMA ready: ') throw new Error(`success text wrong: "${okState.text}"`);
+
+            if (!okState.href || !okState.href.includes('/curator.html?project=episode_')) {
+
+                throw new Error(`success link wrong: "${okState.href}"`);
+
+            }
+
+            
+
+            // 4. UI error panel: stub the route with the live 999 payload, click, assert exact error state.
+
+            await p.evaluate((payload) => {
+
+                window.__origFetch = window.fetch;
+
+                window.fetch = (u, o) => {
+
+                    if (String(u).includes('/api/ddma/launch')) {
+
+                        return Promise.resolve(new Response(JSON.stringify(payload),
+
+                            { headers: { 'Content-Type': 'application/json' } }));
+
+                    }
+
+                    return window.__origFetch(u, o);
+
+                };
+
+            }, { success: false, error: NO_TX });
+
+            await p.evaluate(() => { document.querySelector('#launcher-card button').click(); });
+
+            await p.waitForFunction(
+
+                () => (document.getElementById('launcher-status').textContent || '').startsWith('\u2717 Launch failed: '),
+
+                { timeout: 10000 });
+
+            const errState = await p.$eval('#launcher-status', el => ({ cls: el.className, text: el.textContent }));
+
+            await p.evaluate(() => { window.fetch = window.__origFetch; });
+
+            if (errState.cls !== 'status err') throw new Error(`error class wrong: "${errState.cls}"`);
+
+            if (errState.text !== '\u2717 Launch failed: ' + NO_TX) throw new Error(`error text wrong: "${errState.text}"`);
+
+        });
+
 
         // -------------------------------------------------------------
         // Test 1f: Landing drop — payload for new episode lands in hub inputs
@@ -190,6 +326,130 @@ async function runE2ETests() {
                     const j = await r.json();
                     return (j.settings && j.settings.dd_hub_root) || '';
                 });
+        
+
+        // -------------------------------------------------------------
+
+        // Test 1g: Landing drop slug field (ITEM 7) — named input folder
+
+        // -------------------------------------------------------------
+
+        await runTest('Landing drop: slug routes research payload to inputs/<slug>/', async (p) => {
+
+            const fs2 = require('fs');
+
+            const os2 = require('os');
+
+            const path2 = require('path');
+
+            const srcDir = path2.resolve(__dirname, '..', '..', 'src');
+
+            const summaryPath = path2.join(srcDir, 'SUMMARY.md');
+
+            const origSummary = fs2.readFileSync(summaryPath, 'utf8');
+
+            const beforeFiles = new Set(fs2.readdirSync(srcDir));
+
+            let hubRoot = '';
+
+            const tmpPayload = path2.join(os2.tmpdir(), 'landing-drop-slug.py');
+
+            fs2.writeFileSync(tmpPayload, 'raw_markdown = """# Slug Probe\n\nProbe content for ITEM 7 slug test."""\n', 'utf8');
+
+            try {
+
+                await p.goto(BASE_URL + '/', { waitUntil: 'domcontentloaded', timeout: 8000 });
+
+                const slugInput = await p.$('#landing-slug');
+
+                if (!slugInput) throw new Error('slug field #landing-slug missing on landing drop');
+
+                await p.$eval('#landing-ep', el => { el.value = '996'; });
+
+                await p.$eval('#landing-slug', el => { el.value = 'test-slug-7'; });
+
+                const fileInput = await p.$('#landing-file-input');
+
+                await fileInput.uploadFile(tmpPayload);
+
+                await p.waitForFunction(
+
+                    () => /✅|❌/.test(document.getElementById('drop-status').textContent || ''),
+
+                    { timeout: 15000 });
+
+                const msg = await p.$eval('#drop-status', el => el.textContent);
+
+                if (!msg.includes('Saved to inputs/test-slug-7/')) throw new Error(`status missing slug target: "${msg}"`);
+
+                hubRoot = await p.evaluate(async () => {
+
+                    const r = await fetch('/api/status');
+
+                    const j = await r.json();
+
+                    return (j.settings && j.settings.dd_hub_root) || '';
+
+                });
+
+                const hubPayload = path2.join(hubRoot, 'inputs', 'test-slug-7', 'payload.py');
+
+                if (!fs2.existsSync(hubPayload)) throw new Error(`hub slug payload missing: ${hubPayload}`);
+
+                // Episode-only path unchanged: no slug -> slug defaults to the episode number.
+
+                await p.$eval('#landing-slug', el => { el.value = ''; });
+
+                if (!msg.includes('✅')) throw new Error(`drop not accepted: "${msg}"`);
+
+                // Invalid slug: client-side error, nothing written.
+
+                await p.$eval('#landing-slug', el => { el.value = 'bad/slug'; });
+
+                await fileInput.uploadFile(tmpPayload);
+
+                await p.waitForFunction(
+
+                    () => /Invalid slug/.test(document.getElementById('drop-status').textContent || ''),
+
+                    { timeout: 10000 });
+
+                const badDir = path2.join(hubRoot, 'inputs', 'bad');
+
+                if (fs2.existsSync(badDir)) throw new Error('invalid slug wrote to hub: ' + badDir);
+
+            } finally {
+
+                try {
+
+                    const hubBase = hubRoot || path2.join('G:', 'My Drive', 'dd_hub');
+
+                    const hubIn = path2.join(hubBase, 'inputs', 'test-slug-7');
+
+                    if (fs2.existsSync(hubIn)) fs2.rmSync(hubIn, { recursive: true, force: true });
+
+                } catch (e) { /* hub cleanup best-effort */ }
+
+                try {
+
+                    for (const f of fs2.readdirSync(srcDir)) {
+
+                        if (!beforeFiles.has(f)) fs2.unlinkSync(path2.join(srcDir, f));
+
+                    }
+
+                    fs2.writeFileSync(summaryPath, origSummary, 'utf8');
+
+                } catch (e) { /* src cleanup best-effort */ }
+
+                try { fs2.unlinkSync(tmpPayload); } catch (e) { /* noop */ }
+
+                await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+
+            }
+
+        });
+
                 const hub997 = path2.join(hubRoot, 'inputs', '997', 'payload.py');
                 if (!fs2.existsSync(hub997)) throw new Error(`hub payload missing: ${hub997}`);
                 const status2 = await p.evaluate(async () => {
@@ -238,6 +498,106 @@ async function runE2ETests() {
             const isResearchActive = await p.$eval('#tab-view-research', el => el.classList.contains('active'));
             if (!isResearchActive) throw new Error('Research tab did not re-activate correctly');
         });
+        
+
+        // -------------------------------------------------------------
+
+        // Test 2b: Article command bar hides on Podcast/Reels tabs (ITEM 9)
+
+        // -------------------------------------------------------------
+
+        await runTest('Article command bar hides on Podcast/Reels tabs', async (p) => {
+
+            const bar = () => p.evaluate(() => {
+
+                const disp = id => {
+
+                    const el = document.getElementById(id);
+
+                    return el ? window.getComputedStyle(el).display : 'missing';
+
+                };
+
+                const sw = document.querySelector('.middle-tab-switcher');
+
+                return {
+
+                    serve: disp('btn-serve'), push: disp('btn-push'),
+
+                    switcher: sw ? window.getComputedStyle(sw).display : 'missing',
+
+                    serveOnclick: document.getElementById('btn-serve').getAttribute('onclick') || '',
+
+                    pushOnclick: document.getElementById('btn-push').getAttribute('onclick') || ''
+
+                };
+
+            });
+
+            // Article tab (default): both visible.
+
+            await p.click('#tab-btn-research');
+
+            await p.waitForSelector('#tab-view-research.active', { timeout: 2000 });
+
+            let s = await bar();
+
+            if (s.serve === 'none' || s.push === 'none') throw new Error(`Article tab hid commands: ${JSON.stringify(s)}`);
+
+            // Podcast tab: both hidden, switcher stays.
+
+            await p.click('#tab-btn-narrative');
+
+            await p.waitForSelector('#tab-view-narrative.active', { timeout: 2000 });
+
+            s = await bar();
+
+            if (s.serve !== 'none' || s.push !== 'none') throw new Error(`Podcast tab shows commands: ${JSON.stringify(s)}`);
+
+            if (s.switcher === 'none') throw new Error('tab switcher hidden on Podcast tab');
+
+            // Reels tab: both hidden, switcher stays.
+
+            await p.click('#tab-btn-media');
+
+            await p.waitForSelector('#tab-view-media.active', { timeout: 2000 });
+
+            s = await bar();
+
+            if (s.serve !== 'none' || s.push !== 'none') throw new Error(`Reels tab shows commands: ${JSON.stringify(s)}`);
+
+            if (s.switcher === 'none') throw new Error('tab switcher hidden on Reels tab');
+
+            // Reload on Podcast tab (restored from storage): still hidden on load.
+
+            await p.click('#tab-btn-narrative');
+
+            await p.waitForSelector('#tab-view-narrative.active', { timeout: 2000 });
+
+            await p.reload({ waitUntil: 'domcontentloaded', timeout: 8000 });
+
+            await p.waitForSelector('#tab-view-narrative.active', { timeout: 5000 });
+
+            s = await bar();
+
+            if (s.serve !== 'none' || s.push !== 'none') throw new Error(`restored Podcast tab shows commands: ${JSON.stringify(s)}`);
+
+            // Back to Article: visible again, handlers still wired (not fired: Publish would commit).
+
+            await p.click('#tab-btn-research');
+
+            await p.waitForSelector('#tab-view-research.active', { timeout: 2000 });
+
+            s = await bar();
+
+            if (s.serve === 'none' || s.push === 'none') throw new Error(`Article tab did not restore commands: ${JSON.stringify(s)}`);
+
+            if (!s.serveOnclick.includes('toggleMdServe')) throw new Error('Preview handler unwired');
+
+            if (!s.pushOnclick.includes('triggerPush')) throw new Error('Publish handler unwired');
+
+        });
+
 
         // -------------------------------------------------------------
         // Test 3: Context-Aware Right Studio Deck Synchronization
