@@ -4959,9 +4959,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             curator_target_url = f"http://localhost:8000/curator.html?project={project_id}"
 
-            ddma_dir = PROJECT_ROOT.parent / "ddma"
+            ddma_dir = PROJECT_ROOT / "ddma"
             if not ddma_dir.exists():
-                ddma_dir = PROJECT_ROOT / "ddma"
+                ddma_dir = PROJECT_ROOT.parent / "ddma"
             curator_script = ddma_dir / "scratch" / "run_curator.py"
             
             if not is_ddma_curator_running() and curator_script.exists():
@@ -4997,9 +4997,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             beats_target_url = f"http://127.0.0.1:8001/beats.html?ep={clean_id}"
 
-            ddma_dir = PROJECT_ROOT.parent / "ddma"
+            ddma_dir = PROJECT_ROOT / "ddma"
             if not ddma_dir.exists():
-                ddma_dir = PROJECT_ROOT / "ddma"
+                ddma_dir = PROJECT_ROOT.parent / "ddma"
             beats_script = ddma_dir / "beats_server.py"
 
             if not is_beats_studio_running() and beats_script.exists():
