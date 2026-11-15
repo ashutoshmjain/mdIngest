@@ -475,7 +475,61 @@ async function runE2ETests() {
         });
 
         // -------------------------------------------------------------
-        // Test 2: Middle Pane 3-Tab Switching
+        // -------------------------------------------------------------
+        // -------------------------------------------------------------
+        // Test 1h: Workspace home link opens/reuses the landing tab (ITEM 4 of 5)
+        // -------------------------------------------------------------
+        await runTest('Workspace home link opens/reuses landing tab', async (p) => {
+            const isLanding = u => u === 'http://127.0.0.1:8088/' || u === 'http://localhost:8088/';
+            const landingTargets = () => browser.targets().filter(t => { try { return isLanding(t.url()); } catch (e) { return false; } });
+            try {
+                // 1. Cockpit header link opens the landing page in a named tab.
+                await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+                const wsBtn = await p.$('#btn-workspace');
+                if (!wsBtn) throw new Error('cockpit Workspace link #btn-workspace missing');
+                if ((await (await wsBtn.getProperty('target')).jsonValue()) !== 'deepdive-workspace') {
+                    throw new Error('cockpit Workspace link target is not deepdive-workspace');
+                }
+                await wsBtn.click();
+                const t1 = await browser.waitForTarget(t => { try { return isLanding(t.url()); } catch (e) { return false; } }, { timeout: 10000 });
+                const id1 = t1._targetId || t1._targetInfo.targetId;
+                // 2. Click again -> the SAME landing target is reused (exactly one landing tab).
+                await p.$eval('#btn-workspace', el => el.click());
+                await new Promise(r => setTimeout(r, 1500));
+                const after2 = landingTargets();
+                if (after2.length !== 1) throw new Error(`second click: ${after2.length} landing tabs: ${after2.map(t => t.url()).join(' | ')}`);
+                const id2 = after2[0]._targetId || after2[0]._targetInfo.targetId;
+                if (id2 !== id1) throw new Error('second click opened a new landing tab instead of reusing');
+                console.log(`  - landing tab opened once and reused.`);
+                // 3. Curator header link reuses the same landing tab.
+                const landingPage1 = await t1.page().catch(() => null);
+                const nameBefore = landingPage1 ? await landingPage1.evaluate(() => window.name).catch(() => '?') : 'NO-PAGE';
+                console.log(`  - landing tab name before curator click: "${nameBefore}".`);
+                await p.goto('http://127.0.0.1:8000/curator.html?project=episode_245', { waitUntil: 'domcontentloaded', timeout: 15000 });
+                await new Promise(r => setTimeout(r, 5000));
+                const curBtn = await p.$('#topWorkspaceBtn');
+                if (!curBtn) throw new Error('curator Workspace link #topWorkspaceBtn missing');
+                if ((await (await curBtn.getProperty('target')).jsonValue()) !== 'deepdive-workspace') {
+                    throw new Error('curator Workspace link target is not deepdive-workspace');
+                }
+                await p.$eval('#topWorkspaceBtn', el => el.click());
+                await new Promise(r => setTimeout(r, 2000));
+                const after3 = landingTargets();
+                if (after3.length !== 1) throw new Error(`curator click: ${after3.length} landing tabs: ${after3.map(t => t.url()).join(' | ')}`);
+                const id3 = after3[0]._targetId || after3[0]._targetInfo.targetId;
+                if (id3 !== id1) throw new Error(`curator click opened a new landing tab: ${after3.map(t => t.url()).join(' | ')}`);
+                console.log(`  - curator link reused the same landing tab.`);
+                // 4. The audio-source mode tab still works (not confused with the home link).
+                await p.evaluate(() => { document.getElementById('newProjectBtn').click(); });
+                await p.waitForFunction(() => document.getElementById('projectModalOverlay').classList.contains('active'), { timeout: 10000 });
+                await p.evaluate(() => { document.getElementById('tabWorkspaceBtn').click(); });
+                await p.waitForFunction(() => document.getElementById('tabWorkspaceBtn').classList.contains('active') && document.getElementById('modeWorkspaceBox').style.display === 'block', { timeout: 5000 });
+                console.log(`  - curator audio-source mode tab still switches to workspace mode.`);
+            } finally {
+                await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
+            }
+        });
+                // Test 2: Middle Pane 3-Tab Switching
         // -------------------------------------------------------------
         await runTest('3-Tab Middle Pane Switching & View Visibility', async (p) => {
             // 1. Switch to Narrative tab
