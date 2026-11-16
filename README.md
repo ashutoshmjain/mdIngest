@@ -65,7 +65,7 @@ In the age of LLMs, the cost of generating information has collapsed to zero, bu
 
 ## 🗄️ Setting up dd_hub (the workspace)
 
-dd_hub is the workspace — a Google Drive folder that holds the plan, settings, inputs, working assets, and audio/video outputs. mdIngest (the Publishing Cockpit) and DDMA (the clip engine) both read from and write to dd_hub. GitHub is only the intermediary for the *published* Active Master clips; dd_hub is the live workspace. **mdIngest is the entry point**: its landing page is the workspace home.
+dd_hub is the workspace — a Google Drive folder that holds the plan, settings, inputs, working assets, and audio/video outputs. **mdIngest is the main app and the entry point**: its landing page is the workspace home, and it runs transcription (the podcast stage) as well as the Publishing Cockpit. DDMA is an extension to mdIngest for Clips management and for creating longform video (Beats Studio, the video server, runs on port 8001 as part of DDMA). Both read from and write to dd_hub. GitHub is only the intermediary for the *published* Active Master clips; dd_hub is the live workspace.
 
 > [!IMPORTANT]
 > **The core rule**: The code only does **local file I/O against a local path**. It **never** calls the Google Drive web API for file access. So dd_hub must be mounted as a local filesystem path on every machine that runs mdIngest or DDMA. The code reads the mount path from the `DD_HUB_ROOT` environment variable.
@@ -75,14 +75,15 @@ dd_hub is the workspace — a Google Drive folder that holds the plan, settings,
 * A Google Drive folder to be your dd_hub. Create a new folder, or use an existing one. Note its folder ID from the Drive URL: `https://drive.google.com/drive/folders/<FOLDER_ID>`.
 * The folder should contain (create any that are missing): `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
 
-### Windows (the reference environment)
+### Windows easy path — Antigravity app (recommended)
 
-* Install Google Drive for Desktop. It mounts your Drive as a local drive (typically `G:\My Drive\`).
-* Your dd_hub folder is then at `G:\My Drive\dd_hub` (if your folder is named dd_hub).
-* Set `DD_HUB_ROOT` to that path. The code's first candidate is `G:\My Drive\dd_hub`, so this works out of the box.
-* All reads/writes are plain local file I/O through the mount. No Drive web API calls are made.
+* Install Google Drive for Desktop, and install the Antigravity app (the app, not the IDE).
+* Open the Antigravity app and run the 1-Prompt Setup below (see "1-Prompt Setup for Antigravity & AI Assistants"). The prompt does everything from requirements to dd_hub setup: it verifies the toolchain, finds your Drive mount (`G:\My Drive\dd_hub`), creates the dd_hub folder structure if missing, sets `DD_HUB_ROOT`, and verifies the setup.
+* Prerequisite: Google Drive for Desktop must be installed and signed in (so `G:\My Drive\` exists) before you run the prompt.
 
 ### Linux / VM / Docker
+
+Linux users set up with `agy` (the Antigravity CLI) or Muse Code. The one additional step beyond the normal toolchain is rclone (below).
 
 * Install rclone. Configure a Google Drive remote (for example, named `gdrive`).
 * Mount the dd_hub folder by its ID to a local path (for example `/mnt/gdrive/dd_hub`):
@@ -92,6 +93,7 @@ dd_hub is the workspace — a Google Drive folder that holds the plan, settings,
 * Use `--vfs-cache-mode full` — the pipeline does many small reads/writes, and the cache makes it fast. A generous `--vfs-cache-max-size` helps.
 * Set `DD_HUB_ROOT` to the mount path (for example `/mnt/gdrive/dd_hub`) and persist it (shell profile, systemd unit, or Docker entrypoint) so it survives new shells.
 * In Docker, the entrypoint mounts the Drive folder by ID via rclone to a local path, sets `DD_HUB_ROOT`, then starts the server.
+* If `rclone mount` is not possible (no FUSE — for example, the Antigravity VM sandbox), use `rclone copy` instead of a mount: keep a plain local folder (for example `/home/antigravity/dd_hub`), set `DD_HUB_ROOT` to it, and copy files to/from Drive with `rclone copy` (pull before working, push after). Do not attempt a mount where FUSE is unavailable.
 
 ### Settings (the vault)
 
@@ -126,6 +128,9 @@ Please set up and verify the complete md² (mdIngest) publishing environment in 
 2. Build the md-publish preprocessor binary in the `crate/` directory using `cargo build --release`.
 3. Verify that `book.toml` contains the required `[preprocessor.katex]` and `[preprocessor.ingest]` configuration blocks.
 4. Launch the md² Publishing Cockpit server (`python ui/server.py` or `./start_ui.bat`) on http://localhost:8088 and verify that http://localhost:3000 is accessible via `mdbook serve`.
+5. Set up dd_hub (the workspace): find the Google Drive mount (`G:\My Drive\dd_hub` on Windows — if Drive for Desktop is installed; otherwise ask the user for the dd_hub folder). Create the folder structure if missing (`episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`). Set `DD_HUB_ROOT` to the dd_hub path and persist it.
+6. Create `dd_hub/vault/settings.json` from `settings.template.json` if it does not exist (fill in API keys only if the user provides them; never commit it).
+7. Verify: `DD_HUB_ROOT` resolves, the folder structure exists, and `episodes/<N>/plan.json` is readable for an existing episode (or the folder is empty for a fresh workspace).
 ```
 
 ---
