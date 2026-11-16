@@ -63,6 +63,59 @@ In the age of LLMs, the cost of generating information has collapsed to zero, bu
 
 ---
 
+## 🗄️ Setting up dd_hub (the workspace)
+
+dd_hub is the workspace — a Google Drive folder that holds the plan, settings, inputs, working assets, and audio/video outputs. mdIngest (the Publishing Cockpit) and DDMA (the clip engine) both read from and write to dd_hub. GitHub is only the intermediary for the *published* Active Master clips; dd_hub is the live workspace. **mdIngest is the entry point**: its landing page is the workspace home.
+
+> [!IMPORTANT]
+> **The core rule**: The code only does **local file I/O against a local path**. It **never** calls the Google Drive web API for file access. So dd_hub must be mounted as a local filesystem path on every machine that runs mdIngest or DDMA. The code reads the mount path from the `DD_HUB_ROOT` environment variable.
+
+### What you need
+
+* A Google Drive folder to be your dd_hub. Create a new folder, or use an existing one. Note its folder ID from the Drive URL: `https://drive.google.com/drive/folders/<FOLDER_ID>`.
+* The folder should contain (create any that are missing): `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
+
+### Windows (the reference environment)
+
+* Install Google Drive for Desktop. It mounts your Drive as a local drive (typically `G:\My Drive\`).
+* Your dd_hub folder is then at `G:\My Drive\dd_hub` (if your folder is named dd_hub).
+* Set `DD_HUB_ROOT` to that path. The code's first candidate is `G:\My Drive\dd_hub`, so this works out of the box.
+* All reads/writes are plain local file I/O through the mount. No Drive web API calls are made.
+
+### Linux / VM / Docker
+
+* Install rclone. Configure a Google Drive remote (for example, named `gdrive`).
+* Mount the dd_hub folder by its ID to a local path (for example `/mnt/gdrive/dd_hub`):
+  ```bash
+  rclone mount gdrive: /mnt/gdrive/dd_hub --drive-root-folder-id <FOLDER_ID> --vfs-cache-mode full --daemon
+  ```
+* Use `--vfs-cache-mode full` — the pipeline does many small reads/writes, and the cache makes it fast. A generous `--vfs-cache-max-size` helps.
+* Set `DD_HUB_ROOT` to the mount path (for example `/mnt/gdrive/dd_hub`) and persist it (shell profile, systemd unit, or Docker entrypoint) so it survives new shells.
+* In Docker, the entrypoint mounts the Drive folder by ID via rclone to a local path, sets `DD_HUB_ROOT`, then starts the server.
+
+### Settings (the vault)
+
+* The canonical settings file is `dd_hub/vault/settings.json`. It holds the app settings **and** the API keys (Mosaic, Gemini, etc.).
+* Create it from `settings.template.json` (in the repo root) and fill in your keys.
+* `settings.json` is **never** committed to git. The repo holds only `settings.template.json`. The vault lives in dd_hub, not in the repo.
+* Any environment with workspace access gets the full settings.json, including keys.
+
+### Verify the setup
+
+* `echo $DD_HUB_ROOT` shows the mount path.
+* The mount contains `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
+* `episodes/<N>/plan.json` is readable (for an existing episode).
+* If the mount is unreachable, the apps fall back to the local cache with a loud warning (read-only); writes fail closed — they refuse rather than writing to a stale local copy.
+
+### What NOT to do
+
+* Do **not** use the Google Drive web API or a Drive plugin as the file store. API-level access is too slow and is not a local file path — the pipeline will not work with it. (Fine for one-off reads only.)
+* Do **not** fake a local dd_hub folder (an empty local directory named dd_hub). The apps will write to it and the work will never reach the real workspace.
+* Do **not** commit `settings.json` (or any file with API keys) to git.
+* Do **not** set `DD_HUB_ROOT` to a path that isn't the mounted dd_hub folder.
+
+---
+
 ## 🤖 1-Prompt Setup for Antigravity & AI Assistants
 
 If you are setting up `mdIngest` in a new workspace using **Antigravity** or another AI coding assistant, copy and paste this prompt to configure the complete publishing stack automatically:
@@ -89,7 +142,7 @@ start_ui.bat
 ```bash
 python ui/server.py
 ```
-This opens `http://localhost:8088` in your browser.
+This opens the workspace landing page at `http://localhost:8088/` — the workspace home (workspace picker, launcher for mdIngest + DDMA + Beats Studio, and the single drop point for new inputs). The Publishing Cockpit is at `http://localhost:8088/cockpit.html`.
 
 ---
 
@@ -157,5 +210,11 @@ To ensure `SUMMARY.md` is never corrupted:
 
 ---
 
+## 🐛 Bug tracking
+
+We do **not** manage issues on GitHub. Bugs and fixes for mdIngest, the deepDive pipeline, DDMA, and the portfolio app are tracked in the [Bug Tracker Space](https://muse.ai/s/bug-tracker-ixe6daxhoezyxy/g1O341vEl5aXYIzWFP1db5l-xunGJAxBRSwSJccC110) — a read-only list of all bugs with their status.
+
+---
+
 ## License
-Licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). Build the future.
+Licensed under the [MIT License](LICENSE).
