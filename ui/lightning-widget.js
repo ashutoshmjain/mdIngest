@@ -144,7 +144,7 @@
             const textColor = contrastingColor(this.accent);
             const btnColor = luma(this.accent) < 200 ? this.accent : '#000000';
             const backBtnHtml = (this.step !== 'start' && this.step !== 'thankyou')
-                ? `<button class="back-btn" id="lw-back" title="Back" aria-label="Back">?</button>`
+                ? `<button class="back-btn" id="lw-back" title="Back" aria-label="Back">←</button>`
                 : '';
 
             let bodyHtml = '';
