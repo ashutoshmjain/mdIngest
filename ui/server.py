@@ -101,15 +101,28 @@ def kill_mdserve():
                 pass
         mdserve_process = None
 
-    # Kill any orphan mdbook processes on port 3000
+    # Kill any orphan mdbook processes serving THIS project on port 3000.
+    # Narrow match only: the full spawn command line (Linux) or the PID
+    # actually listening on port 3000 (Windows). A bare "mdbook serve"
+    # anywhere else (another project) must survive this.
     if sys.platform == "win32":
         try:
-            subprocess.run(["taskkill", "/F", "/IM", "mdbook.exe"], capture_output=True)
+            out = subprocess.run(
+                ["cmd", "/c", "netstat -ano -p TCP"],
+                capture_output=True, text=True, timeout=10,
+            ).stdout
+            for line in out.splitlines():
+                parts = line.split()
+                # e.g. TCP 0.0.0.0:3000 0.0.0.0:0 LISTENING 1234
+                if len(parts) == 5 and parts[0] == "TCP" and parts[1].endswith(":3000") and parts[3] == "LISTENING" and parts[4].isdigit():
+                    pid = int(parts[4])
+                    if pid > 4:
+                        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
         except Exception:
             pass
     else:
         try:
-            subprocess.run(["pkill", "-f", "mdbook serve"], capture_output=True)
+            subprocess.run(["pkill", "-f", "mdbook serve.*-p 3000"], capture_output=True)
         except Exception:
             pass
 
@@ -136,8 +149,8 @@ def load_settings():
         "apple_podcasts_url": "https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251",
         "youtube_music_url": "https://music.youtube.com/playlist?list=PLIX4sFsmu37qtJMlv-VzMYWM26M1QyXTe",
         "fountain_url": "https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF",
-        "tiktok_handle": "@shutosha@bot",
-        "instagram_handle": "@shutosha@bot",
+        "tiktok_handle": "@shutoshabot",
+        "instagram_handle": "@shutoshabot",
         "lightning_address": "shutosha@primal.net",
         "downloads_path": "C:/Users/ashut/Downloads",
         "title_word_limit": 5,
@@ -1651,7 +1664,7 @@ def detect_redundant_welcome_cuts(words: list[dict], segments: list[dict], opene
     return suggested_cuts
 
 
-def review_podcast_with_gemini(clean_id: str) -> dict:
+def structure_podcast_stings_and_cuts(clean_id: str) -> dict:
     """
     Deterministically structures the Longform Podcast music stings & welcome cuts using spoken clip boundaries:
     1. Strips redundant 'Welcome to the deep dive' / 'Today we are going on a massive deep dive' in Clip 0.
@@ -3326,7 +3339,7 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
     """
     Automatically runs faster-whisper (large-v3-turbo) word-timestamp transcription in a background thread,
     saves to src/ddma/docs/episodes/<id>/, ddma/projects/episode_<id>/, and dd_hub/episodes/<id>/,
-    and automatically runs review_podcast_with_gemini(clean_id) + seed_ddma_project_if_missing(clean_id).
+    and automatically runs structure_podcast_stings_and_cuts(clean_id) + seed_ddma_project_if_missing(clean_id).
     """
     clean_id = str(clean_id).replace(".md", "").lstrip("_")
     if not clean_id:
@@ -3402,9 +3415,9 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
 
             transcription_jobs[cid]["progress"] = "Auto-structuring podcast stings & seeding DDMA clips..."
             try:
-                review_podcast_with_gemini(cid)
+                structure_podcast_stings_and_cuts(cid)
             except Exception as rev_e:
-                print(f"[AUTO-INGEST] review_podcast_with_gemini warning for {cid}: {rev_e}")
+                print(f"[AUTO-INGEST] structure_podcast_stings_and_cuts warning for {cid}: {rev_e}")
 
             try:
                 seed_ddma_project_if_missing(cid)
@@ -3701,12 +3714,42 @@ def handle_unified_drop(data: dict) -> dict:
 
     return {"success": False, "error": f"Unsupported file extension: {ext}"}
 
+class _DiscardBody:
+    """Wraps wfile for HEAD: the response headers pass through, body bytes are dropped.
+
+    BaseHTTPRequestHandler buffers all headers and emits them in a single
+    wfile.write inside end_headers; every later write is body. So the first
+    write passes through and the rest are discarded.
+    """
+
+    def __init__(self, wfile):
+        self._wfile = wfile
+        self._headers_sent = False
+
+    def write(self, data):
+        if not self._headers_sent:
+            self._headers_sent = True
+            return self._wfile.write(data)
+        return len(data)
+
+    def flush(self):
+        try:
+            self._wfile.flush()
+        except Exception:
+            pass
+
+
 class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(INGEST_DIR), **kwargs)
 
     def do_HEAD(self):
-        return self.do_GET()
+        real_wfile = self.wfile
+        self.wfile = _DiscardBody(real_wfile)
+        try:
+            return self.do_GET()
+        finally:
+            self.wfile = real_wfile
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -4095,9 +4138,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             range_header = self.headers.get('Range')
             if range_header and range_header.startswith('bytes='):
-                bytes_range = range_header[6:].split('-')
-                start = int(bytes_range[0]) if bytes_range[0] else 0
-                end = int(bytes_range[1]) if len(bytes_range) > 1 and bytes_range[1] else file_size - 1
+                try:
+                    bytes_range = range_header[6:].split('-')
+                    start = int(bytes_range[0]) if bytes_range[0] else 0
+                    end = int(bytes_range[1]) if len(bytes_range) > 1 and bytes_range[1] else file_size - 1
+                except (ValueError, IndexError):
+                    start = None
+                    end = None
+                if start is None or end is None or start < 0 or start >= file_size or start > end:
+                    self.send_response(416)
+                    self.send_header('Content-Range', f'bytes */{file_size}')
+                    self.send_header('Accept-Ranges', 'bytes')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    return
                 end = min(end, file_size - 1)
                 length = end - start + 1
 
@@ -4779,10 +4833,20 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             transcript_text = data.get("transcript", "")
 
             t_path = get_episode_transcript_path(clean_id)
+            if t_path.exists():
+                try:
+                    shutil.copy2(t_path, str(t_path) + ".bak")
+                except Exception:
+                    pass
             with open(t_path, "w", encoding="utf-8") as f:
                 f.write(transcript_text)
 
             n_path = get_episode_narrative_path(clean_id)
+            if n_path.exists():
+                try:
+                    shutil.copy2(n_path, str(n_path) + ".bak")
+                except Exception:
+                    pass
             with open(n_path, "w", encoding="utf-8") as f:
                 f.write(transcript_text)
 
@@ -5077,7 +5141,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             if not clean_id:
                 self.send_json({"success": False, "error": "clean_id is required"}, status=400)
                 return
-            res = review_podcast_with_gemini(clean_id)
+            res = structure_podcast_stings_and_cuts(clean_id)
             self.send_json(res)
             return
 
@@ -5220,11 +5284,13 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "Endpoint not found")
 
     def send_json(self, data, status=200):
+        body = json.dumps(data).encode('utf-8')
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode('utf-8'))
+        self.wfile.write(body)
 
 class DualStackThreadingHTTPServer(http.server.ThreadingHTTPServer):
     """
