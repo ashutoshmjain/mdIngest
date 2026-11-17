@@ -36,15 +36,16 @@ PROJECT_ROOT = INGEST_DIR.parent
 VIDEO_RENDER_JOBS = {}
 candidate_roots = [PROJECT_ROOT, PROJECT_ROOT.parent / "deepDive"]
 PROD_ROOT = next((r for r in candidate_roots if (r / "src" / "SUMMARY.md").exists() and (r / "src" / "SUMMARY.md").stat().st_size > 1000), PROJECT_ROOT)
+if PROD_ROOT != PROJECT_ROOT:
+    print(f"WARNING: workspace auto-discovery selected sibling checkout {PROD_ROOT} (its src/SUMMARY.md exists and is >1000B) instead of {PROJECT_ROOT} -- using the sibling as project root.")
 
 SRC_DIR = PROD_ROOT / "src"
 IMG_DIR = SRC_DIR / "img"
 VID_DIR = SRC_DIR / "vid"
 SUMMARY_FILE = SRC_DIR / "SUMMARY.md"
 SETTINGS_FILE = INGEST_DIR / "settings.json"
-
-IMG_DIR.mkdir(parents=True, exist_ok=True)
-VID_DIR.mkdir(parents=True, exist_ok=True)
+# NOTE: IMG_DIR/VID_DIR are created in run_server(), not at import time --
+# importing this module must not create directories.
 
 # Global tracker for mdbook serve background process
 mdserve_process = None
@@ -3191,6 +3192,7 @@ def sync_summary_file(mempool_items, template_items):
 
     lines = content.splitlines()
     header_lines = []
+    middle_lines = []
     chain_lines = []
     in_header = True
     in_chain = False
@@ -3202,39 +3204,58 @@ def sync_summary_file(mempool_items, template_items):
 
         if in_header:
             header_lines.append(line)
+            continue
 
         if "- [chain" in l:
             in_chain = True
 
         if in_chain:
             chain_lines.append(line)
+        else:
+            middle_lines.append(line)
 
-    # Build new Summary
+    # Build new Summary: regenerate the two known sections, carry every
+    # other line through verbatim in its original position (so a future
+    # section is never silently deleted).
+    def _emit_mempool():
+        new_lines.append("- [mempool](mempool.md)")
+        if not mempool_items:
+            new_lines.append("    - [None at this moment. Join us on GitHub!](github.md)")
+        else:
+            for item in mempool_items:
+                new_lines.append(f"    - [{item['title']}]({item['filename']})")
+        new_lines.append("")
+
+    def _emit_template():
+        new_lines.append("- [template](template.md)")
+        for item in template_items:
+            new_lines.append(f"    - [{item['title']}]({item['filename']})")
+        new_lines.append("")
+
     new_lines = []
     # 1. Header (e.g. # Summary \n - [deepDive](./cover.md))
     for h in header_lines:
         new_lines.append(h)
 
-    # 2. Mempool
-    new_lines.append("- [mempool](mempool.md)")
-    if not mempool_items:
-        new_lines.append("    - [None at this moment. Join us on GitHub!](github.md)")
-    else:
-        for item in mempool_items:
-            fn = item["filename"]
-            title = item["title"]
-            new_lines.append(f"    - [{title}]({fn})")
-
-    new_lines.append("")
-
-    # 3. Template
-    new_lines.append("- [template](template.md)")
-    for item in template_items:
-        fn = item["filename"]
-        title = item["title"]
-        new_lines.append(f"    - [{title}]({fn})")
-
-    new_lines.append("")
+    # 2-3. Middle: known sections regenerated, unknown lines verbatim.
+    seen_mempool = False
+    seen_template = False
+    for line in middle_lines:
+        l = line.strip().lower()
+        if l.startswith("- [mempool"):
+            _emit_mempool()
+            seen_mempool = True
+        elif l.startswith("- [template"):
+            _emit_template()
+            seen_template = True
+        else:
+            new_lines.append(line)
+    # Preserve the old always-emit behavior for degenerate inputs missing
+    # a known section header.
+    if not seen_mempool:
+        _emit_mempool()
+    if not seen_template:
+        _emit_template()
 
     # 4. Chain & Genesis (Preserved 100%)
     for c in chain_lines:
@@ -4521,7 +4542,8 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 file_content = f.read()
 
             title_words = raw_new_title.split()
-            clean_title_text = " ".join(title_words[:5]) if len(title_words) > 5 else raw_new_title
+            word_limit = load_settings().get("title_word_limit", 5)
+            clean_title_text = " ".join(title_words[:word_limit]) if len(title_words) > word_limit else raw_new_title
             clean_title_text = re.sub(r'^\d+\s*:\s*', '', clean_title_text).strip()
 
             num_match = re.match(r'^(\d+)\.md$', filename)
@@ -5316,8 +5338,10 @@ class DualStackThreadingHTTPServer(http.server.ThreadingHTTPServer):
         super().server_bind()
 
 def run_server():
+    IMG_DIR.mkdir(parents=True, exist_ok=True)
+    VID_DIR.mkdir(parents=True, exist_ok=True)
     settings = load_settings()
-    port = settings.get("port", 8088)
+    port = int(os.environ.get("PORT", settings.get("port", 8088)))
     DualStackThreadingHTTPServer.allow_reuse_address = True
     bind_addr = ("::", port) if socket.has_ipv6 else ("", port)
     try:
@@ -5333,7 +5357,8 @@ def run_server():
         print(f"  URL: http://localhost:{port}")
         print(f"  Root: {PROJECT_ROOT}")
         print(f"==================================================\n")
-        webbrowser.open(f"http://localhost:{port}")
+        if not os.environ.get("NO_BROWSER"):
+            webbrowser.open(f"http://localhost:{port}")
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

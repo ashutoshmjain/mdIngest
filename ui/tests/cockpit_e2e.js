@@ -6,6 +6,8 @@
  */
 
 const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 let puppeteer;
 try {
     puppeteer = require('puppeteer');
@@ -18,7 +20,40 @@ try {
     }
 }
 
-const BASE_URL = process.env.TEST_URL || 'http://localhost:8088';
+const TEST_PORT = process.env.TEST_PORT || '18088';
+const BASE_URL = process.env.TEST_URL || `http://localhost:${TEST_PORT}`;
+let serverProc = null;
+async function startTestServer() {
+    if (process.env.TEST_URL) return; // external server provided; do not spawn
+    const serverScript = path.join(__dirname, '..', 'server.py');
+    const env = { ...process.env, PORT: TEST_PORT, NO_BROWSER: '1' };
+    const attempts = [['py', ['-3', serverScript]], ['python', [serverScript]]];
+    let lastErr = null;
+    for (const [cmd, args] of attempts) {
+        try {
+            serverProc = spawn(cmd, args, { env, cwd: path.join(__dirname, '..'), stdio: 'ignore' });
+            await new Promise((resolve, reject) => {
+                serverProc.once('error', reject);
+                setTimeout(resolve, 1000);
+            });
+            if (serverProc.exitCode !== null) throw new Error(`${cmd} exited immediately`);
+            break;
+        } catch (e) {
+            lastErr = e;
+            serverProc = null;
+        }
+    }
+    if (!serverProc) throw new Error(`could not spawn test server (py -3 / python): ${lastErr}`);
+    const deadline = Date.now() + 60000;
+    for (;;) {
+        try {
+            const res = await fetch(`${BASE_URL}/cockpit.html`);
+            if (res.ok) return;
+        } catch (e) { /* not ready yet */ }
+        if (Date.now() > deadline) throw new Error(`test server did not become ready at ${BASE_URL}`);
+        await new Promise(r => setTimeout(r, 500));
+    }
+}
 
 function getExecutablePath() {
     const paths = [
@@ -54,6 +89,7 @@ async function runE2ETests() {
     }
 
     try {
+        await startTestServer();
         browser = await puppeteer.launch(launchOptions);
         const page = await browser.newPage();
         await page.setViewport({ width: 1440, height: 900 });
@@ -1073,6 +1109,7 @@ async function runE2ETests() {
         failed++;
     } finally {
         if (browser) await browser.close();
+        if (serverProc) { serverProc.kill(); serverProc = null; }
     }
 
     console.log('\n====================================================');

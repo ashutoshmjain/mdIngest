@@ -7,10 +7,16 @@ echo ==================================================
 echo.
 echo Launching the md² Publishing Cockpit Server...
 echo.
+where py >nul 2>nul
+if not errorlevel 1 (
+    set PYLAUNCH=py -3
+) else (
+    set PYLAUNCH=python
+)
 if exist "ingest\server.py" (
-    python ingest\server.py
+    %PYLAUNCH% ingest\server.py
 ) else if exist "ui\server.py" (
-    python ui\server.py
+    %PYLAUNCH% ui\server.py
 )
 echo.
 echo Server has stopped.
