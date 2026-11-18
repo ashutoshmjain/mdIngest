@@ -1617,15 +1617,6 @@
 
             <!-- TAB 2: 🎙️ PODCAST GENERATION STUDIO & TRANSCRIPT EDITOR -->
             <div class="tab-view preview-content-scroll" id="tab-view-narrative">
-                <!-- Mode Switcher: Podcast Studio vs Social Prose / Nostr -->
-                <div class="podcast-mode-switch">
-                    <button class="btn-mode-tab active" id="btn-submode-podcast" onclick="switchPodcastSubmode('podcast')">
-                        🎙️ Podcast Studio &amp; Cuts
-                    </button>
-                    <button class="btn-mode-tab" id="btn-submode-nostr" onclick="switchPodcastSubmode('nostr')">
-                        📝 Social Prose &amp; Nostr
-                    </button>
-                </div>
 
                 <!-- SUBMODE A: PODCAST STUDIO & CUTS -->
                 <div id="submode-view-podcast" style="display: block; width: 100%;">
@@ -1673,66 +1664,6 @@
                     </div>
                 </div>
 
-                <!-- SUBMODE B: SOCIAL PROSE & NOSTR (PRESERVED) -->
-                <div id="submode-view-nostr" style="display: none; width: 100%;">
-                    <div class="paper-sheet" id="narrative-paper-sheet">
-                        <!-- Narrative Action Toolbar -->
-                        <div id="narrative-toolbar" style="display: flex; align-items: center; justify-content: flex-start; border-bottom: 1px solid var(--border-light); padding-bottom: 0.85rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.6rem;">
-                            <button class="btn-cmd primary" id="btn-streamline-ai" onclick="streamlineNarrative()" title="AI Editorial Formatting Rules:
-• Clean Grammar: Strips spoken conversational fillers (&quot;you know&quot;, &quot;right?&quot;), normalizes punctuation &amp; casing.
-• Semantic Structure: Injects thematic H2 section headings.
-• Bullet Lists: Converts verbal enumeration (&quot;First...&quot;, &quot;Second...&quot;) into clean bullet points.
-• Entity Bolding: Highlights core architectural entities &amp; concepts.
-• Promo Isolation: Quarantines sponsor/channel notes into callout blocks.
-• Multi-Platform Ready: Formats for Nostr, Substack, Medium, and LinkedIn.">
-                                <span>⚡</span> Format with AI
-                            </button>
-                            <button class="btn-cmd" id="btn-open-vim" onclick="openExternalVim()" title="Edit narrative.md in external Vim / gVim">
-                                <span>📟</span> Edit in Vim (.md)
-                            </button>
-                        </div>
-
-                        <!-- H1 Header -->
-                        <h1 class="paper-h1" id="narrative-h1">Episode Narrative &amp; Social Transcript</h1>
-
-                        <!-- Read-Only Rendered Narrative Body -->
-                        <div class="rendered-body" id="narrative-rendered-body">
-                            <p style="color: var(--text-dark-muted); font-style: italic;">No narrative transcript loaded for this episode. Upload audio and run Whisper, or paste content in the Audio Studio deck.</p>
-                        </div>
-
-                        <!-- Bottom Syndication and Sats Wallet -->
-                        <div id="narrative-bottom-syndication">
-                            <div class="bottom-syndication-block" style="margin: 2.5rem 0 1.5rem 0; padding-top: 1.5rem; border-top: 1px solid var(--border-light); text-align: center;">
-                                <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; font-family: var(--font-sans);">Tips and Donations</h3>
-                                <p style="font-size: 0.85rem; color: var(--text-dark-secondary); margin-bottom: 1rem;">
-                                    If you enjoyed this research, consider supporting the project with a tip in <strong>Sats</strong>. It's a simple, global way to support independent research.
-                                </p>
-                                <div style="display: flex; justify-content: center; margin: 1rem 0;">
-                                    <lightning-widget
-                                      name="Thanks for supporting the publication"
-                                      accent="#f9ce00"
-                                      to="shutosha@primal.net"
-                                      image="https://nostrcheck.me/media/5af0794606a15b5641e25aa23d04af4cb0d7d5e68b11cacb47e56a4698fca8c4/49ff6d00cb5bc819cd19f77783d4815fbd46a5b99b6fbdead1eaecfab798187b.webp"
-                                    ></lightning-widget>
-                                </div>
-                                <div style="display: flex; gap: 0.6rem; justify-content: center; margin: 1.25rem 0; flex-wrap: wrap;">
-                                    <a href="https://open.spotify.com/show/7doWf0GON9JsG6r8igc7RE" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">▶ Spotify</a>
-                                    <a href="https://podcasts.apple.com/us/podcast/deep-dive-with-gemini/id1844532251" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">◈ Apple Podcasts</a>
-                                    <a href="https://music.youtube.com" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⫸ YouTube Music</a>
-                                    <a href="https://fountain.fm/show/7LBvZT6ffpGyubvk8aSF" target="_blank" class="audio-pill" style="padding: 0.35rem 0.85rem; font-size: 0.78rem;">⚡ Fountain.fm</a>
-                                </div>
-                                <p style="font-size: 0.75rem; color: var(--text-dark-muted); margin-top: 0.5rem;">
-                                    To send Sats, you'll need a <a href="https://lightningaddress.com/" target="_blank" style="color: var(--accent-amber-dark); text-decoration: underline;">lightning wallet</a>.
-                                </p>
-                                <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px dashed var(--border-light); font-size: 0.8rem; color: var(--text-dark-secondary);">
-                                    🔬 Explore the full peer-reviewed research paper with mathematical proofs &amp; interactive models on:
-                                    <br>
-                                    <a href="https://deepdive.shutri.com/index.html" target="_blank" id="narrative-canonical-preview" style="color: var(--accent-amber-dark); font-weight: 600; text-decoration: underline; font-family: var(--font-mono); font-size: 0.75rem;">https://deepdive.shutri.com/index.html</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- SUBMODE C: 🎬 LONGFORM BEAT-BY-BEAT TIMELINE & ARCHETYPE STUDIO (HORIZONTAL SPLIT) -->
             </div>
@@ -3003,7 +2934,6 @@ if __name__ == '__main__':
         // 🎙️ PODCAST GENERATION STUDIO JAVASCRIPT STATE & ENGINE
         // ==========================================
         let currentPodcastData = null;
-        let podcastSubmode = 'podcast';
         let selectedWordRange = null;
         let searchMatches = [];
         let currentSearchMatchIdx = -1;
@@ -3011,26 +2941,6 @@ if __name__ == '__main__':
         // Alias switchTab -> switchMiddleTab for backward compatibility
         window.switchTab = switchMiddleTab;
 
-
-        function switchPodcastSubmode(mode) {
-            // Beat Studio moved to its own app (Beats Studio, :8001) — see Beats Studio launcher.
-            podcastSubmode = mode;
-            const btnPod = document.getElementById('btn-submode-podcast');
-            const btnNostr = document.getElementById('btn-submode-nostr');
-            const viewPod = document.getElementById('submode-view-podcast');
-            const viewNostr = document.getElementById('submode-view-nostr');
-
-            [btnPod, btnNostr].forEach(b => { if (b) b.classList.remove('active'); });
-            [viewPod, viewNostr].forEach(v => { if (v) v.style.display = 'none'; });
-
-            if (mode === 'nostr') {
-                if (btnNostr) btnNostr.classList.add('active');
-                if (viewNostr) viewNostr.style.display = 'block';
-            } else {
-                if (btnPod) btnPod.classList.add('active');
-                if (viewPod) viewPod.style.display = 'block';
-            }
-        }
 
 
         async function syncPodcastStudio(filename) {
@@ -4736,40 +4646,6 @@ if __name__ == '__main__':
             }
         }
 
-        async function streamlineNarrative() {
-            if (!selectedEpisode) {
-                showToast('Please select an episode first');
-                return;
-            }
-            const btn = document.getElementById('btn-streamline-ai');
-            if (btn) btn.innerHTML = '<span>⏳</span> Formatting...';
-            try {
-                const res = await fetch('/api/transcript/streamline', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        filename: selectedEpisode.filename,
-                        title: selectedEpisode.title || ''
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    if (!currentAudioData) currentAudioData = {};
-                    currentAudioData.narrative_md = data.streamlined;
-                    if (data.nostr_meta) currentAudioData.nostr_meta = data.nostr_meta;
-                    renderNarrativeTab(selectedEpisode, currentAudioData);
-                    showToast(`⚡ Formatted with AI (${data.promo_count} promo blocks isolated)!`);
-                } else {
-                    showToast(`Formatting error: ${data.error || 'Failed'}`);
-                }
-            } catch (err) {
-                console.error("Formatting failed:", err);
-                showToast('Formatting request failed');
-            } finally {
-                if (btn) btn.innerHTML = '<span>⚡</span> Format with AI';
-            }
-        }
-
         function copyNostrMarkdown() {
             if (!selectedEpisode) {
                 showToast('Please select an episode first');
@@ -4786,29 +4662,6 @@ if __name__ == '__main__':
             });
         }
         window.copySocialNarrative = copyNostrMarkdown;
-
-        async function openExternalVim() {
-            if (!selectedEpisode) return;
-            try {
-                const res = await fetch('/api/transcript/open_external', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filename: selectedEpisode.filename
-                    })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    const edName = data.editor || 'Vim';
-                    showToast(`📟 Opened narrative.md in ${edName}!`);
-                } else {
-                    showToast(`Could not open external editor: ${data.error || ''}`);
-                }
-            } catch (err) {
-                console.error("External editor launch error:", err);
-                showToast(`Failed to launch editor: ${err.message}`);
-            }
-        }
 
         function handleSidebarTranscriptInput() {
             updateTranscriptWordCount();

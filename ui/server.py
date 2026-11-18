@@ -3131,7 +3131,8 @@ def parse_summary_structure():
                 "has_image": has_img,
                 "vid_count": v_count,
                 "is_locked": v_count > 0,
-                "exists": file_exists
+                "exists": file_exists,
+                "path": f"src/{filename}"
             }
 
             # Number detection
@@ -3799,7 +3800,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             params = parse_qs(url.query)
             fn = params.get("filename", [""])[0]
             if not fn or not (SRC_DIR / fn).exists():
-                self.send_error(404, "Episode not found")
+                self.send_error(404, f"Episode not found at src/{fn}")
                 return
 
             file_path = SRC_DIR / fn
@@ -3816,6 +3817,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
             self.send_json({
                 "filename": fn,
+                "path": f"src/{fn}",
                 "title": title,
                 "content": raw_text,
                 "word_count": words,
