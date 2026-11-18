@@ -21,6 +21,34 @@ In the age of LLMs, the cost of generating information has collapsed to zero, bu
 
 ---
 
+## 🤖 1-Prompt Setup for Antigravity & AI Assistants
+
+If you are setting up `mdIngest` in a new workspace using **Antigravity** or another AI coding assistant, copy and paste this prompt to configure the complete publishing stack automatically:
+
+```text
+Please set up and verify the complete publishing environment (mdIngest + DDMA) in this workspace. Do every step below in order. Do not skip a step. If a step fails, fix it and continue — do not stop and ask unless a step explicitly says to ask.
+
+1. Verify the toolchain: Python 3.10+, Cargo/Rust, mdbook (v0.5.0+), and mdbook-katex are installed and available on PATH. If mdbook or mdbook-katex are missing, install them via `cargo install mdbook mdbook-katex`.
+2. Install the Python packages for mdIngest: from the mdIngest repo root, run `pip install -r ui/requirements.txt` (faster-whisper, av, openai-whisper, numpy — required for transcription; the server starts without them but transcription fails).
+3. Install the Python packages for DDMA: from the ddma repo root, run `pip install -r requirements.txt` (faster-whisper, av, manim, google-generativeai, pyyaml, and the rest).
+4. Verify ffmpeg is installed and on PATH (`ffmpeg -version`). If it is missing, install it (Windows: `winget install ffmpeg` or `choco install ffmpeg`; macOS: `brew install ffmpeg`; Linux: `sudo apt install ffmpeg` or the distro equivalent). The pipeline cannot compile audio or video without ffmpeg.
+5. Build the md-publish preprocessor binary from the mdIngest repo root using `cargo build --release` (the manifest is the repo-root `Cargo.toml`; the binary source is `crate/src/main.rs` — do NOT run the build inside `crate/`, there is no manifest there).
+6. Verify the built binary exists at `target/release/md-publish`. Do NOT require `[preprocessor.katex]` or `[preprocessor.ingest]` blocks in the repo-root `book.toml` — that file intentionally has no preprocessors enabled (for manual-build stability); the preprocessor is wired in at publish time.
+7. Set up the workspace folder. The user creates an empty folder on Google Drive to be the workspace (ask the user for the folder, or use the folder ID from its Drive URL `https://drive.google.com/drive/folders/<FOLDER_ID>`). Then mount it as a local path — the code only does local file I/O against a local path, never the Google Drive web API:
+   - On Windows or macOS: use Google Drive for Desktop. Install it and sign in if it is not already installed. The mount appears at `G:\My Drive\` on Windows, or `~/Library/CloudStorage/GoogleDrive-<email>/My Drive` on macOS. Do NOT use rclone on Windows or macOS.
+   - On Linux or WSL: use rclone (Google offers no Drive client for Linux). Install rclone, run `rclone config` to create a Drive remote named `gdrive` (complete the browser sign-in), then mount only the workspace folder by its ID: `rclone mount gdrive: /mnt/gdrive/workspace --drive-root-folder-id <FOLDER_ID> --vfs-cache-mode full --daemon`. On WSL, prefer this native Linux mount over `/mnt/g` (the Windows Drive mount is slow through the WSL bridge, especially for ffmpeg); use `/mnt/g/My Drive/<folder>` only as a fallback if the rclone mount is not possible. If `rclone mount` is not possible at all (no FUSE), use `rclone copy` instead: keep a plain local folder, set the workspace path to it, and copy files to/from Drive with `rclone copy` (pull before working, push after).
+   - In Docker or a VM: use rclone as on Linux (there is no desktop app in a container).
+   - Create the folder structure inside the mounted workspace folder if any are missing: `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
+   - Set the `DD_HUB_ROOT` environment variable to the mounted workspace path and persist it (shell profile, systemd unit, or Docker entrypoint) so it survives new shells.
+8. Set up settings: create `<workspace>/vault/settings.json` from `settings.template.json` (in the mdIngest repo root) if it does not exist. Fill in API keys only if the user provides them; never commit settings.json. If the user already has a settings.json in an existing workspace folder, copy that file into the new workspace folder's `vault/` instead of creating one from the template.
+9. Launch the mdIngest Publishing Cockpit server (`python ui/server.py` from the mdIngest repo, or `./start_ui.bat` on Windows) on http://localhost:8088 and verify that http://localhost:3000 is accessible via `mdbook serve`.
+10. Launch the DDMA Clip Studio (Curator) server: from the ddma repo root, run `python scratch/run_curator.py` and verify http://localhost:8000/curator.html loads.
+11. Launch Beats Studio from the mdIngest landing page (http://localhost:8088/, the "Launch Beats Studio" button) and verify http://localhost:8001 responds.
+12. Verify: `DD_HUB_ROOT` resolves, the workspace folder structure exists, `episodes/<N>/plan.json` is readable for an existing episode (or the workspace folder is empty for a fresh workspace), and all three servers respond (cockpit :8088, Curator :8000, Beats :8001).
+```
+
+---
+
 ## The md² Publishing Cockpit (Web Application)
 
 `mdIngest` includes a standalone, zero-dependency desktop web application styled in the **Shutri.com Minimalist Editorial design system** (`#fbf9f5` warm sand canvas, `#e7e5e4` stone borders, `#d97706` amber accents, and `#1c1917` ink typography).
@@ -54,88 +82,17 @@ In the age of LLMs, the cost of generating information has collapsed to zero, bu
 
 ## Dependencies & System Requirements
 
-| Tool | Version Requirement | Purpose |
-| :--- | :--- | :--- |
-| **Python** | `3.10+` (e.g. `3.12`) | Powers the Cockpit backend server (`server.py`), AST payload extractor, and rolling backup engine. **Zero pip dependencies** (built with pure standard library). |
-| **Rust & Cargo** | `1.85+` (e.g. `1.97+`) | Compiles the optional headless `md-publish` preprocessor binary. |
-| **mdbook** | `v0.5.0+` (e.g. `v0.5.4`) | High-performance CLI documentation engine and local preview server. |
-| **mdbook-katex** | `v0.5.1+` (or `v0.10.0+`) | Preprocessor for high-fidelity LaTeX/KaTeX mathematical equation rendering. |
-
+The 1-Prompt Setup above verifies and installs the full toolchain (Python 3.10+, Cargo/Rust, mdbook, mdbook-katex, Python packages, ffmpeg).
 ---
 
-## 🗄️ Setting up dd_hub (the workspace)
+## Setting up the workspace folder
 
-dd_hub is the workspace — a Google Drive folder that holds the plan, settings, inputs, working assets, and audio/video outputs. **mdIngest is the main app and the entry point**: its landing page is the workspace home, and it runs transcription (the podcast stage) as well as the Publishing Cockpit. DDMA is an extension to mdIngest for Clips management and for creating longform video (Beats Studio, the video server, runs on port 8001 as part of DDMA). Both read from and write to dd_hub. GitHub is only the intermediary for the *published* Active Master clips; dd_hub is the live workspace.
-
-> [!IMPORTANT]
-> **The core rule**: The code only does **local file I/O against a local path**. It **never** calls the Google Drive web API for file access. So dd_hub must be mounted as a local filesystem path on every machine that runs mdIngest or DDMA. The code reads the mount path from the `DD_HUB_ROOT` environment variable.
-
-### What you need
-
-* A Google Drive folder to be your dd_hub. Create a new folder, or use an existing one. Note its folder ID from the Drive URL: `https://drive.google.com/drive/folders/<FOLDER_ID>`.
-* The folder should contain (create any that are missing): `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
-
-### Windows easy path — Antigravity app (recommended)
-
-* Install Google Drive for Desktop, and install the Antigravity app (the app, not the IDE).
-* Open the Antigravity app and run the 1-Prompt Setup below (see "1-Prompt Setup for Antigravity & AI Assistants"). The prompt does everything from requirements to dd_hub setup: it verifies the toolchain, finds your Drive mount (`G:\My Drive\dd_hub`), creates the dd_hub folder structure if missing, sets `DD_HUB_ROOT`, and verifies the setup.
-* Prerequisite: Google Drive for Desktop must be installed and signed in (so `G:\My Drive\` exists) before you run the prompt.
-
-### Linux / VM / Docker
-
-Linux users set up with `agy` (the Antigravity CLI) or Muse Code. The one additional step beyond the normal toolchain is rclone (below).
-
-* Install rclone. Configure a Google Drive remote (for example, named `gdrive`).
-* Mount the dd_hub folder by its ID to a local path (for example `/mnt/gdrive/dd_hub`):
-  ```bash
-  rclone mount gdrive: /mnt/gdrive/dd_hub --drive-root-folder-id <FOLDER_ID> --vfs-cache-mode full --daemon
-  ```
-* Use `--vfs-cache-mode full` — the pipeline does many small reads/writes, and the cache makes it fast. A generous `--vfs-cache-max-size` helps.
-* Set `DD_HUB_ROOT` to the mount path (for example `/mnt/gdrive/dd_hub`) and persist it (shell profile, systemd unit, or Docker entrypoint) so it survives new shells.
-* In Docker, the entrypoint mounts the Drive folder by ID via rclone to a local path, sets `DD_HUB_ROOT`, then starts the server.
-* If `rclone mount` is not possible (no FUSE — for example, the Antigravity VM sandbox), use `rclone copy` instead of a mount: keep a plain local folder (for example `/home/antigravity/dd_hub`), set `DD_HUB_ROOT` to it, and copy files to/from Drive with `rclone copy` (pull before working, push after). Do not attempt a mount where FUSE is unavailable.
-
-### Settings (the vault)
-
-* The canonical settings file is `dd_hub/vault/settings.json`. It holds the app settings **and** the API keys (Mosaic, Gemini, etc.).
-* Create it from `settings.template.json` (in the repo root) and fill in your keys.
-* `settings.json` is **never** committed to git. The repo holds only `settings.template.json`. The vault lives in dd_hub, not in the repo.
-* Any environment with workspace access gets the full settings.json, including keys.
-
-### Verify the setup
-
-* `echo $DD_HUB_ROOT` shows the mount path.
-* The mount contains `episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`.
-* `episodes/<N>/plan.json` is readable (for an existing episode).
-* If the mount is unreachable, the apps fall back to the local cache with a loud warning (read-only); writes fail closed — they refuse rather than writing to a stale local copy.
-
-### What NOT to do
-
-* Do **not** use the Google Drive web API or a Drive plugin as the file store. API-level access is too slow and is not a local file path — the pipeline will not work with it. (Fine for one-off reads only.)
-* Do **not** fake a local dd_hub folder (an empty local directory named dd_hub). The apps will write to it and the work will never reach the real workspace.
-* Do **not** commit `settings.json` (or any file with API keys) to git.
-* Do **not** set `DD_HUB_ROOT` to a path that isn't the mounted dd_hub folder.
-
----
-
-## 🤖 1-Prompt Setup for Antigravity & AI Assistants
-
-If you are setting up `mdIngest` in a new workspace using **Antigravity** or another AI coding assistant, copy and paste this prompt to configure the complete publishing stack automatically:
-
-```text
-Please set up and verify the complete md² (mdIngest) publishing environment in this workspace:
-1. Verify that Python 3.10+, Cargo/Rust, mdbook (v0.5.0+), and mdbook-katex are installed and available on PATH. If mdbook or mdbook-katex are missing, install them via `cargo install mdbook mdbook-katex`.
-2. Build the md-publish preprocessor binary in the `crate/` directory using `cargo build --release`.
-3. Verify that `book.toml` contains the required `[preprocessor.katex]` and `[preprocessor.ingest]` configuration blocks.
-4. Launch the md² Publishing Cockpit server (`python ui/server.py` or `./start_ui.bat`) on http://localhost:8088 and verify that http://localhost:3000 is accessible via `mdbook serve`.
-5. Set up dd_hub (the workspace): find the Google Drive mount (`G:\My Drive\dd_hub` on Windows — if Drive for Desktop is installed; otherwise ask the user for the dd_hub folder). Create the folder structure if missing (`episodes/`, `vault/`, `inputs/`, `audio/`, `video/`, `mosaics/`, `manims/`, `rules/`). Set `DD_HUB_ROOT` to the dd_hub path and persist it.
-6. Create `dd_hub/vault/settings.json` from `settings.template.json` if it does not exist (fill in API keys only if the user provides them; never commit it).
-7. Verify: `DD_HUB_ROOT` resolves, the folder structure exists, and `episodes/<N>/plan.json` is readable for an existing episode (or the folder is empty for a fresh workspace).
-```
-
+Create an empty workspace folder on Google Drive. Then copy the 1-Prompt Setup below into an AI assistant and let it do the rest — mounting the folder, creating the subfolders, installing the toolchain, and setting up settings.
 ---
 
 ## Quick Start: Launching the Cockpit
+First-time setup is the 1-Prompt Setup above, not this section.
+
 
 ### Windows 1-Click Launcher
 Double-click `start_ui.bat` or run:
@@ -183,26 +140,8 @@ if __name__ == '__main__':
 
 ## The Underlying Rust Preprocessor (`md-publish`)
 
-For automated headless CI/CD builds, `mdIngest` includes the high-performance `md-publish` Rust binary.
+The 1-Prompt Setup above builds the `md-publish` binary (`cargo build --release` from the repo root — NOT inside `crate/`, there is no manifest there). This section remains only as a reference for headless builds.
 
-### Build & Installation:
-```bash
-# Build the Rust preprocessor
-cargo build --release
-
-# Add to system PATH
-cp target/release/md-publish /usr/local/bin/
-```
-
-### `book.toml` Configuration:
-```toml
-[preprocessor.ingest]
-command = "md-publish"
-downloads_path = "/path/to/downloads"
-video_source = "/path/to/video/archive"
-lightning_address = "yourname@primal.net"
-title_word_limit = 5
-```
 
 ---
 
