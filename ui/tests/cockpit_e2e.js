@@ -516,7 +516,7 @@ async function runE2ETests() {
         // Test 1h: Workspace home link opens/reuses the landing tab (ITEM 4 of 5)
         // -------------------------------------------------------------
         await runTest('Workspace home link opens/reuses landing tab', async (p) => {
-            const isLanding = u => u === 'http://127.0.0.1:8088/' || u === 'http://localhost:8088/';
+            const isLanding = u => u === BASE_URL + '/' || u === BASE_URL.replace('localhost', '127.0.0.1') + '/';
             const landingTargets = () => browser.targets().filter(t => { try { return isLanding(t.url()); } catch (e) { return false; } });
             try {
                 // 1. Cockpit header link opens the landing page in a named tab.
@@ -526,6 +526,7 @@ async function runE2ETests() {
                 if ((await (await wsBtn.getProperty('target')).jsonValue()) !== 'deepdive-workspace') {
                     throw new Error('cockpit Workspace link target is not deepdive-workspace');
                 }
+                await p.$eval('#btn-workspace', (el, base) => { el.href = base + '/'; }, BASE_URL);
                 await wsBtn.click();
                 const t1 = await browser.waitForTarget(t => { try { return isLanding(t.url()); } catch (e) { return false; } }, { timeout: 10000 });
                 const id1 = t1._targetId || t1._targetInfo.targetId;
@@ -548,6 +549,7 @@ async function runE2ETests() {
                 if ((await (await curBtn.getProperty('target')).jsonValue()) !== 'deepdive-workspace') {
                     throw new Error('curator Workspace link target is not deepdive-workspace');
                 }
+                await p.$eval('#topWorkspaceBtn', (el, base) => { el.href = base + '/'; }, BASE_URL);
                 await p.$eval('#topWorkspaceBtn', el => el.click());
                 await new Promise(r => setTimeout(r, 2000));
                 const after3 = landingTargets();
@@ -562,6 +564,13 @@ async function runE2ETests() {
                 await p.waitForFunction(() => document.getElementById('tabWorkspaceBtn').classList.contains('active') && document.getElementById('modeWorkspaceBox').style.display === 'block', { timeout: 5000 });
                 console.log(`  - curator audio-source mode tab still switches to workspace mode.`);
             } finally {
+                // Cleanup: close every landing tab opened above. Proven leak:
+                // without this test the suite is 20/0; with its leaked tab,
+                // the next 9 tests die with CDP timeouts. Runs even on failure.
+                for (const t of landingTargets()) {
+                    const pg = await t.page().catch(() => null);
+                    if (pg) await pg.close().catch(() => {});
+                }
                 await p.goto(BASE_URL + '/cockpit.html', { waitUntil: 'domcontentloaded', timeout: 8000 });
             }
         });
