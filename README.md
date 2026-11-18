@@ -1,29 +1,20 @@
-# md² (The mdd Engine & Publishing Cockpit)
+# mdIngest
 
-> **md²** (pronounced *md-squared*) stands for **mdBook deepDive**. Much like `vim` is a recursion of `vi`, **md²** is a recursive evolution of the `mdbook` ecosystem, transformed into an opinionated, multi-modal publishing web application for the **Personal Knowledge Blockchain**.
+mdIngest is a pipe that connects your research and conversations into published episodes. It is not a one-click-and-done app — it is an interface that lets you finesse raw research into a polished web page, or a raw conversation into a podcast-quality stream.
 
----
+It runs locally on your machine — Linux, Windows, or Mac — as a web app on localhost. No login, no paywall, fully open source.
 
-![md² Ingest Publishing Cockpit UI](screenshot.png)
+Here's what you do with it, and what you get out of it:
 
----
+- **You bring raw research → you finesse it into a polished web page.** The Cockpit (http://localhost:8088/cockpit.html) is where you shape your drafts and episodes and publish them as an article on the site.
+- **You bring a raw conversation (audio) → you finesse it into a podcast-quality stream.** It gets transcribed once, at the word level, and that one transcription drives everything — the article, the clips, the longform. Nothing ever re-transcribes it.
+- **You start at the landing page (http://localhost:8088/)** — the drop point for new inputs and the launcher for the Cockpit, DDMA, and Beats Studio.
 
-## The Philosophy: Personal Knowledge Blockchain
+DDMA is the extension (Clip Studio + Beats Studio — clips and longform video). It is installed by the same 1-Prompt Setup below; see the [ddma repo](https://github.com/ashutoshmjain/ddma) for what it does.
 
-In the age of LLMs, the cost of generating information has collapsed to zero, but the cost of maintaining **Signal** has skyrocketed. Most research dies in transient chat windows. 
+## Installation — 1-Prompt Setup
 
-**md²** provides a formal framework to organize research into an immutable ledger of discovery:
-
-* **Block 0 (The Genesis Block):** The hardcoded rules of your universe. It contains the **Six Foundational Pillars** (e.g., Bitcoin, Intelligence, Physics) that anchor all subsequent research.
-* **Knowledge Blocks (Block 1, 2, ...):** Chronological epochs of discovery. Each block is limited by the **Law of 21**; once the 21st episodic transaction is mined, the block is sealed into the permanent chain.
-* **The Mempool:** The volatile staging zone for unmined research drafts (`src/_<slug>.md`).
-* **The Block Template:** The active mining epoch holding verified episodes awaiting block seal.
-
----
-
-## 🤖 1-Prompt Setup for Antigravity & AI Assistants
-
-If you are setting up `mdIngest` in a new workspace using **Antigravity** or another AI coding assistant, copy and paste this prompt to configure the complete publishing stack automatically:
+Copy and paste this prompt into Antigravity, Muse Code, or Claude to set up the complete publishing environment (mdIngest + DDMA). Do every step in order. If a step fails, fix it and continue — do not stop and ask unless a step explicitly says to ask.
 
 ```text
 Please set up and verify the complete publishing environment (mdIngest + DDMA) in this workspace. Do every step below in order. Do not skip a step. If a step fails, fix it and continue — do not stop and ask unless a step explicitly says to ask.
@@ -47,118 +38,10 @@ Please set up and verify the complete publishing environment (mdIngest + DDMA) i
 12. Verify: `DD_HUB_ROOT` resolves, the workspace folder structure exists, `episodes/<N>/plan.json` is readable for an existing episode (or the workspace folder is empty for a fresh workspace), and all three servers respond (cockpit :8088, Curator :8000, Beats :8001).
 ```
 
----
+After setup, launch with `python ui/server.py` (or `start_ui.bat` on Windows). The landing page is at http://localhost:8088/.
 
-## The md² Publishing Cockpit (Web Application)
+## State of the app — alpha test phase
 
-`mdIngest` includes a standalone, zero-dependency desktop web application styled in the **Shutri.com Minimalist Editorial design system** (`#fbf9f5` warm sand canvas, `#e7e5e4` stone borders, `#d97706` amber accents, and `#1c1917` ink typography).
+mdIngest is in alpha. It works end to end — see [episode 249: What Exactly is Reality?](https://deepdive.shutri.com/249.html) and [episode 250: What Exactly is Infinity?](https://deepdive.shutri.com/250.html) ([Spotify](https://open.spotify.com/episode/1sUNnANbczGUpY8os0i03z)) — but it is still being hardened and tested. Expect rough edges. Bugs are tracked in the [Bug Tracker Space](https://muse.ai/s/bug-tracker-ixe6daxhoezyxy/g1O341vEl5aXYIzWFP1db5l-xunGJAxBRSwSJccC110), not on GitHub Issues.
 
-### 1. 3-Pane Modular Workspace
-
-* **Left Pane (Active Ledger Scope):**
-  * **Mempool Drafts:** Visual list of active drafts (`src/_<slug>.md`) with live status indicators.
-  * **Two-Way Inline Title Editor:** Hover `✏️` or double-click to edit summary titles with real-time 5-word limit badges. Auto-saves and synchronizes `SUMMARY.md` instantly.
-  * **Draft Management:** 1-Click `🗑️` deletion for unmined drafts with automatic tree reconciliation.
-  * **Block Template & Chain Archive:** Visual inspection of active epoch episodes and historical Genesis blocks.
-  * **Collapsible & Expandable:** Toggle via edge tabs (`LEDGER` / `STUDIO`) or keyboard shortcuts (`[` and `]`).
-
-* **Central Pane (Live Editorial Preview):**
-  * **Absolute KaTeX Pipeline:** High-fidelity mathematical formula rendering ($\mathbb{R}, \mathbb{C}, \mathbb{H}, \mathbb{O}$, Dirac spinors, quaternions, and matrices) with delimiter hardening.
-  * **Clean Paper Typography:** Seamless reading experience matching physical book aesthetics.
-  * **Podcast Syndication Strip:** Live preview links for Spotify, Apple Podcasts, YouTube Music, and Fountain.fm.
-
-* **Right Pane (Studio & Ingestion):**
-  * **Lossless `.py` Payload Extractor:** AST-driven Python script unpacker with live metadata diagnostics and citation counters.
-  * **Single-Asset Store Discovery:** Automatically discovers 740×740 square video clips and cover art across both `src/vid/` and DDMA single-asset archives.
-
-* **Top Command Bar:**
-  * **`⚡ Mine & Lock`:** 1-Click atomic mining—allocates the next sequential episode number (e.g. `# 247`), updates `SUMMARY.md`, and moves the draft into the Block Template.
-  * **`🟢 mdserve:3000` (Two-Way Toggle):** Starts/stops the local `mdbook serve` process on `0.0.0.0:3000` with live port probing.
-  * **`🚀 Push (Remote)`:** Stages, commits, and pushes changes to your remote Git repository with automated semantic messages.
-  * **`📋 Prompt`:** One-click clipboard copy of the canonical Master Packaging Prompt.
-  * **`⚙️ Settings`:** Manage podcast URLs and publishing word limits.
-
----
-
-## Dependencies & System Requirements
-
-The 1-Prompt Setup above verifies and installs the full toolchain (Python 3.10+, Cargo/Rust, mdbook, mdbook-katex, Python packages, ffmpeg).
----
-
-## Setting up the workspace folder
-
-Create an empty workspace folder on Google Drive. Then copy the 1-Prompt Setup below into an AI assistant and let it do the rest — mounting the folder, creating the subfolders, installing the toolchain, and setting up settings.
----
-
-## Quick Start: Launching the Cockpit
-First-time setup is the 1-Prompt Setup above, not this section.
-
-
-### Windows 1-Click Launcher
-Double-click `start_ui.bat` or run:
-```cmd
-start_ui.bat
-```
-
-### Universal Launch (macOS / Linux / Windows)
-```bash
-python ui/server.py
-```
-This opens the workspace landing page at `http://localhost:8088/` — the workspace home (workspace picker, launcher for mdIngest + DDMA + Beats Studio, and the single drop point for new inputs). The Publishing Cockpit is at `http://localhost:8088/cockpit.html`.
-
----
-
-## The Master Packaging Prompt
-
-*Copy this into Google Gemini, Claude, or ChatGPT to generate a 100% lossless self-extracting payload:*
-
-```text
-Objective: Package the complete exhaustive research from this session into a self-extracting Python script without summarizing or pruning.
-
-1. Packaging Requirements:
-* Full Fidelity: Package the exhaustive research in its entirety. Do not summarize or prune.
-* Absolute KaTeX: Wrap all mathematical notation and symbols in Absolute KaTeX delimiters: $...$ for inline and $$...$$ for block displays. Never leave whitespace adjacent to '$'. Escape financial dollar amounts as \$ (e.g. \$100M).
-* Hyperlinked Bibliography: Format every entry in the "Works Cited" section as a clickable Markdown link: [^N]: [Author, Title, Year](URL).
-* Title Header: Ensure the document begins with a strict H1 title adhering to a 5-word maximum limit: # [Title].
-
-2. Python Script Format:
-Create an executable Python script where the full exhaustive research markdown is stored in raw_markdown:
-
-raw_markdown = """
-# [Title]
-
-[Insert complete exhaustive markdown research here with $inline$ and $$block$$ math and [^1] citations...]
-"""
-
-if __name__ == '__main__':
-    with open('final_research.md', 'w', encoding='utf-8') as f:
-        f.write(raw_markdown)
-    print("✅ Extracted final_research.md successfully.")
-```
-
----
-
-## The Underlying Rust Preprocessor (`md-publish`)
-
-The 1-Prompt Setup above builds the `md-publish` binary (`cargo build --release` from the repo root — NOT inside `crate/`, there is no manifest there). This section remains only as a reference for headless builds.
-
-
----
-
-## Safety & Integrity Mechanisms
-
-To ensure `SUMMARY.md` is never corrupted:
-1. **Automated Pre-Write Backups:** `server.py` writes rolling timestamped snapshots to `ingest/backups/SUMMARY_<timestamp>.md.bak` before every write.
-2. **Surgical AST Section Isolation:** Reconstructs Mempool and Block Template sections while keeping Genesis Pillars and Header links 100% immutable.
-3. **Git Atomic Versioning:** Every transaction is tracked in Git with 1-click rollback.
-
----
-
-## 🐛 Bug tracking
-
-We do **not** manage issues on GitHub. Bugs and fixes for mdIngest, the deepDive pipeline, DDMA, and the portfolio app are tracked in the [Bug Tracker Space](https://muse.ai/s/bug-tracker-ixe6daxhoezyxy/g1O341vEl5aXYIzWFP1db5l-xunGJAxBRSwSJccC110) — a read-only list of all bugs with their status.
-
----
-
-## License
 Licensed under the [MIT License](LICENSE).
