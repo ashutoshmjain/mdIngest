@@ -1603,7 +1603,7 @@
                 <!-- LEVEL 2 SUB-TOOLBAR: REELS (VIDEO CHANNEL: DDMA 740x740 CLIPS) -->
                 <div class="channel-actions" id="channel-actions-media" style="display: none; align-items: center; gap: 0.5rem;">
                     <button class="btn-cmd primary" style="padding: 0.35rem 0.75rem; font-size: 0.74rem;" onclick="launchDdmaStudio()">
-                        🚀 Open DDMA Studio
+                        🚀 Open Cutroom
                     </button>
                 </div>
             </div>
@@ -1674,12 +1674,12 @@
                 <div class="media-full-view">
                     <div class="media-hero-banner">
                         <div>
-                            <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #fde68a; text-transform: uppercase; font-weight: 700;">DeepDive Media Automator (DDMA)</span>
+                            <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #fde68a; text-transform: uppercase; font-weight: 700;">Cutroom</span>
                             <h2 style="font-size: 1.35rem; font-weight: 800; margin-top: 0.25rem;" id="media-tab-title">740×740 Infographic Video Deck</h2>
                             <p style="font-size: 0.8rem; color: #d6d3d1; margin-top: 0.35rem;" id="media-tab-desc">Inspect, preview, and sound-check 740×740 square video clips generated for this episode.</p>
                         </div>
                         <button class="btn-cmd primary" style="background: var(--accent-amber); color: #ffffff; padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 8px rgba(0,0,0,0.3);" onclick="launchDdmaStudio()">
-                            🚀 Open DDMA Studio
+                            🚀 Open Cutroom
                         </button>
                     </div>
 
@@ -2022,7 +2022,7 @@
 
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.4rem;">
-                        <span>🎬 DDMA Episode Bridge</span>
+                        <span>🎬 Cutroom Episode Bridge</span>
                         <span style="color: var(--accent-emerald);" id="ddma-deck-status-badge">Ready</span>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--text-dark-secondary); display: flex; flex-direction: column; gap: 0.4rem; font-family: var(--font-mono);">
@@ -2055,13 +2055,13 @@
 
                 <div class="audio-card">
                     <div class="studio-title" style="margin-bottom: 0.4rem;">
-                        <span>🚀 Launch DDMA Studio</span>
+                        <span>🚀 Launch Cutroom</span>
                     </div>
                     <p style="font-size: 0.72rem; color: var(--text-dark-secondary); margin: 0; line-height: 1.4;">
-                        Opens the DeepDive Media Automator in a new tab to curate infographic video clips.
+                        Opens Cutroom in a new tab to curate infographic video clips.
                     </p>
                     <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.6rem; font-weight: 700; margin-top: 0.4rem;" onclick="launchDdmaStudio()">
-                        🎬 Launch DDMA (Port 8000)
+                        🎬 Launch Cutroom (Port 8000)
                     </button>
                 </div>
             </div>
@@ -2086,7 +2086,7 @@
                 <label class="form-label">1. Episode Draft Name / Slug &lt;name&gt;</label>
                 <input type="text" class="form-input" id="new-draft-slug" placeholder="e.g. qualia_gauge or universal_compression" value="universal_compression">
                 <div style="font-size: 0.72rem; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; border-radius: 4px; padding: 0.45rem 0.6rem; margin-top: 0.35rem; line-height: 1.45;">
-                    <strong>⚠️ Permanent Primary Key:</strong> The slug is permanent once created and anchors all audio files, Whisper word-level transcripts, DDMA video reels, and Gemini music director work. It cannot be changed after creation. (Article titles can be freely updated anytime without affecting the slug).
+                    <strong>⚠️ Permanent Primary Key:</strong> The slug is permanent once created and anchors all audio files, Whisper word-level transcripts, Cutroom video reels, and Gemini music director work. It cannot be changed after creation. (Article titles can be freely updated anytime without affecting the slug).
                 </div>
             </div>
 
@@ -2186,10 +2186,10 @@ if __name__ == '__main__':
             </div>
 
             <div class="form-group">
-                <label class="form-label">Default Whisper STT Model (DDMA Word Timestamps)</label>
+                <label class="form-label">Default Whisper STT Model (Cutroom Word Timestamps)</label>
                 <select class="form-input" id="setting-whisper-model" style="background: #ffffff;">
                     <option value="large-v3-turbo" selected>large-v3-turbo (AVX-512 Turbo • Recommended)</option>
-                    <option value="small.en">small.en (DDMA Standard • Fast)</option>
+                    <option value="small.en">small.en (Cutroom Standard • Fast)</option>
                     <option value="small">small (Multilingual • High Accuracy)</option>
                     <option value="base.en">base.en (Fast English)</option>
                     <option value="base">base (Standard)</option>
@@ -2661,7 +2661,7 @@ if __name__ == '__main__':
             if (titleEl) {
                 if (tabName === 'research') titleEl.innerHTML = '🔬 Research &amp; AST Inspector';
                 else if (tabName === 'narrative') titleEl.innerHTML = '🎙️ Podcast Generation Studio';
-                else if (tabName === 'media') titleEl.innerHTML = '🎬 DDMA Media Controller';
+                else if (tabName === 'media') titleEl.innerHTML = '🎬 Cutroom Media Controller';
             }
 
             // Sync View states
@@ -4808,7 +4808,7 @@ if __name__ == '__main__':
                                     This episode does not have generated infographic clips in <code style="font-family: var(--font-mono);">ddma/docs/episodes/${escapeHtml(data.clean_id)}/clips/</code> yet.
                                 </p>
                                 <button class="btn-cmd primary" style="padding: 0.55rem 1.25rem;" onclick="launchDdmaStudio()">
-                                    🚀 Open DDMA Studio to Generate Clips
+                                    🚀 Open Cutroom to Generate Clips
                                 </button>
                             </div>
                         `;
@@ -4833,7 +4833,7 @@ if __name__ == '__main__':
             
             const targetUrl = epNum ? `http://localhost:8000/curator.html?project=episode_${epNum}` : 'http://localhost:8000/curator.html';
             
-            showToast('🚀 Opening DDMA Studio (Port 8000)...');
+            showToast('🚀 Opening Cutroom (Port 8000)...');
 
             // CRITICAL: Open window synchronously directly during user gesture so Chrome/Edge popup blocker will NOT block it!
             let newWindow = null;

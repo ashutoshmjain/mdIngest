@@ -5,7 +5,7 @@
 ## Repository Roles & Strict Media Boundaries
 
 1. **`mdIngest` (Merged Upstream Repository)**:
-   - The ONE repo users fork. App code lives in `ingest/` (servers, cockpit, landing page); the DDMA extension lives in `ddma/` (Curator/Clip Studio + Beats Studio).
+   - The ONE repo users fork. App code lives in `ingest/` (servers, cockpit, landing page); the Cutroom extension lives in `ddma/` (Curator/Clip Studio + Beats Studio).
    - Contains ONLY code and templates. **STRICT RULE**: NEVER commit or push audio/video media files or binary assets to `mdIngest` — including its `ddma/` folder.
    - The standalone `ddma` repo is archived. Do NOT mirror to it, push to it, or clone it for setup.
 
@@ -38,12 +38,12 @@
 
 3. **Active Master Clips Publication & Distribution Invariant**:
    - **Local Staging vs. Remote Distribution**:
-     - Whenever an active master clip is compiled in DDMA (`ddma compile-clip` or Curator `/set-active-master`), it is automatically staged to:
+     - Whenever an active master clip is compiled in Cutroom (`ddma compile-clip` or Curator `/set-active-master`), it is automatically staged to:
        a. `deepDive/src/ddma/docs/episodes/<ep>/clips/<ep>-<clip>.mp4` (via `resolve_deepdive_publication_clips_dir()`, anchored on `Path(__file__).resolve()`).
        b. `dd_hub/mosaics/<ep>-<clip>.mp4` (or `manims/`) for 1-tap mobile review.
      - **CRITICAL DISTRIBUTION RULE**: Google Drive (`dd_hub/mosaics/` and `manims/`) serves ONLY as a personal mobile review outbox and manual fallback. **The Active Master reel has THREE independent consumers, and ALL of them pick it up from GitHub Pages (`deepDive/src/ddma/docs/episodes/<ep>/clips/`) — never from Drive:**
        - **(1) The distribution agent (`meta-muse` / Muse)** — picks the mp4 file from the repo and re-publishes it to Nostr / Instagram / YouTube / TikTok (X and LinkedIn get link posts, not video).
-       - **(2) `deepdive.shutri.com`** — serves the reel two ways: the episode-page carousel (`VIDEO_STRIP` in `src/<ep>.md`) and the DDMA player (`ddma/docs/index.html`, driven by `episodes.json` + per-episode `plan.json`; the player HEAD-probes each clip and silently hides missing ones).
+       - **(2) `deepdive.shutri.com`** — serves the reel two ways: the episode-page carousel (`VIDEO_STRIP` in `src/<ep>.md`) and the Cutroom player (`ddma/docs/index.html`, driven by `episodes.json` + per-episode `plan.json`; the player HEAD-probes each clip and silently hides missing ones).
        - **(3) `shutri.com`** — the Shutri peer-review site, where deepDive is the reference implementation; it links visitors to the player and episode pages (no direct mp4 fetch), so its showcase breaks whenever a clip is not live on GitHub Pages.
      - An active clip is **NOT considered published or live on the web until it is committed and pushed to GitHub in `deepDive` AND passes the 3-point live check below**.
    - **Pre-Push Markdown Carousel Synchronization**:

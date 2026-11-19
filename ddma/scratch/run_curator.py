@@ -1408,7 +1408,7 @@ def build_mosaic_prompt_with_context(title, transcript=None, custom_instructions
 
 def get_gemini_default_prompt():
     return (
-        "You are the Creative Remix Agent for the DeepDive Media Automator (DDMA).\n"
+        "You are the Creative Remix Agent for Cutroom.\n"
         "Your task is to recast the segments, title, and bridge transition text of Clip {clip_num} in the plan.\n\n"
         "### Creative & Structural Rules:\n"
         "1. **Total Duration**: The total duration of the clip MUST be strictly under 2 minutes and 55 seconds (175 seconds).\n"
@@ -1431,7 +1431,7 @@ def get_gemini_default_prompt():
 
 def get_gemini_episode_default_prompt():
     return (
-        "You are the Executive Producer & AI Storyboard Curator for the DeepDive Media Automator (DDMA).\n"
+        "You are the Executive Producer & AI Storyboard Curator for Cutroom.\n"
         "Your task is to analyze the full raw episode transcript and structure it into a sequence of high-engagement, standalone podcast/social video clips.\n\n"
         "### 🎬 EPISODE STORYBOARDING & CLIP DYNAMICS RULES:\n"
         "1. **0-Based Clip Numbering (`<ep>-0`, `<ep>-1`, ...)**:\n"
@@ -1445,7 +1445,7 @@ def get_gemini_episode_default_prompt():
         "5. **Concise Outro Card Bridge Text (MAX 5 WORDS)**:\n"
         "   - Under `\"bridge_text\"` (a 1-element list of strings), provide an ultra-concise punchy question or exclamation of **STRICTLY MAXIMUM 5 WORDS** introducing the next clip's core concept (e.g. `[\"What is 8D Totality !\"]`, `[\"Why Four Division Algebras ?\"]`).\n"
         "   - NEVER write \"Coming up in the next clip...\" or multi-clause sentences because the hosts are already speaking that transition aloud!\n"
-        "6. **Verbatim Word-Level Quote Anchors**: For each clip, output exact 3-7 word verbatim transcript quote fragments (`\"start_quote\"` and `\"end_quote\"`) matching the spoken transcript text so DDMA snaps clip boundaries sample-accurately to Whisper word timestamps.\n\n"
+        "6. **Verbatim Word-Level Quote Anchors**: For each clip, output exact 3-7 word verbatim transcript quote fragments (`\"start_quote\"` and `\"end_quote\"`) matching the spoken transcript text so Cutroom snaps clip boundaries sample-accurately to Whisper word timestamps.\n\n"
         "### 📋 OUTPUT FORMAT (JSON ARRAY ONLY):\n"
         "Return ONLY a valid JSON array of clip objects with no markdown codeblock wrapping or extra conversational text:\n"
         "[\n"
@@ -1760,7 +1760,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             print(f"Warning: Failed to load settings.json: {se}")
                     
                     if not configure_gemini(api_key):
-                        reply = "Help Error: Neither 'gemini-creds.json' credentials nor 'GEMINI_API_KEY' in settings are configured. Please set them up in DDMA first!"
+                        reply = "Help Error: Neither 'gemini-creds.json' credentials nor 'GEMINI_API_KEY' in settings are configured. Please set them up in Cutroom first!"
                     else:
                         
                         # Load request body
@@ -1779,8 +1779,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                                     print(f"Warning: Failed to read {doc_file} for help bot: {fe}")
                         
                         system_instruction = (
-                            "You are the DDMA Help Assistant, an expert AI chatbot designed to assist users in understanding "
-                            "and using the DeepDive Media Automator (DDMA).\n\n"
+                            "You are the Cutroom Help Assistant, an expert AI chatbot designed to assist users in understanding "
+                            "and using Cutroom.\n\n"
                             "### IMPORTANT SYSTEM RULE:\n"
                             "- To change or customize default Mosaic prompts (Motion Design Instructions) or Gemini Remix instructions, "
                             "users DO NOT need to edit Python code files. They can simply click the ⚙️ Settings button in the bottom left "
@@ -2003,7 +2003,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                                 "Gemini Authentication Failed (401): The configured Gemini API key is invalid or expired.\n\n"
                                 "To fix this:\n"
                                 "1. Obtain an active Gemini API key from Google AI Studio (https://aistudio.google.com/app/apikey).\n"
-                                "2. In DDMA Cockpit, click '⚙️ Settings' (top right) -> '🤖 Gemini Co-Pilot Prompts' tab.\n"
+                                "2. In Cutroom, click '⚙️ Settings' (top right) -> '🤖 Gemini Co-Pilot Prompts' tab.\n"
                                 "3. Paste your new API key into 'GEMINI API CREDENTIALS' and click 'Save Settings'."
                             )
                 
@@ -2016,7 +2016,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             "Gemini Authentication Failed (401): The configured Gemini API key is invalid or expired.\n\n"
                             "To fix this:\n"
                             "1. Obtain an active Gemini API key from Google AI Studio (https://aistudio.google.com/app/apikey).\n"
-                            "2. In DDMA Cockpit, click '⚙️ Settings' (top right) -> '🤖 Gemini Co-Pilot Prompts' tab.\n"
+                            "2. In Cutroom, click '⚙️ Settings' (top right) -> '🤖 Gemini Co-Pilot Prompts' tab.\n"
                             "3. Paste your new API key into 'GEMINI API CREDENTIALS' and click 'Save Settings'."
                         )
                     raise last_err or Exception("All Gemini models failed to generate content.")
@@ -4998,10 +4998,10 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             if fn.lower().endswith((".mp3", ".wav", ".m4a", ".aac", ".flac")):
                                 files.append(os.path.join(dirpath, fn))
                 files.sort()
-                payload = {"target": "deepdive-workspace",
+                payload = {"target": "mdingest-workspace",
                            "root": str(hub_root), "files": files}
             except Exception as e:
-                self.send_error(500, f"deepdive-workspace unreachable: {e}")
+                self.send_error(500, f"mdingest-workspace unreachable: {e}")
                 return
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -5722,7 +5722,7 @@ def start_server():
 
 def main():
     print("==================================================")
-    print("      DDMA Clip Curator Launcher v2.0 (Multi-Proj)")
+    print("      Cutroom Clip Curator Launcher v2.0 (Multi-Proj)")
     print("==================================================")
     
     # Run legacy data migration to avoid losing 244 progress

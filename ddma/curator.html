@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHUTRI DDMA &bull; Media Automation Cockpit (Shutri Pillar 3)</title>
+    <title>Cutroom &bull; Media Automation Cockpit</title>
     <!-- Fonts matching Shutri.com / MdIngest -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1514,7 +1514,7 @@
     <header class="app-topbar" style="padding: 0.4rem 1.25rem; height: 48px; display: flex; justify-content: space-between; align-items: center; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); flex-shrink: 0; z-index: 100;">
         <!-- Left: Brand Wordmark + Episode Switcher -->
         <div style="display: flex; align-items: center; gap: 1.25rem;">
-            <a href="https://deepdive.shutri.com" target="_blank" class="brand-wordmark" style="font-family: var(--font-sans); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.3em; color: var(--text-dark-primary); text-transform: uppercase; text-decoration: none;">S H U T R I &nbsp;DDMA</a>
+            <span class="brand-wordmark" style="font-family: var(--font-sans); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.3em; color: var(--text-dark-primary); text-transform: uppercase; text-decoration: none;">Cutroom</span>
 
             <div style="display: flex; align-items: center; gap: 0.4rem; background: var(--bg-light); padding: 0.2rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-light);">
                 <label for="topEpisodeSelect" style="font-size: 0.72rem; font-weight: 700; color: var(--accent-amber-dark); font-family: var(--font-mono);">EPISODE:</label>
@@ -1737,7 +1737,7 @@
                     <div style="display: flex; gap: 0.3rem; margin-bottom: 0.5rem;">
                         <button id="tabUploadBtn" type="button" class="btn btn-secondary btn-mini active" style="flex: 1; font-weight: 600; font-size: 0.7rem;">📥 Upload / Downloads</button>
                         <button id="tabSystemPathBtn" type="button" class="btn btn-secondary btn-mini" style="flex: 1; font-weight: 600; font-size: 0.7rem;">💻 System Path</button>
-                        <button id="tabWorkspaceBtn" type="button" class="btn btn-secondary btn-mini" style="flex: 1; font-weight: 600; font-size: 0.7rem;">📂 deepdive-workspace</button>
+                        <button id="tabWorkspaceBtn" type="button" class="btn btn-secondary btn-mini" style="flex: 1; font-weight: 600; font-size: 0.7rem;">📂 mdingest-workspace</button>
                     </div>
 
                     <!-- Mode 1: File Browser (Pick from Computer/Downloads) -->
@@ -1756,7 +1756,7 @@
 
                     <!-- Mode 3: deepdive-workspace (named hub target) -->
                     <div id="modeWorkspaceBox" style="display: none;">
-                        <div id="workspaceTargetLabel" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; font-family: var(--font-mono);">deepdive-workspace</div>
+                        <div id="workspaceTargetLabel" style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.35rem; font-family: var(--font-mono);">mdingest-workspace</div>
                         <select id="newProjectAudioSelect" style="width: 100%; padding: 0.5rem; font-size: 0.85rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
                             <!-- Scanned audio options -->
                         </select>
@@ -3865,10 +3865,10 @@
                 .then(data => {
                     const files = (data && data.files) || [];
                     const label = document.getElementById('workspaceTargetLabel');
-                    if (label) label.textContent = `${(data && data.target) || 'deepdive-workspace'} → ${((data && data.root) || '')}`;
+                    if (label) label.textContent = `${(data && data.target) || 'mdingest-workspace'} → ${((data && data.root) || '')}`;
                     newProjectAudioSelect.innerHTML = '';
                     if (files.length === 0) {
-                        newProjectAudioSelect.innerHTML = `<option value="">No audio files found in deepdive-workspace (hub inputs/...)</option>`;
+                        newProjectAudioSelect.innerHTML = `<option value="">No audio files found in mdingest-workspace (hub inputs/...)</option>`;
                     } else {
                         files.forEach(f => {
                             const opt = document.createElement('option');
@@ -5694,7 +5694,7 @@
                 updateStateBar("Ready (remix failed)");
                 let msg = err.message || "Unknown error";
                 if (msg.includes("401") || msg.includes("ACCESS_TOKEN_TYPE_UNSUPPORTED") || msg.includes("invalid authentication") || msg.includes("UNAUTHENTICATED")) {
-                    msg += "\n\n💡 How to resolve:\n1. Your Gemini API Key is invalid or expired.\n2. Obtain an active API key from Google AI Studio:\n   https://aistudio.google.com/app/apikey\n3. Click '⚙️ Settings' (top-right of DDMA Cockpit) -> '🤖 Gemini Co-Pilot Prompts' tab.\n4. Paste your key into 'GEMINI API CREDENTIALS' and click 'Save Settings'.";
+                    msg += "\n\n💡 How to resolve:\n1. Your Gemini API Key is invalid or expired.\n2. Obtain an active API key from Google AI Studio:\n   https://aistudio.google.com/app/apikey\n3. Click '⚙️ Settings' (top-right of Cutroom) -> '🤖 Gemini Co-Pilot Prompts' tab.\n4. Paste your key into 'GEMINI API CREDENTIALS' and click 'Save Settings'.";
                 }
                 alert("Remix failed:\n\n" + msg);
             })
@@ -6349,7 +6349,7 @@
                             : 'font-weight: 600; opacity: 0.78;';
                         const activeLabel = isInfographicActive ? '🟢 Manim ✓' : '🟢 Manim';
                         const activeTip = isInfographicActive
-                            ? 'ACTIVE MASTER for deepDive / shutri.com (synced to dd_hub/manims) • Left-click to play • Right-click for custom instructions / re-render'
+                            ? 'ACTIVE MASTER for the published book (synced to dd_hub/manims) • Left-click to play • Right-click for custom instructions / re-render'
                             : 'Click to switch Active Master to Manim (updates clips/' + episodeNum + '-' + clip.num + '.mp4 &amp; dd_hub/manims) • Right-click to re-render';
                         infographicBtnHtml = `<button class="btn btn-mini btn-card-infographic btn-status-success" id="infographicCardBtn_${index}" style="${activeStyle}" title="${activeTip}">${activeLabel}</button>`;
                     } else {
@@ -6376,7 +6376,7 @@
                             : 'font-weight: 600; opacity: 0.78;';
                         const activeLabel = isMosaicActive ? '🟢 Mosaic ✓' : '🟢 Mosaic';
                         const activeTip = isMosaicActive
-                            ? 'ACTIVE MASTER for deepDive / shutri.com (synced to dd_hub/mosaics) • Click to preview or re-run Mosaic'
+                            ? 'ACTIVE MASTER for the published book (synced to dd_hub/mosaics) • Click to preview or re-run Mosaic'
                             : 'Cached locally • Click [OK] to switch Active Master back to Mosaic';
                         mosaicBtnHtml = `<button class="btn btn-mini btn-card-mosaic btn-status-success" id="mosaicCardBtn_${index}" style="${activeStyle}" title="${activeTip}">${activeLabel}</button>`;
                     } else {

@@ -267,7 +267,7 @@ async function runE2ETests() {
 
             await p.waitForFunction(
 
-                () => (document.getElementById('launcher-status').textContent || '').startsWith('\u2713 DDMA ready: '),
+                () => (document.getElementById('launcher-status').textContent || '').startsWith('\u2713 Cutroom ready: '),
 
                 { timeout: 30000 });
 
@@ -281,7 +281,7 @@ async function runE2ETests() {
 
             if (okState.cls !== 'status ok') throw new Error(`success class wrong: "${okState.cls}"`);
 
-            if (okState.text !== '\u2713 DDMA ready: ') throw new Error(`success text wrong: "${okState.text}"`);
+            if (okState.text !== '\u2713 Cutroom ready: ') throw new Error(`success text wrong: "${okState.text}"`);
 
             if (!okState.href || !okState.href.includes('/curator.html?project=episode_')) {
 

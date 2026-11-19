@@ -280,7 +280,7 @@ def resolve_working_asset_output(plan_file, out_dir, out_filename):
     return (hub_path, local_path)
 
 
-app = typer.Typer(help="DeepDive Media Automator (DDMA) CLI Tool")
+app = typer.Typer(help="Cutroom CLI Tool")
 
 
 def resolve_acoustic_word_end(raw_end: float, next_word_start: Optional[float] = None, audio_path: Optional[str] = None) -> float:

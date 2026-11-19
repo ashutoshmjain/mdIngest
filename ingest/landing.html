@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>deepDive Workspace</title>
+<title>mdIngest Workspace</title>
 <style>
   :root { --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --muted: #64748b; --accent: #4338ca; --accent-bg: #eef2ff; --line: #e2e8f0; --ok: #15803d; --err: #b91c1c; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 2rem 1rem 4rem; }
@@ -31,12 +31,12 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🏠 deepDive Workspace</h1>
-  <p class="sub">One plan + one settings source on Google Drive, read by every environment. This page is the shell — the work happens in the apps below.</p>
+  <h1>🏠 mdIngest Workspace</h1>
+  <p class="sub">One plan + one settings source in one workspace folder, read by every environment. This page is the shell — the work happens in the apps below.</p>
 
   <div class="card" id="workspace-card">
     <h2>Workspace</h2>
-    <label for="workspace-url">Workspace URL (Google Drive folder — same on every environment)</label>
+    <label for="workspace-url">Workspace URL (optional — only for a synced folder, e.g. Google Drive; it identifies this workspace on every machine)</label>
     <input type="text" id="workspace-url" spellcheck="false" placeholder="https://drive.google.com/drive/folders/<folder-id>">
     <div class="kv"><b>Folder ID:</b> <span id="workspace-folder-id">—</span></div>
     <div class="kv"><b>Local path:</b> <span id="workspace-local-path">—</span></div>
@@ -49,11 +49,13 @@
     <div class="fine">Saving writes the URL to settings via <code>/api/settings</code>. While the vault is reachable, the <em>effective</em> workspace stays the vault's — the values re-read below always show what is actually in force.</div>
   </div>
 
+  <p class="fine" style="margin: -0.25rem 0 1rem; padding: 0 0.25rem;">New here? The workspace runs with no API keys at all. Add keys later, in the app's Settings, when you want what they unlock: a Gemini API key powers the AI assistance (co-pilot prompts, storyboard and remix agents, sting review); a Mosaic API key renders motion-graphics clips. Transcription, editing, and publishing need no key.</p>
+
   <div class="card" id="launcher-card">
     <h2>Apps</h2>
     <div class="row">
       <a class="btn secondary" href="/cockpit.html">Open mdIngest Cockpit</a>
-      <button onclick="launchDdMa()">Launch DDMA</button>
+      <button onclick="launchDdMa()">Launch Cutroom</button>
       <button onclick="launchBeats()">Launch Beats Studio</button>
     </div>
     <div class="status" id="launcher-status"></div>
@@ -161,7 +163,7 @@ async function saveWorkspaceUrl() {
 }
 
 async function launchDdMa() {
-  setStatus('launcher-status', 'Launching DDMA…');
+  setStatus('launcher-status', 'Launching Cutroom…');
   try {
     const res = await fetch('/api/ddma/launch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
@@ -171,7 +173,7 @@ async function launchDdMa() {
       const el = document.getElementById('launcher-status');
       el.className = 'status ok';
       el.innerHTML = '';
-      el.appendChild(document.createTextNode('✓ DDMA ready: '));
+      el.appendChild(document.createTextNode('✓ Cutroom ready: '));
       const a = document.createElement('a');
       a.href = data.curator_url;
       a.textContent = data.curator_url;

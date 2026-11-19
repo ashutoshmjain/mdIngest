@@ -1,0 +1,11 @@
+# mdIngest + Cutroom — one list for the whole app (cockpit, transcription, clips, Manim).
+faster-whisper==1.2.1
+av==19.0.2
+openai-whisper
+numpy
+requests
+typer
+pillow
+google-generativeai
+pyyaml
+manim==0.22.0

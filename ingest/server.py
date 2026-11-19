@@ -3417,7 +3417,7 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
                     with open(proj_dir / "transcript.txt", "w", encoding="utf-8") as ptf:
                         ptf.write(text_out)
 
-            transcription_jobs[cid]["progress"] = "Auto-structuring podcast stings & seeding DDMA clips..."
+            transcription_jobs[cid]["progress"] = "Auto-structuring podcast stings & seeding Cutroom clips..."
             try:
                 structure_podcast_stings_and_cuts(cid)
             except Exception as rev_e:
@@ -3430,7 +3430,7 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
 
             transcription_jobs[cid] = {
                 "status": "done",
-                "progress": "Auto-transcription, podcast stings & DDMA clips ready!",
+                "progress": "Auto-transcription, podcast stings & Cutroom clips ready!",
                 "text": text_out
             }
         except Exception as e:
@@ -5041,7 +5041,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "success": True,
                 "project_id": project_id,
                 "curator_url": curator_target_url,
-                "message": f"DDMA Project {project_id} ready and launched on {curator_target_url}",
+                "message": f"Cutroom Project {project_id} ready and launched on {curator_target_url}",
             })
             return
 

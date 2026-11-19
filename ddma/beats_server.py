@@ -354,7 +354,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json(
                     {"success": False,
-                     "error": f"curator unreachable on :8000 — open DDMA first: {e}"},
+                     "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
                     status=502)
             return
 

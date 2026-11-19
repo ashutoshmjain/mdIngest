@@ -4,13 +4,13 @@ Local web UI and HTTP API server for episode ingestion, audio/clip review, and m
 
 ## What it serves
 
-* `/` — the workspace landing page (the home page): workspace picker, launcher for mdIngest + DDMA + Beats Studio, and the single drop point for new inputs (Python payload + base audio → `dd_hub/inputs/<episode>/`).
+* `/` — the workspace landing page (the home page): workspace picker, launcher for mdIngest + Cutroom + Beats Studio, and the single drop point for new inputs (Python payload + base audio → `dd_hub/inputs/<episode>/`).
 * `/cockpit.html` — the mdIngest Publishing Cockpit (3-pane workspace: ledger, preview, studio).
 
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+pip install -r ../requirements.txt
 python server.py
 ```
 

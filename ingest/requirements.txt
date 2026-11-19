@@ -1,8 +1,0 @@
-faster-whisper==1.2.1
-av==19.0.2
-openai-whisper
-numpy
-# NOTE: requests and pillow were removed (2026-11-11) — verified unused:
-# server.py, update_listen_buttons.py and tests/ import stdlib only,
-# plus faster-whisper / openai-whisper / av / numpy (lazy imports).
-# The node E2E suite uses its own tests/package.json (puppeteer).
