@@ -735,8 +735,6 @@ def get_dd_hub_root() -> Path:
     if cfg_hub and Path(cfg_hub).exists():
         return Path(cfg_hub)
     for cand in [
-        Path(r"G:\My Drive\dd_hub"),
-        Path("/mnt/gdrive/dd_hub"),
         Path("/workspace/dd_hub"),
     ]:
         try:
@@ -744,11 +742,12 @@ def get_dd_hub_root() -> Path:
                 return cand
         except Exception:
             pass
-    print("WARNING: DD_HUB_ROOT is unset and no dd_hub directory exists at any known location -- using default G:\\My Drive\\dd_hub which DOES NOT EXIST. Vault/plan reads will fail and hub syncs will be skipped.")
-    return Path(r"G:\My Drive\dd_hub")
+    local_default = PROJECT_ROOT / "dd_hub"
+    print(f"WARNING: DD_HUB_ROOT is unset and no dd_hub directory exists at any known location -- defaulting to plain local folder {local_default} (set DD_HUB_ROOT to your workspace to override). Vault/plan reads may fail and hub syncs will be skipped until the folder exists.")
+    return local_default
 
 def get_episode_audio_path(clean_id: str) -> Path | None:
-    """Discovers local audio file for an episode, including DDMA projects and Google Drive dd_hub/inputs."""
+    """Discovers local audio file for an episode, including DDMA projects and workspace dd_hub/inputs."""
     possible_dirs = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,
@@ -766,15 +765,15 @@ def get_episode_audio_path(clean_id: str) -> Path | None:
                 if f.exists():
                     return f
 
-    # Automatic Google Drive dd_hub/inputs/<ep> (and legacy agy_inputs/<ep>) fallback
+    # Automatic workspace dd_hub/inputs/<ep> (and legacy agy_inputs/<ep>) fallback
     hub_root = get_dd_hub_root()
-    for gdrive_ep_dir in [
+    for hub_ep_dir in [
         hub_root / "inputs" / str(clean_id),
-        Path(r"G:\My Drive\agy_inputs") / str(clean_id),
+        hub_root / "agy_inputs" / str(clean_id),
     ]:
-        if gdrive_ep_dir.exists():
+        if hub_ep_dir.exists():
             for ext in [".m4a", ".mp3", ".wav", ".ogg", ".aac"]:
-                matches = sorted(gdrive_ep_dir.glob(f"*{ext}"))
+                matches = sorted(hub_ep_dir.glob(f"*{ext}"))
                 if matches:
                     src_audio = matches[0]
                     try:
@@ -824,7 +823,7 @@ def get_episode_podcast_video_path(clean_id: str) -> Path:
         PROJECT_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
         PROD_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
         hub_root / "video" / f"podcast_{clean_id}.mp4",
-        Path("G:/My Drive/pickup_longform") / f"podcast_{clean_id}.mp4",
+        hub_root / "pickup_longform" / f"podcast_{clean_id}.mp4",
     ]:
         try:
             if alt.exists():
@@ -2088,7 +2087,7 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
             return False, f"Cannot export: Podcast MP3 is not rendered yet ({msg})"
         mp3_path = Path(res_path)
 
-    # 3. Destination folder in Google Drive (dd_hub/audio)
+    # 3. Destination folder in the workspace (dd_hub/audio)
     dest_str = custom_dest.strip()
     settings = load_settings()
     if not dest_str:
@@ -2098,7 +2097,7 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        return False, f"Could not create Google Drive destination '{dest_str}': {e}"
+        return False, f"Could not create destination '{dest_str}': {e}"
 
     target_mp3 = dest_dir / f"podcast_{clean_id}.mp3"
 
@@ -2235,7 +2234,7 @@ def export_podcast_to_gdrive(clean_id: str, custom_dest: str = "") -> tuple[bool
 def export_video_to_gdrive(clean_id: str, custom_dest: str = None) -> tuple[bool, str]:
     """
     Exports rendered 1080p horizontal podcast video and comprehensive video_meta.json
-    to dedicated Google Drive folder (default G:/My Drive/Podcast_Video_Pickup)
+    to the workspace video folder (default dd_hub/video); a Drive pickup path can be set via settings for opt-in Drive export
     for YouTube, Spotify Video, and TikTok long-form distribution.
     """
     video_path = get_episode_podcast_video_path(clean_id)
@@ -2248,7 +2247,7 @@ def export_video_to_gdrive(clean_id: str, custom_dest: str = None) -> tuple[bool
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
-        return False, f"Could not access or create Google Drive destination '{dest_dir}': {e}"
+        return False, f"Could not access or create destination '{dest_dir}': {e}"
 
     # Get episode details
     mempool, template, chain, _ = parse_summary_structure()

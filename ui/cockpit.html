@@ -20,6 +20,7 @@
 
     <!-- Self-hosted Lightning Widget (extracted from theme/book.js) -->
     <script src="lightning-widget.js"></script>
+    <script src="workspace-link.js"></script>
 
     <style>
         /* ==========================================================================
@@ -1546,7 +1547,7 @@
 
             <!-- Workspace home page (landing page, named target reuses the tab) -->
 
-            <a class="btn-cmd" href="http://127.0.0.1:8088/" target="deepdive-workspace" id="btn-workspace" title="Open the Workspace home page">
+            <a class="btn-cmd" data-workspace-home target="deepdive-workspace" id="btn-workspace" title="Open the Workspace home page">
 
                 <span>🏠</span> Workspace
 
