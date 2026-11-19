@@ -1763,6 +1763,16 @@
                     <button class="btn-cmd" style="width: 100%; justify-content: center; padding: 0.45rem; font-size: 0.75rem;" onclick="copyCurrentMarkdown()">
                         📋 Copy Raw Markdown
                     </button>
+                    <div style="border-top: 1px dashed var(--border-light); padding-top: 0.5rem; margin-top: 0.5rem;">
+                        <div style="font-size: 0.66rem; font-family: var(--font-mono); color: var(--text-dark-secondary); margin-bottom: 0.3rem; overflow-wrap: anywhere;">
+                            Publish remote: <strong id="publish-remote-url">...</strong>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <input id="publish-remote-input" type="text" placeholder="https://github.com/YOU/REPO.git" style="flex: 1; font-size: 0.7rem; min-width: 0;" />
+                            <button class="btn-cmd" onclick="savePublishRemote()" style="padding: 0.3rem 0.6rem; font-size: 0.7rem;">Save</button>
+                        </div>
+                        <div id="publish-remote-status" style="font-size: 0.65rem; margin-top: 0.25rem;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -2276,6 +2286,7 @@ if __name__ == '__main__':
             } catch (e) {}
             setupScrollPersistence();
             fetchStatus();
+            loadPublishRemote();
         });
 
         // Browser Back/Forward navigation with URL hash
@@ -4202,6 +4213,44 @@ if __name__ == '__main__':
                 showToast(data.message);
             } else {
                 showToast('Git error: ' + (data.error || 'Check terminal'));
+            }
+        }
+
+        async function loadPublishRemote() {
+            try {
+                const res = await fetch('/api/git/remote', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: '{}'
+                });
+                const data = await res.json();
+                const shown = (data && data.origin) || '(no origin set)';
+                document.getElementById('publish-remote-url').textContent = shown;
+                if (data && data.origin) document.getElementById('publish-remote-input').value = data.origin;
+            } catch (e) {
+                document.getElementById('publish-remote-url').textContent = '(unavailable)';
+            }
+        }
+
+        async function savePublishRemote() {
+            const statusEl = document.getElementById('publish-remote-status');
+            const url = document.getElementById('publish-remote-input').value.trim();
+            try {
+                const res = await fetch('/api/git/remote/set', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ url: url })
+                });
+                const data = await res.json();
+                if (data && data.success) {
+                    document.getElementById('publish-remote-url').textContent = data.origin;
+                    statusEl.textContent = 'Publish remote updated.';
+                    showToast('Publish remote updated.');
+                } else {
+                    throw new Error((data && data.error) || 'Remote was not changed.');
+                }
+            } catch (err) {
+                statusEl.textContent = err.message;
             }
         }
 

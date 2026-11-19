@@ -30,14 +30,11 @@ import time
 INGEST_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = INGEST_DIR.parent
 
-# Auto-discover canonical deepDive production workspace if running in sibling mdIngest
+# Merged repo: this checkout is the production root (ingest/ + ddma/ + src/ side by side).
 
 # Global async background job tracker for long-form video rendering
 VIDEO_RENDER_JOBS = {}
-candidate_roots = [PROJECT_ROOT, PROJECT_ROOT.parent / "deepDive"]
-PROD_ROOT = next((r for r in candidate_roots if (r / "src" / "SUMMARY.md").exists() and (r / "src" / "SUMMARY.md").stat().st_size > 1000), PROJECT_ROOT)
-if PROD_ROOT != PROJECT_ROOT:
-    print(f"WARNING: workspace auto-discovery selected sibling checkout {PROD_ROOT} (its src/SUMMARY.md exists and is >1000B) instead of {PROJECT_ROOT} -- using the sibling as project root.")
+PROD_ROOT = PROJECT_ROOT
 
 SRC_DIR = PROD_ROOT / "src"
 IMG_DIR = SRC_DIR / "img"
@@ -410,20 +407,20 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
     if canonical_ep_dir.exists():
         candidates.extend(canonical_ep_dir.glob("*.mp4"))
 
-    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4 (Root fallback in deepDive & sibling ddma)
-    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+    # 2. ddma/docs/episodes/<clean_id>/clips/*.mp4 (merged-repo ddma extension)
+    for ddma_root in [PROJECT_ROOT / "ddma"]:
         ep_clips_dir = ddma_root / "docs" / "episodes" / clean_id / "clips"
         if ep_clips_dir.exists():
             candidates.extend(ep_clips_dir.glob("*.mp4"))
 
     # 3. ddma/projects/episode_<id>/clips (Draft and working clips)
-    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+    for ddma_root in [PROJECT_ROOT / "ddma"]:
         proj_clips = ddma_root / "projects" / f"episode_{clean_id}" / "clips"
         if proj_clips.exists():
             candidates.extend(proj_clips.glob("*.mp4"))
 
-    # 4. ddma/clips/<clean_id>-*.mp4 (ddma root clips folder in both deepDive and sibling ddma)
-    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+    # 4. ddma/clips/<clean_id>-*.mp4 (merged-repo ddma extension)
+    for ddma_root in [PROJECT_ROOT / "ddma"]:
         clips_folder = ddma_root / "clips"
         if clips_folder.exists():
             candidates.extend(clips_folder.glob(f"{clean_id}-*.mp4"))
@@ -433,7 +430,7 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
     candidates.extend(VID_DIR.glob(f"_{clean_id}-*.mp4"))
 
     # 6. ddma/docs/assets/clips/<clean_id>-*.mp4
-    for ddma_root in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
+    for ddma_root in [PROJECT_ROOT / "ddma"]:
         assets_clips_dir = ddma_root / "docs" / "assets" / "clips"
         if assets_clips_dir.exists():
             candidates.extend(assets_clips_dir.glob(f"{clean_id}-*.mp4"))
@@ -443,7 +440,6 @@ def find_episode_videos(slug_or_num: str) -> list[dict]:
     for plan_cand in [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "plan.json",
         PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
-        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
     ]:
         if plan_cand.exists():
             try:
@@ -509,7 +505,7 @@ def find_episode_cover(slug_or_num: str) -> bool:
 
 def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
     """
-    Synchronizes clips and plan.json from sibling ddma repo to deepDive,
+    Synchronizes clips and plan.json from the merged ddma extension into src/,
     and automatically regenerates/embeds the <!-- VIDEO_STRIP_START -->
     video carousel in src/<clean_id>.md.
     Ensures mdBook (local), mdIngest Research Tab, and GitHub Pages (deepdive.shutri.com)
@@ -520,21 +516,19 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
     deepdive_clips_dir = deepdive_ep_dir / "clips"
     deepdive_clips_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Discover sibling ddma directory
-    sibling_ddma = None
-    for d in [PROJECT_ROOT / "ddma", PROJECT_ROOT.parent / "ddma"]:
-        if d.exists() and ((d / "clips").exists() or (d / "projects" / f"episode_{clean_id}").exists() or (d / "docs" / "episodes" / clean_id).exists()):
-            sibling_ddma = d
-            break
+    # 1. The merged-repo ddma extension lives at <repo>/ddma.
+    merged_ddma = PROJECT_ROOT / "ddma"
+    if not merged_ddma.exists():
+        merged_ddma = None
 
     synced_clips = []
-    if sibling_ddma:
-        ddma_plan_file = sibling_ddma / "docs" / "episodes" / clean_id / "plan.json"
+    if merged_ddma:
+        ddma_plan_file = merged_ddma / "docs" / "episodes" / clean_id / "plan.json"
 
         # Copy plan.json if newer or missing (single source of truth: projects/<ep>/plan.json)
-        proj_plan_file = sibling_ddma / "projects" / f"episode_{clean_id}" / "plan.json"
+        proj_plan_file = merged_ddma / "projects" / f"episode_{clean_id}" / "plan.json"
         if not proj_plan_file.exists():
-            proj_plan_file = sibling_ddma / "projects" / clean_id / "plan.json"
+            proj_plan_file = merged_ddma / "projects" / clean_id / "plan.json"
         
         dest_plan = deepdive_ep_dir / "plan.json"
         if proj_plan_file.exists():
@@ -567,8 +561,8 @@ def sync_episode_clips_and_markdown(slug_or_num: str) -> dict:
 
         # Copy ONLY canonical `<clean_id>-<num>.mp4` compiled master clips from all possible ddma clip folders
         possible_clip_dirs = [
-            sibling_ddma / "clips",
-            sibling_ddma / "docs" / "episodes" / clean_id / "clips",
+            merged_ddma / "clips",
+            merged_ddma / "docs" / "episodes" / clean_id / "clips",
             PROJECT_ROOT / "ddma" / "clips",
         ]
         seen_dirs = set()
@@ -752,7 +746,6 @@ def get_episode_audio_path(clean_id: str) -> Path | None:
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id,
         PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}",
-        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}",
         SRC_DIR / "audio",
         PROJECT_ROOT / "ddma" / "audio",
     ]
@@ -820,8 +813,6 @@ def get_episode_podcast_video_path(clean_id: str) -> Path:
         return canonical
     hub_root = get_dd_hub_root()
     for alt in [
-        PROJECT_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
-        PROD_ROOT.parent / "ddma" / "clips" / f"{clean_id}-longform-master.mp4",
         hub_root / "video" / f"podcast_{clean_id}.mp4",
         hub_root / "pickup_longform" / f"podcast_{clean_id}.mp4",
     ]:
@@ -839,7 +830,7 @@ def render_podcast_video_pipeline(clean_id: str, preview_seconds: float = None, 
     - Right 840x1080: Episode Identity, Live Word Karaoke Captions, and Progress
     Returns (success: bool, path_or_err: str, message: str)
     """
-    for d in [PROD_ROOT / "ddma", PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+    for d in [PROJECT_ROOT / "ddma"]:
         if d.exists() and str(d.resolve()) not in sys.path:
             sys.path.insert(0, str(d.resolve()))
     
@@ -954,7 +945,6 @@ def get_episode_transcription_json_path(clean_id: str) -> Path | None:
     candidates = [
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
         PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id / "transcription.json",
-        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
         PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
         hub_root / "episodes" / str(clean_id) / "transcription.json",
     ]
@@ -1070,7 +1060,6 @@ def get_available_stings() -> list[dict]:
     candidates = [
         PROD_ROOT / "ddma" / "music",
         PROJECT_ROOT / "ddma" / "music",
-        PROJECT_ROOT.parent / "ddma" / "music",
     ]
     seen = set()
     for d in candidates:
@@ -1701,7 +1690,6 @@ def structure_podcast_stings_and_cuts(clean_id: str) -> dict:
     for p_cand in [
         PROD_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
         SRC_DIR / "ddma" / "docs" / "episodes" / clean_id / "plan.json",
-        PROD_ROOT.parent / "ddma" / "projects" / f"episode_{clean_id}" / "plan.json",
     ]:
         if p_cand.exists():
             try:
@@ -2696,16 +2684,11 @@ def seed_ddma_project_if_missing(clean_id: str) -> str:
     project_id = f"episode_{clean_id}"
     clean_id_digits = re.sub(r'\D', '', clean_id)
     
-    # Locate all potential DDMA roots
+    # The merged-repo ddma extension lives at <repo>/ddma.
     ddma_roots = []
-    parent_ddma = PROJECT_ROOT.parent / "ddma"
-    if parent_ddma.exists():
-        ddma_roots.append(parent_ddma)
     local_ddma = PROJECT_ROOT / "ddma"
-    if local_ddma.exists() and local_ddma not in ddma_roots:
+    if local_ddma.exists():
         ddma_roots.append(local_ddma)
-    if not ddma_roots:
-        ddma_roots.append(parent_ddma)
 
     # Locate audio source
     audio_path = get_episode_audio_path(clean_id)
@@ -3426,7 +3409,7 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
                 print(f"[DD_HUB] Warning saving transcription.json to dd_hub: {he}")
 
             # 5. Sync directly into DDMA projects folder & auto-seed DDMA project + Gemini podcast stings
-            for ddma_root in [PROJECT_ROOT.parent / "ddma", PROJECT_ROOT / "ddma"]:
+            for ddma_root in [PROJECT_ROOT / "ddma"]:
                 proj_dir = ddma_root / "projects" / f"episode_{cid}"
                 if proj_dir.exists():
                     with open(proj_dir / "transcription.json", "w", encoding="utf-8") as pjf:
@@ -3903,8 +3886,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             
             ddma_ep_dir = PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_id
             if not ddma_ep_dir.exists():
-                ddma_ep_dir = PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / clean_id
-            if not ddma_ep_dir.exists():
                 ddma_ep_dir = SRC_DIR / "ddma" / "docs" / "episodes" / clean_id
             
             clips = find_episode_videos(clean_id)
@@ -4111,9 +4092,7 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 PROJECT_ROOT.parent / clean_path,
                 SRC_DIR / "ddma" / "docs" / "episodes" / clean_path,
                 PROJECT_ROOT / "ddma" / "docs" / "episodes" / clean_path,
-                PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / clean_path,
                 PROJECT_ROOT / "ddma" / clean_path,
-                PROJECT_ROOT.parent / "ddma" / clean_path,
                 SRC_DIR / "vid" / Path(clean_path).name,
                 SRC_DIR / "img" / Path(clean_path).name,
             ]
@@ -4129,12 +4108,9 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if ep_num:
                     for cand in [
                         PROJECT_ROOT / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
-                        PROJECT_ROOT.parent / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
                         SRC_DIR / "ddma" / "docs" / "episodes" / ep_num / "clips" / fname,
                         PROJECT_ROOT / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname,
-                        PROJECT_ROOT.parent / "ddma" / "projects" / f"episode_{ep_num}" / "clips" / fname,
                         PROJECT_ROOT / "ddma" / "clips" / fname,
-                        PROJECT_ROOT.parent / "ddma" / "clips" / fname,
                         VID_DIR / fname,
                     ]:
                         if cand.exists():
@@ -5047,8 +5023,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             curator_target_url = f"http://localhost:8000/curator.html?project={project_id}"
 
             ddma_dir = PROJECT_ROOT / "ddma"
-            if not ddma_dir.exists():
-                ddma_dir = PROJECT_ROOT.parent / "ddma"
             curator_script = ddma_dir / "scratch" / "run_curator.py"
             
             if not is_ddma_curator_running() and curator_script.exists():
@@ -5085,8 +5059,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             beats_target_url = f"http://127.0.0.1:8001/beats.html?ep={clean_id}"
 
             ddma_dir = PROJECT_ROOT / "ddma"
-            if not ddma_dir.exists():
-                ddma_dir = PROJECT_ROOT.parent / "ddma"
             beats_script = ddma_dir / "beats_server.py"
 
             if not is_beats_studio_running() and beats_script.exists():
@@ -5125,6 +5097,40 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 from update_listen_buttons import update_episode_listen_buttons
                 success = update_episode_listen_buttons(clean_id)
                 self.send_json({"success": success, "clean_id": clean_id, "message": f"Updated listen buttons for {clean_id}"})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        if path == "/api/git/remote":
+            # Read-only: show which origin PUBLISH will push to (PROD_ROOT's origin).
+            try:
+                r = subprocess.run(["git", "remote", "get-url", "origin"],
+                                   cwd=str(PROD_ROOT), capture_output=True, text=True, timeout=15)
+                if r.returncode != 0:
+                    self.send_json({"success": True, "origin": "", "message": "No origin remote configured."})
+                else:
+                    self.send_json({"success": True, "origin": r.stdout.strip()})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        if path == "/api/git/remote/set":
+            # Point PUBLISH at a different remote. Validates first; never half-applies.
+            url = (data.get("url") or "").strip()
+            if not url or any(ch.isspace() for ch in url) or ("://" not in url and not url.startswith("git@")):
+                self.send_json({"success": False, "error": "Enter a non-empty remote URL (https://... or git@...). The remote was not changed."}, status=400)
+                return
+            try:
+                has = subprocess.run(["git", "remote"], cwd=str(PROD_ROOT),
+                                     capture_output=True, text=True, timeout=15)
+                if "origin" in (has.stdout or "").split():
+                    cmd = ["git", "remote", "set-url", "origin", url]
+                else:
+                    cmd = ["git", "remote", "add", "origin", url]
+                subprocess.run(cmd, cwd=str(PROD_ROOT), check=True, capture_output=True, text=True, timeout=30)
+                self.send_json({"success": True, "origin": url})
+            except subprocess.CalledProcessError as e:
+                self.send_json({"success": False, "error": f"Git command failed: {e}"}, status=500)
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, status=500)
             return

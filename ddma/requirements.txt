@@ -1,0 +1,10 @@
+openai-whisper
+requests
+typer
+pillow
+numpy
+google-generativeai
+pyyaml
+faster-whisper==1.2.1
+av==19.0.2
+manim==0.22.0  # Known-good version for local & headless Manim rendering

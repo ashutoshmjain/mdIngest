@@ -1,0 +1,21 @@
+h1 { text-align: center; }
+.sidebar li a { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+
+/* Hide all chapter and section numbers in sidebar */
+.sidebar .section-number,
+.chapter li > a > strong[aria-hidden="true"],
+.chapter li .section-number,
+.chapter li > span > a > strong[aria-hidden="true"],
+.chapter li > a > strong,
+.chapter li > span > a > strong {
+    display: none !important;
+}
+
+/* Restrict in-page sidebar TOC to only top-level H2 headings (hide H3, H4, etc.) */
+.sidebar .on-this-page ol,
+.sidebar .on-this-page li li,
+.sidebar .header-item .header-item,
+.sidebar .header-item ol {
+    display: none !important;
+}
+

@@ -15,10 +15,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="${DD_HUB_ROOT:-/mnt/gdrive/workspace}"
 FOLDER_ID="${DD_HUB_FOLDER_ID:-}"
 
-# The ddma repo must sit next to this repo (the 1-Prompt Setup clones both
-# side by side). Fail early with a clear message if it is missing.
-if [ ! -d "$REPO_ROOT/../ddma" ]; then
-  echo "ERROR: ddma repo not found at $REPO_ROOT/../ddma. Clone it next to mdIngest, then run ./start.sh again."
+# The ddma extension lives inside this repo (merged layout). Fail early with
+# a clear message if it is missing.
+if [ ! -d "$REPO_ROOT/ddma" ]; then
+  echo "ERROR: ddma folder not found at $REPO_ROOT/ddma. Re-clone mdIngest, then run ./start.sh again."
   exit 1
 fi
 
@@ -59,8 +59,8 @@ echo "Using Python: $PY"
 
 # 3. Start the servers in the background (logs go to ~/logs/).
 mkdir -p ~/logs
-cd "$REPO_ROOT" && DD_HUB_ROOT="$WORKSPACE" nohup "$PY" ui/server.py > ~/logs/cockpit.log 2>&1 &
-cd "$REPO_ROOT/../ddma" && DD_HUB_ROOT="$WORKSPACE" nohup "$PY" scratch/run_curator.py > ~/logs/curator.log 2>&1 &
+cd "$REPO_ROOT" && DD_HUB_ROOT="$WORKSPACE" nohup "$PY" ingest/server.py > ~/logs/cockpit.log 2>&1 &
+cd "$REPO_ROOT/ddma" && DD_HUB_ROOT="$WORKSPACE" nohup "$PY" scratch/run_curator.py > ~/logs/curator.log 2>&1 &
 cd "$REPO_ROOT" && nohup mdbook serve --port 3000 > ~/logs/mdbook.log 2>&1 &
 
 sleep 3

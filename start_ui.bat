@@ -15,8 +15,6 @@ if not errorlevel 1 (
 )
 if exist "ingest\server.py" (
     %PYLAUNCH% ingest\server.py
-) else if exist "ui\server.py" (
-    %PYLAUNCH% ui\server.py
 )
 echo.
 echo Server has stopped.

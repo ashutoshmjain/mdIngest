@@ -1,8 +1,36 @@
 [book]
-authors = ["ashutosh"]
+authors = ["Your Name"]
 language = "en"
+text-direction = "ltr"
 src = "src"
-title = "md-publish: The Ingestion Layer"
+title = "Your Book Title"
+description = "A book built with the md-publish ingestion pipeline."
 
+[build]
+create-missing = false
 
-# No preprocessors enabled for the manual build to ensure CI stability.
+[preprocessor.katex]
+
+[preprocessor.ingest]
+command = "md-publish"
+downloads_path = "/path/to/downloads"
+video_source = "/path/to/video/source"
+lightning_address = "you@your-lightning-node"
+podcast_html = """
+<!-- Your podcast subscribe-buttons HTML goes here -->
+"""
+title_word_limit = 5
+
+[output.html]
+git-repository-url = "https://github.com/YOUR-USER/YOUR-REPO"
+theme = "theme"
+additional-css = ["theme/custom.css"]
+cname = "YOUR-CUSTOM-DOMAIN"
+no-section-label = true
+
+[output.html.print]
+enable = false
+
+[output.html.fold]
+enable = true
+level = 0
