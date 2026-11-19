@@ -46,7 +46,7 @@ If a step needs sudo and it asks for a password, STOP and ask the user to provid
 13. Verify: `DD_HUB_ROOT` resolves, the workspace folder structure exists, `episodes/<N>/plan.json` is readable for an existing episode (or the workspace folder is empty for a fresh workspace), and all three servers respond (cockpit :8088, Curator :8000, Beats :8001).
 ```
 
-After setup, launch with `python ui/server.py` (or `start_ui.bat` on Windows). The landing page is at http://localhost:8088/.
+After setup, launch with `python ui/server.py` (or `start_ui.bat` on Windows, or `./start.sh` on Linux/WSL — it mounts the Drive workspace if needed and starts all three servers). The landing page is at http://localhost:8088/.
 
 ## State of the app — alpha test phase
 
