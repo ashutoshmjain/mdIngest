@@ -418,6 +418,53 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                     status=502)
             return
 
+        if path == "/api/beats/set_engine":
+            ep = clean_ep(data.get("ep", "248"))
+            try:
+                clip_num = int(data.get("clip_num", 1))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"}, status=400)
+                return
+            vs = str(data.get("visual_source", "")).strip().lower()
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                res = archetype_studio.set_clip_visual_source(ep, clip_num, vs)
+                self.send_json(res)
+            except ValueError as ve:
+                self.send_json({"success": False, "error": str(ve)}, status=400)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        if path == "/api/beats/manim_retrigger":
+            ep = clean_ep(data.get("ep", "248"))
+            try:
+                clip_num = int(data.get("clip_num", 1))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"}, status=400)
+                return
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                res = archetype_studio.set_clip_visual_source(ep, clip_num, "manim")
+                project_id = f"episode_{ep}"
+                req = urllib.request.Request(
+                    f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
+                    data=json.dumps({}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}, method="POST")
+                try:
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        res["curator"] = json.loads(r.read().decode("utf-8"))
+                except Exception as ce:
+                    res["curator_note"] = f"visual_source set to manim; curator unreachable ({ce})"
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         if path == "/api/beats/personal/save":
             ep = clean_ep(data.get("ep", "248"))
             try:

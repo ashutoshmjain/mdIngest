@@ -62,6 +62,10 @@ a { color: #7dd3fc; }
                                             <button type="button" id="btn-playback-mode-clip" onclick="setLfPlaybackMode('clip')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Clip</button>
                                         </div>
                                         <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; background: #1e293b; padding: 3px 9px; border-radius: 5px;">00:00 / 00:00</span>
+                                        <div style="display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 6px; overflow: hidden;">
+                                            <button type="button" id="btn-engine-mosaic" onclick="setClipEngine('mosaic')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Mosaic</button>
+                                            <button type="button" id="btn-engine-manim" onclick="setClipEngine('manim')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Manim</button>
+                                        </div>
                                         <button type="button" id="btn-beats-mosaic-retry" onclick="beatsMosaicRetrigger()" style="background:#7c3aed;color:#ffffff;border:1px solid #6d28d9;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:800;cursor:pointer;" title="Fresh Mosaic RUN for this part — double-confirmed, explicit only">Mosaic Retrigger</button>
                                         <span id="beats-mosaic-status" style="font-size:0.7rem;color:#a78bfa;"></span>
                                         <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: #0284c7; color: #fff; border: 1px solid #0369a1; border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button>
@@ -300,6 +304,16 @@ a { color: #7dd3fc; }
             const metaEl = document.getElementById('lf-active-chapter-meta');
             const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
             const isMosaicCh = chInfo?.visual_source === 'mosaic';
+            const btnEMos = document.getElementById('btn-engine-mosaic');
+            const btnEMan = document.getElementById('btn-engine-manim');
+            if (btnEMos) {
+                btnEMos.style.background = isMosaicCh ? '#0284c7' : 'transparent';
+                btnEMos.style.color = isMosaicCh ? '#fff' : '#cbd5e1';
+            }
+            if (btnEMan) {
+                btnEMan.style.background = !isMosaicCh ? '#7c3aed' : 'transparent';
+                btnEMan.style.color = !isMosaicCh ? '#fff' : '#cbd5e1';
+            }
             if (metaEl && chInfo) {
                 const badge = isMosaicCh ? '<span style="background:#0284c7;color:#fff;font-size:0.64rem;padding:2px 7px;border-radius:4px;margin-left:8px;font-weight:800;letter-spacing:0.5px;">🎞 MOSAIC MASTER</span>' : '';
                 metaEl.innerHTML = `Part ${cNum}: ${escapeHtml(chInfo.title)} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})${badge}`;
@@ -434,6 +448,24 @@ a { color: #7dd3fc; }
                 videoEl.currentTime = (lfPlaybackMode === 'clip')
                     ? (b.short_video_start || 0)
                     : (b.longform_start + 0.08);
+            }
+        }
+
+        async function setClipEngine(vs) {
+            const cNum = lfActiveClipNum || 1;
+            try {
+                const res = await fetch('/api/beats/set_engine', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ep: beatsEpisode(), clip_num: cNum, visual_source: vs })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || 'Switch failed');
+                lfChapterLRU.delete(cNum);
+                await initLongformBeatStudio();
+                showToast(`✅ Part ${cNum} engine set to ${vs}`);
+            } catch (e) {
+                showToast('❌ Engine switch failed: ' + e.message);
             }
         }
 

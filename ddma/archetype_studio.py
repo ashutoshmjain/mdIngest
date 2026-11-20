@@ -1207,12 +1207,13 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         else:
             c_start = map_t(float(clip.get("start", 0.0)))
         chapters[c_num] = {"start": round(c_start, 2), "beats": beats, "title": str(clip.get("title", f"Part {c_num}")).strip()}
-        # Active Master: plan.json visual_source ("mosaic" | "manim" | None -> manim / existing behaviour)
-        mosaic_body = None
-        if str(clip.get("visual_source") or "").lower() == "mosaic":
-            mosaic_body = resolve_mosaic_body(clean_ep, c_num, clip)
-        chapters[c_num]["visual_source"] = "mosaic" if mosaic_body else "manim"
+        # Active Master: plan.json visual_source ("mosaic" | "manim", default "mosaic" per D5)
+        raw_vs = str(clip.get("visual_source") or "").strip().lower()
+        configured_vs = raw_vs if raw_vs in ("mosaic", "manim") else "mosaic"
+        mosaic_body = resolve_mosaic_body(clean_ep, c_num, clip) if configured_vs == "mosaic" else None
+        chapters[c_num]["visual_source"] = configured_vs
         chapters[c_num]["mosaic_body"] = mosaic_body
+        chapters[c_num]["locked"] = bool(configured_vs == "mosaic" and mosaic_body)
         order.append(c_num)
 
     for i, c_num in enumerate(order):
@@ -1333,8 +1334,8 @@ def get_longform_timeline_index(ep_num: str = "248") -> Dict[str, Any]:
             "duration": round(ch["end"] - ch["start"], 2),
             "scenes_count": n_scenes,
             "py_file": f"archetypes/clip_{c_num:02d}_gemini_scenes.py",
-            "visual_source": ch.get("visual_source", "manim"),
-            "locked": ch.get("visual_source") == "mosaic",
+            "visual_source": ch.get("visual_source", "mosaic"),
+            "locked": bool(ch.get("locked", False)),
         })
 
     return {
@@ -1405,10 +1406,95 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
         "scenes_count": len(lf_beats),
         "beats": lf_beats,
         "omitted_beats": omitted,
-        "visual_source": ch.get("visual_source", "manim"),
-        "locked": ch.get("visual_source") == "mosaic",
+        "visual_source": ch.get("visual_source", "mosaic"),
+        "locked": bool(ch.get("locked", False)),
         "mosaic_file": os.path.basename((ch.get("mosaic_body") or {}).get("path", "")) or None,
     }
+
+
+def _preserve_number_types(new_obj: Any, old_obj: Any) -> Any:
+    if isinstance(new_obj, dict) and isinstance(old_obj, dict):
+        return {
+            k: (_preserve_number_types(v, old_obj[k]) if k in old_obj else v)
+            for k, v in new_obj.items()
+        }
+    if isinstance(new_obj, list) and isinstance(old_obj, list):
+        return [
+            _preserve_number_types(v, old_obj[i]) if i < len(old_obj) else v
+            for i, v in enumerate(new_obj)
+        ]
+    if (
+        isinstance(new_obj, (int, float))
+        and not isinstance(new_obj, bool)
+        and isinstance(old_obj, (int, float))
+        and not isinstance(old_obj, bool)
+        and new_obj == old_obj
+    ):
+        return old_obj
+    return new_obj
+
+
+def set_clip_visual_source(ep_num: str, clip_num: int, visual_source: str) -> Dict[str, Any]:
+    """Explicitly switches a clip's visual_source ('mosaic' | 'manim') in the canonical
+    hub plan (D1/D5) and syncs derived local caches with byte-stable number preservation."""
+    vs = str(visual_source or "").strip().lower()
+    if vs not in ("mosaic", "manim"):
+        raise ValueError(f"Invalid visual_source {visual_source!r}; expected 'mosaic' or 'manim'")
+    clean_ep = _clean_ep(ep_num)
+    c_num = int(clip_num)
+
+    plan_path = _resolve_episode_plan_path(clean_ep)
+    if not plan_path:
+        raise FileNotFoundError(f"No plan.json found for episode {clean_ep}")
+
+    with open(plan_path, "r", encoding="utf-8") as f:
+        plan_data = json.load(f)
+    if not isinstance(plan_data, list):
+        raise ValueError(f"Invalid plan format in {plan_path}")
+
+    existing = json.loads(json.dumps(plan_data))
+    found = False
+    for clip in plan_data:
+        if str(clip.get("num")) == str(c_num):
+            clip["visual_source"] = vs
+            found = True
+            break
+    if not found:
+        raise ValueError(f"Clip {c_num} not found in episode {clean_ep} plan")
+
+    plan_data = _preserve_number_types(plan_data, existing)
+    hub = _resolve_dd_hub_root()
+    if hub:
+        import datetime as _dt
+        hub_ep_dir = os.path.join(hub, "episodes", clean_ep)
+        hub_plan = os.path.join(hub_ep_dir, "plan.json")
+        hub_meta = os.path.join(hub_ep_dir, "plan.meta.json")
+        cur_rev = 0
+        if os.path.exists(hub_meta):
+            try:
+                with open(hub_meta, "r", encoding="utf-8") as mf:
+                    cur_rev = int(json.load(mf).get("plan_rev", 0))
+            except Exception:
+                cur_rev = 0
+        new_rev = cur_rev + 1
+        stamp = _dt.datetime.now().astimezone().isoformat()
+        os.makedirs(hub_ep_dir, exist_ok=True)
+        with open(hub_plan, "w", encoding="utf-8") as f:
+            json.dump(plan_data, f, indent=4)
+        with open(hub_meta, "w", encoding="utf-8") as mf:
+            json.dump({"plan_rev": new_rev, "last_writer": "beats_studio", "updated_at": stamp}, mf, indent=4)
+        local_proj_dir = os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}")
+        if os.path.isdir(local_proj_dir):
+            with open(os.path.join(local_proj_dir, "plan.json"), "w", encoding="utf-8") as f:
+                json.dump(plan_data, f, indent=4)
+            with open(os.path.join(local_proj_dir, "plan.meta.json"), "w", encoding="utf-8") as mf:
+                json.dump({"plan_rev": new_rev, "last_writer": "beats_studio", "updated_at": stamp}, mf, indent=4)
+    else:
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(plan_data, f, indent=4)
+
+    _LF_INTERVALS_CACHE.clear()
+    return {"success": True, "ep_num": clean_ep, "clip_num": c_num, "visual_source": vs}
 
 
 def _slugify_pb(text: str) -> str:
