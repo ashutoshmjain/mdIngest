@@ -718,11 +718,11 @@ async function runE2ETests() {
                 throw new Error(`Narrative deck mismatch: title="${rightTitle}", active=${isNarrativeDeckActive}`);
             }
 
-            // In Media tab -> Right deck should show DDMA Media Controller
+            // In Media tab -> Right deck should show Cutroom Media Controller
             await p.click('#tab-btn-media');
             rightTitle = (await p.$eval('#right-pane-dynamic-title', el => el.innerText)).toLowerCase();
             let isMediaDeckActive = await p.$eval('#right-deck-media', el => el.classList.contains('active'));
-            if (!rightTitle.includes('ddma') || !isMediaDeckActive) {
+            if (!rightTitle.includes('cutroom') || !isMediaDeckActive) {
                 throw new Error(`Media deck mismatch: title="${rightTitle}", active=${isMediaDeckActive}`);
             }
 
