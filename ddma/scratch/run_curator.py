@@ -180,6 +180,30 @@ def safe_save_json(file_path, data):
             json.dump(data, f, indent=4)
         os.replace(temp_path, file_path)
 
+
+def _preserve_number_types(new_obj, old_obj):
+    """Preserve int vs whole-number float representation from old_obj so JS JSON.stringify
+    round-trips (0.0 -> 0) do not produce spurious diffs on unedited plan fields (O3)."""
+    if isinstance(new_obj, dict) and isinstance(old_obj, dict):
+        return {
+            k: (_preserve_number_types(v, old_obj[k]) if k in old_obj else v)
+            for k, v in new_obj.items()
+        }
+    if isinstance(new_obj, list) and isinstance(old_obj, list):
+        return [
+            _preserve_number_types(v, old_obj[i]) if i < len(old_obj) else v
+            for i, v in enumerate(new_obj)
+        ]
+    if (
+        isinstance(new_obj, (int, float))
+        and not isinstance(new_obj, bool)
+        and isinstance(old_obj, (int, float))
+        and not isinstance(old_obj, bool)
+        and new_obj == old_obj
+    ):
+        return old_obj
+    return new_obj
+
 def notify_failure(workflow, step, error):
     """Failure notification for the pipeline workflows (TRIGGER_CONTRACT.md section 4).
 
@@ -1874,7 +1898,10 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     clips_array = json_data["plan"]
                 else:
                     clips_array = json_data
-                
+
+                if old_plan:
+                    clips_array = _preserve_number_types(clips_array, old_plan)
+
                 # Save hub FIRST, then local cache, then Active Master paths (fail loudly on hub outage)
                 save_plan(project_id, clips_array, expected_rev=save_expected_rev)
                     
@@ -2322,7 +2349,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 plan_path = os.path.join(project_dir, "plan.json")
                 with open(plan_path, "w", encoding="utf-8") as pf:
-                    json.dump(new_plan, pf, indent=2)
+                    json.dump(new_plan, pf, indent=4)
 
                 # Sync regenerated plan to dd_hub vault and src/
                 ep_match = re.search(r'\d+', project_id)
@@ -3729,7 +3756,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         break
                 
                 with open(plan_path, "w", encoding="utf-8") as f:
-                    json.dump(plan, f, indent=2, ensure_ascii=False)
+                    json.dump(plan, f, indent=4, ensure_ascii=False)
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')

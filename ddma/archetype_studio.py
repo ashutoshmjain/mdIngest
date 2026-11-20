@@ -16,6 +16,63 @@ MEDIA_VIDEOS_DIR = os.path.join(GITHUB_ROOT, "media", "videos")
 SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
 GENERATED_ARCHETYPES_JSON = os.path.join(SCRIPT_DIR, "generated_archetypes.json")
 
+
+def _clean_ep(ep_num: str = "248") -> str:
+    return str(ep_num or "248").replace(".md", "").lstrip("_") or "248"
+
+
+def _resolve_dd_hub_root() -> Optional[str]:
+    env = os.environ.get("DD_HUB_ROOT", "").strip()
+    if env and os.path.exists(env):
+        return env
+    if os.path.exists(SETTINGS_PATH):
+        try:
+            with open(SETTINGS_PATH, "r", encoding="utf-8") as f:
+                dd = str(json.load(f).get("dd_hub_root", "")).strip()
+            if dd and os.path.exists(dd):
+                return dd
+        except Exception:
+            pass
+    return None
+
+
+def _episode_beats_dir(ep_num: str = "248") -> str:
+    """Per-episode scratch/output directory outside the tracked repo tree (O2)."""
+    clean_ep = _clean_ep(ep_num)
+    hub = _resolve_dd_hub_root()
+    if hub:
+        return os.path.join(hub, "episodes", clean_ep, "beats")
+    return os.path.join(SCRIPT_DIR, "cache", "beats", clean_ep)
+
+
+def _resolve_clip_py_path(clip_num: int, ep_num: str = "248") -> str:
+    c_num = int(clip_num)
+    fname = f"clip_{c_num:02d}_gemini_scenes.py"
+    o2_path = os.path.join(_episode_beats_dir(ep_num), fname)
+    if os.path.exists(o2_path):
+        return o2_path
+    return os.path.join(ARCHETYPES_DIR, fname)
+
+
+def _resolve_clip_meta_path(clip_num: int, ep_num: str = "248") -> str:
+    c_num = int(clip_num)
+    fname = f"clip_{c_num:02d}_meta.json"
+    o2_path = os.path.join(_episode_beats_dir(ep_num), fname)
+    if os.path.exists(o2_path):
+        return o2_path
+    return os.path.join(ARCHETYPES_DIR, fname)
+
+
+def _resolve_beat_mp4_path(clip_num: int, class_name: str, ep_num: str = "248") -> str:
+    c_num = int(clip_num)
+    o2_mp4 = os.path.join(
+        _episode_beats_dir(ep_num), "media", "videos",
+        f"clip_{c_num:02d}_gemini_scenes", "740p15", f"{class_name}.mp4"
+    )
+    if os.path.exists(o2_mp4):
+        return o2_mp4
+    return os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15", f"{class_name}.mp4")
+
 PRIMARY_MODELS = [
     "models/gemini-3.5-flash-lite",
     "models/gemini-flash-lite-latest",
@@ -79,15 +136,18 @@ def extract_scene_classes_from_py(py_path: str) -> List[Dict[str, Any]]:
     return results
 
 
-def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, body_duration: Optional[float] = None) -> Dict[str, Any]:
+def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, body_duration: Optional[float] = None, ep_num: str = "248") -> Dict[str, Any]:
     """
-    Loads or synthesizes clip_XX_meta.json aligned with clip_XX_gemini_scenes.py and media/videos/clip_XX_gemini_scenes/740p15/*.mp4.
-    Returns both absolute episode timestamps and clip-relative timestamps (rel_start, rel_end, video_start, video_end).
+    Loads or synthesizes clip_XX_meta.json aligned with clip_XX_gemini_scenes.py and rendered 740p15/*.mp4.
+    Reads from the per-episode O2 beats directory first, falling back to read-only ARCHETYPES_DIR.
+    Writes materialized meta ONLY to the per-episode O2 beats directory (never to ARCHETYPES_DIR).
     """
     c_num = int(clip_num)
-    py_path = os.path.join(ARCHETYPES_DIR, f"clip_{c_num:02d}_gemini_scenes.py")
-    meta_path = os.path.join(ARCHETYPES_DIR, f"clip_{c_num:02d}_meta.json")
-    video_dir = os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15")
+    clean_ep = _clean_ep(ep_num)
+    beats_dir = _episode_beats_dir(clean_ep)
+    py_path = _resolve_clip_py_path(c_num, clean_ep)
+    meta_path = _resolve_clip_meta_path(c_num, clean_ep)
+    o2_meta_path = os.path.join(beats_dir, f"clip_{c_num:02d}_meta.json")
 
     parsed_classes = extract_scene_classes_from_py(py_path)
 
@@ -103,9 +163,8 @@ def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, 
 
     # Determine clip start/end and spoken words from plan_clip if available
     if plan_clip is None:
-        # Auto-discover plan_clip from projects/episode_248/plan.json or root plan.json so we NEVER lose caption_chunks or audio_duration!
         for cand_plan in [
-            os.path.join(SCRIPT_DIR, "projects", "episode_248", "plan.json"),
+            os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
             os.path.join(SCRIPT_DIR, "plan.json"),
         ]:
             if os.path.exists(cand_plan):
@@ -142,7 +201,7 @@ def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, 
     enriched_beats = []
     for idx, cls_info in enumerate(parsed_classes):
         cls_name = cls_info["class_name"]
-        mp4_path = os.path.join(video_dir, f"{cls_name}.mp4")
+        mp4_path = _resolve_beat_mp4_path(c_num, cls_name, clean_ep)
         raw_b = raw_beats[idx] if idx < len(raw_beats) else {}
 
         rel_start = round(idx * beat_dur, 2)
@@ -222,7 +281,8 @@ def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, 
     disk_meta = dict(out_meta)
     disk_meta["beats"] = disk_beats
     try:
-        with open(meta_path, "w", encoding="utf-8") as f:
+        os.makedirs(beats_dir, exist_ok=True)
+        with open(o2_meta_path, "w", encoding="utf-8") as f:
             json.dump(disk_meta, f, indent=2)
     except Exception:
         pass
@@ -236,28 +296,28 @@ def stitch_precompiled_archetypes_for_clip(
     out_mp4_path: str,
     body_duration: float,
     plan_clip: Optional[Dict[str, Any]] = None,
+    ep_num: str = "248",
 ) -> bool:
     """
     Super-fast (< 3 seconds) assembler for a DDMA short clip body video (740x740 with masked bottom title
     and centered graphic alignment between the captions line and bottom footer line)
-    using the pre-compiled Manim MP4s in media/videos/clip_XX_gemini_scenes/740p15/*.mp4!
+    using the pre-compiled Manim MP4s!
     Automatically compiles any missing single scene if needed.
     """
     c_num = int(clip_num)
-    meta = ensure_clip_meta(c_num, plan_clip=plan_clip, body_duration=body_duration)
+    clean_ep = _clean_ep(ep_num)
+    meta = ensure_clip_meta(c_num, plan_clip=plan_clip, body_duration=body_duration, ep_num=clean_ep)
     beats = meta.get("beats", [])
     if not beats:
         return False
 
-    video_dir = os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15")
-    os.makedirs(video_dir, exist_ok=True)
-
     mp4_paths = []
     for b in beats:
         cls_name = b["class_name"]
-        mp4_p = os.path.join(video_dir, f"{cls_name}.mp4")
+        mp4_p = _resolve_beat_mp4_path(c_num, cls_name, clean_ep)
         if not os.path.exists(mp4_p):
-            compile_single_scene(c_num, cls_name)
+            compile_single_scene(c_num, cls_name, ep_num=clean_ep)
+            mp4_p = _resolve_beat_mp4_path(c_num, cls_name, clean_ep)
         if os.path.exists(mp4_p):
             mp4_paths.append((mp4_p, float(b["duration"])))
 
@@ -332,34 +392,43 @@ def stitch_precompiled_archetypes_for_clip(
     return True
 
 
-def compile_single_scene(clip_num: int, class_name: str) -> Tuple[bool, str]:
+def compile_single_scene(clip_num: int, class_name: str, ep_num: str = "248") -> Tuple[bool, str]:
     """
-    Compiles a single Manim Scene class inside ddma/archetypes/clip_XX_gemini_scenes.py
-    and places the resulting 740x740 MP4 into media/videos/clip_XX_gemini_scenes/740p15/<class_name>.mp4.
+    Compiles a single Manim Scene class inside the resolved clip_XX_gemini_scenes.py
+    and places the resulting 740x740 MP4 into the per-episode O2 beats media directory.
     """
     c_num = int(clip_num)
-    py_path = os.path.join(ARCHETYPES_DIR, f"clip_{c_num:02d}_gemini_scenes.py")
+    clean_ep = _clean_ep(ep_num)
+    beats_dir = _episode_beats_dir(clean_ep)
+    py_path = _resolve_clip_py_path(c_num, clean_ep)
     if not os.path.exists(py_path):
         return False, f"Scene file {py_path} not found."
 
+    media_dir = os.path.join(beats_dir, "media")
+    os.makedirs(media_dir, exist_ok=True)
+
     env = os.environ.copy()
     existing_pp = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = f"{ARCHETYPES_DIR}{os.pathsep}{existing_pp}" if existing_pp else ARCHETYPES_DIR
+    pp_parts = [beats_dir, ARCHETYPES_DIR]
+    if existing_pp:
+        pp_parts.append(existing_pp)
+    env["PYTHONPATH"] = os.pathsep.join(pp_parts)
 
     cmd = [
         sys.executable, "-m", "manim", "render",
         "-r", "740,740",
         "--fps", "15",
         "--format", "mp4",
-        "--media_dir", os.path.join(GITHUB_ROOT, "media"),
+        "--media_dir", media_dir,
         py_path,
         class_name,
     ]
     res = subprocess.run(cmd, cwd=GITHUB_ROOT, env=env, capture_output=True, text=True)
-    out_mp4 = os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15", f"{class_name}.mp4")
+    video_dir = os.path.join(media_dir, "videos", f"clip_{c_num:02d}_gemini_scenes", "740p15")
+    out_mp4 = os.path.join(video_dir, f"{class_name}.mp4")
 
     # Purge partial_movie_files immediately so disk stays clean
-    partial_dir = os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15", "partial_movie_files", class_name)
+    partial_dir = os.path.join(video_dir, "partial_movie_files", class_name)
     if os.path.exists(partial_dir):
         shutil.rmtree(partial_dir, ignore_errors=True)
 
@@ -568,24 +637,30 @@ def update_single_scene_with_ai(
     spoken_text: str = "",
     duration: float = 7.5,
     custom_code: Optional[str] = None,
+    ep_num: str = "248",
 ) -> Dict[str, Any]:
     """
     Either saves direct custom Manim code or prompts Gemini Flash Lite (with automatic
     local figurative synthesizer fallback if the API key is an expired OAuth token)
-    to rewrite ONLY the specified Scene class (`class_name`) inside
-    `ddma/archetypes/clip_XX_gemini_scenes.py` based on `user_directive` and `spoken_text`,
-    compiles just that single scene (~3s), and updates `clip_XX_meta.json`!
-    Because it updates `ddma/archetypes/clip_XX_gemini_scenes.py` and `media/videos/clip_XX_gemini_scenes/740p15/`,
-    both the Short Clip and the next Longform Master Video render automatically inherit the improvement!
+    to rewrite ONLY the specified Scene class (`class_name`) inside the per-episode O2
+    beats directory (seeded from read-only ARCHETYPES_DIR if not yet copied),
+    compiles just that single scene (~3s), and updates `clip_XX_meta.json` in O2!
+    Never writes to tracked `ddma/archetypes/`.
     """
     c_num = int(clip_num)
-    py_path = os.path.join(ARCHETYPES_DIR, f"clip_{c_num:02d}_gemini_scenes.py")
-    meta_path = os.path.join(ARCHETYPES_DIR, f"clip_{c_num:02d}_meta.json")
-    if not os.path.exists(py_path):
-        raise Exception(f"Archetype file not found: {py_path}")
+    clean_ep = _clean_ep(ep_num)
+    beats_dir = _episode_beats_dir(clean_ep)
+    src_py_path = _resolve_clip_py_path(c_num, clean_ep)
+    src_meta_path = _resolve_clip_meta_path(c_num, clean_ep)
+    py_path = os.path.join(beats_dir, f"clip_{c_num:02d}_gemini_scenes.py")
+    meta_path = os.path.join(beats_dir, f"clip_{c_num:02d}_meta.json")
+    if not os.path.exists(src_py_path):
+        raise Exception(f"Archetype file not found: {src_py_path}")
 
-    with open(py_path, "r", encoding="utf-8") as f:
+    with open(src_py_path, "r", encoding="utf-8") as f:
         full_py = f.read()
+    os.makedirs(beats_dir, exist_ok=True)
+    had_o2_py = os.path.exists(py_path)
 
     # Locate the target class block in clip_XX_gemini_scenes.py
     pattern = re.compile(r"(^class\s+(Scene\w+)\s*\([^\)]*\):)", re.MULTILINE)
@@ -673,7 +748,7 @@ Return ONLY the valid Python code for `class {class_name}(Scene):` inside a ```p
     with open(py_path, "w", encoding="utf-8") as f:
         f.write(updated_full_py)
 
-    ok, msg = compile_single_scene(c_num, class_name)
+    ok, msg = compile_single_scene(c_num, class_name, ep_num=clean_ep)
     if not ok:
         # If Gemini returned code with a syntax/Manim error, try our guaranteed local figurative synthesizer before rolling back!
         if not custom_code:
@@ -686,21 +761,24 @@ Return ONLY the valid Python code for `class {class_name}(Scene):` inside a ```p
             updated_full_py = full_py[:start_pos] + fallback_code + "\n\n" + full_py[end_pos:]
             with open(py_path, "w", encoding="utf-8") as f:
                 f.write(updated_full_py)
-            ok2, msg2 = compile_single_scene(c_num, class_name)
+            ok2, msg2 = compile_single_scene(c_num, class_name, ep_num=clean_ep)
             if ok2:
                 new_cls_code = fallback_code
                 ok = True
 
     if not ok:
-        # Rollback so we never leave broken code in the library
-        with open(py_path, "w", encoding="utf-8") as f:
-            f.write(full_py)
+        # Rollback in O2 so we never leave broken code
+        if had_o2_py:
+            with open(py_path, "w", encoding="utf-8") as f:
+                f.write(full_py)
+        elif os.path.exists(py_path):
+            os.remove(py_path)
         raise Exception(f"Manim compilation failed for updated {class_name} (rolled back safely):\n{msg}")
 
-    # Persist user_notes / visual_summary in clip_XX_meta.json
-    if os.path.exists(meta_path):
+    # Persist user_notes / visual_summary in O2 clip_XX_meta.json
+    if os.path.exists(src_meta_path):
         try:
-            with open(meta_path, "r", encoding="utf-8") as f:
+            with open(src_meta_path, "r", encoding="utf-8") as f:
                 m_data = json.load(f)
             for b in m_data.get("beats", []):
                 if b.get("class_name") == class_name or b.get("index") == beat_index:
@@ -718,7 +796,7 @@ Return ONLY the valid Python code for `class {class_name}(Scene):` inside a ```p
         "clip_num": c_num,
         "class_name": class_name,
         "code": new_cls_code,
-        "mp4_url": f"/media/videos/clip_{c_num:02d}_gemini_scenes/740p15/{class_name}.mp4?t={int(time.time())}",
+        "mp4_url": f"/media/videos/clip_{c_num:02d}_gemini_scenes/740p15/{class_name}.mp4?ep={clean_ep}&t={int(time.time())}",
     }
 
 
@@ -923,7 +1001,8 @@ def _anchor_beats_to_spoken_words(beats: List[Dict[str, Any]], mapped_words: Lis
 
 
 def map_clip_beats_to_longform(clip_num: int, plan_clip: Dict[str, Any], map_t_fn,
-                               mapped_words: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+                               mapped_words: Optional[List[Dict[str, Any]]] = None,
+                               ep_num: str = "248") -> List[Dict[str, Any]]:
     """
     Exact audio-timestamp alignment: maps each Short beat [rel_start, rel_end] (Short body time)
     -> raw source audio time (removing the Short-only hook/sting structure) -> Longform Master time.
@@ -931,7 +1010,7 @@ def map_clip_beats_to_longform(clip_num: int, plan_clip: Dict[str, Any], map_t_f
     because the Longform plays that sentence linearly inside the main discussion.
     Returns [{"beat": short_beat, "longform_start", "longform_end"}] (+ omitted list via "omitted" flag).
     """
-    meta = ensure_clip_meta(clip_num, plan_clip=plan_clip)
+    meta = ensure_clip_meta(clip_num, plan_clip=plan_clip, ep_num=ep_num)
     short_beats = meta.get("beats", [])
     segs = plan_clip.get("segments", []) if plan_clip else []
 
@@ -1019,9 +1098,10 @@ def _lf_cache_key(clean_ep: str) -> str:
     for p in [os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
               os.path.join(_episode_dir(clean_ep), "podcast_edit.json")]:
         parts.append(str(os.path.getmtime(p)) if os.path.exists(p) else "0")
-    for p in sorted(glob.glob(os.path.join(ARCHETYPES_DIR, "clip_*_gemini_scenes.py")) +
-                    glob.glob(os.path.join(ARCHETYPES_DIR, "clip_*_meta.json"))):
-        parts.append(f"{os.path.basename(p)}:{os.path.getmtime(p)}")
+    for d in (_episode_beats_dir(clean_ep), ARCHETYPES_DIR):
+        for p in sorted(glob.glob(os.path.join(d, "clip_*_gemini_scenes.py")) +
+                        glob.glob(os.path.join(d, "clip_*_meta.json"))):
+            parts.append(f"{os.path.basename(p)}:{os.path.getmtime(p)}")
     for p in sorted(glob.glob(os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-*-mosaic*.mp4"))):
         parts.append(f"{os.path.basename(p)}:{os.path.getmtime(p)}")
     return "|".join(parts)
@@ -1106,7 +1186,7 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
     for idx, clip in enumerate(plan_data):
         c_num = int(clip.get("num", idx + 1))
         try:
-            beats = map_clip_beats_to_longform(c_num, clip, map_t, mapped_words)
+            beats = map_clip_beats_to_longform(c_num, clip, map_t, mapped_words, ep_num=clean_ep)
         except Exception:
             beats = []
         kept = [b for b in beats if not b["omitted"]]
@@ -1179,12 +1259,11 @@ def get_longform_scene_intervals(ep_num: str = "248", total_duration: Optional[f
                                   "visual_source": "mosaic", "src_offset": round(src_st, 3),
                                   "src_hold": round(src_hold, 3), "src_kind": mb["kind"]})
             continue
-        v_dir = os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15")
         for b in ch["beats"]:
             if b["omitted"]:
                 continue
             cls = b["beat"].get("class_name", "")
-            mp4 = os.path.join(v_dir, f"{cls}.mp4")
+            mp4 = _resolve_beat_mp4_path(c_num, cls, ep_num=ep_num)
             if not os.path.exists(mp4):
                 continue
             intervals.append({"start": b["longform_start"], "end": b["longform_end"], "mp4": mp4, "fps": 15,
@@ -1301,7 +1380,7 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
             "short_video_end": sb.get("video_end", 0.0),
             "text": spoken,
             "mp4_exists": sb.get("mp4_exists", True),
-            "beat_video_url": f"/api/podcast/beat_video?clip_num={c_num}&class_name={cls_name}",
+            "beat_video_url": f"/api/podcast/beat_video?ep={clean_ep}&clip_num={c_num}&class_name={cls_name}",
             "code": sb.get("code", ""),
             "visual_source": ch.get("visual_source", "manim"),
         })

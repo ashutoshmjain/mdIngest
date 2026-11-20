@@ -169,6 +169,10 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(500, str(e))
 
     # ---------- GET ----------
+    STATIC_WHITELIST = {
+        "/workspace-link.js": ("workspace-link.js", "application/javascript"),
+    }
+
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         path = url.path
@@ -176,6 +180,11 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
 
         if path in ("/", "/beats.html"):
             self.serve_file(DDMA_DIR / "beats.html")
+            return
+
+        if path in self.STATIC_WHITELIST:
+            fname, mime = self.STATIC_WHITELIST[path]
+            self.serve_file(DDMA_DIR / fname, mime=mime)
             return
 
         if path == "/api/beats/index":
@@ -220,14 +229,17 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/beats/beat_video":
+            ep = clean_ep(params.get("ep", ["248"])[0])
             try:
                 clip_num = int(params.get("clip_num", ["1"])[0])
             except ValueError:
                 self.send_error(400, "bad clip_num")
                 return
             cls_name = params.get("class_name", [""])[0].strip().replace("/", "")
-            media_root = (DDMA_DIR.parent / "media" / "videos"
-                          / f"clip_{clip_num:02d}_gemini_scenes" / "740p15" / f"{cls_name}.mp4")
+            import importlib
+            import archetype_studio
+            importlib.reload(archetype_studio)
+            media_root = Path(archetype_studio._resolve_beat_mp4_path(clip_num, cls_name, ep_num=ep))
             if media_root.exists():
                 self.serve_media_file(media_root)
             else:
@@ -291,11 +303,12 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                     spoken_text=str(data.get("spoken_text", "")).strip(),
                     custom_code=data.get("custom_code"),
                     duration=float(data.get("duration", 7.5)),
+                    ep_num=ep,
                 )
                 ch = archetype_studio.get_longform_chapter_beats(ep, clip_num)
                 res["chapter_data"] = rewrite_beat_urls(ch)
                 res["beat_video_url"] = (
-                    f"/api/beats/beat_video?clip_num={clip_num}"
+                    f"/api/beats/beat_video?ep={ep}&clip_num={clip_num}"
                     f"&class_name={urllib.parse.quote(str(data.get('class_name', '')))}"
                     f"&t={int(time.time())}")
                 self.send_json(res)
