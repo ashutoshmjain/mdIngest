@@ -120,3 +120,5 @@ PACING & ANIMATION RULES
 - Never read entire generated Manim scripts into context; inspect with targeted regex/AST and patch in batches.
 - Keep CLI output to summary lines; verbose tracebacks go to log files.
 - One background compilation/render at a time; delegate repetitive loops to a subagent and `/compact` between major phases.
+
+**Testing:** the e2e suite runs in two tiers — see TESTING.md, and judge Tier-1 (WSL) runs against the baseline recorded there.
