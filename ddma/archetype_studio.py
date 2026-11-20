@@ -73,6 +73,24 @@ def _resolve_beat_mp4_path(clip_num: int, class_name: str, ep_num: str = "248") 
         return o2_mp4
     return os.path.join(MEDIA_VIDEOS_DIR, f"clip_{c_num:02d}_gemini_scenes", "740p15", f"{class_name}.mp4")
 
+
+def _resolve_episode_plan_path(ep_num: str = "248") -> Optional[str]:
+    """Hub-first canonical plan resolution (D1): dd_hub/episodes/<ep>/plan.json first,
+    then derived local caches (projects/episode_<ep>/plan.json, ddma/plan.json)."""
+    clean_ep = _clean_ep(ep_num)
+    cands = []
+    hub = _resolve_dd_hub_root()
+    if hub:
+        cands.append(os.path.join(hub, "episodes", clean_ep, "plan.json"))
+    cands.extend([
+        os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
+        os.path.join(SCRIPT_DIR, "plan.json"),
+    ])
+    for cand in cands:
+        if os.path.exists(cand):
+            return cand
+    return None
+
 PRIMARY_MODELS = [
     "models/gemini-3.5-flash-lite",
     "models/gemini-flash-lite-latest",
@@ -163,20 +181,15 @@ def ensure_clip_meta(clip_num: int, plan_clip: Optional[Dict[str, Any]] = None, 
 
     # Determine clip start/end and spoken words from plan_clip if available
     if plan_clip is None:
-        for cand_plan in [
-            os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
-            os.path.join(SCRIPT_DIR, "plan.json"),
-        ]:
-            if os.path.exists(cand_plan):
-                try:
-                    with open(cand_plan, "r", encoding="utf-8") as pf:
-                        p_list = json.load(pf)
-                    if isinstance(p_list, list):
-                        plan_clip = next((c for c in p_list if str(c.get("num")) == str(c_num)), None)
-                        if plan_clip:
-                            break
-                except Exception:
-                    pass
+        cand_plan = _resolve_episode_plan_path(clean_ep)
+        if cand_plan:
+            try:
+                with open(cand_plan, "r", encoding="utf-8") as pf:
+                    p_list = json.load(pf)
+                if isinstance(p_list, list):
+                    plan_clip = next((c for c in p_list if str(c.get("num")) == str(c_num)), None)
+            except Exception:
+                pass
 
     c_start = float(plan_clip.get("start", 0.0)) if plan_clip else (float(raw_beats[0]["start"]) if raw_beats else 0.0)
     c_end = float(plan_clip.get("end", c_start + 120.0)) if plan_clip else (float(raw_beats[-1]["end"]) if raw_beats else c_start + 120.0)
@@ -801,19 +814,15 @@ Return ONLY the valid Python code for `class {class_name}(Scene):` inside a ```p
 
 
 def _load_episode_plan(ep_num: str = "248") -> List[Dict[str, Any]]:
-    clean_ep = str(ep_num).replace(".md", "").lstrip("_")
-    for cand in [
-        os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
-        os.path.join(SCRIPT_DIR, "plan.json"),
-    ]:
-        if os.path.exists(cand):
-            try:
-                with open(cand, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                if isinstance(data, list) and data:
-                    return data
-            except Exception:
-                pass
+    cand = _resolve_episode_plan_path(ep_num)
+    if cand:
+        try:
+            with open(cand, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and data:
+                return data
+        except Exception:
+            pass
     return []
 
 
@@ -1095,9 +1104,9 @@ def map_clip_beats_to_longform(clip_num: int, plan_clip: Dict[str, Any], map_t_f
 
 def _lf_cache_key(clean_ep: str) -> str:
     parts = [clean_ep]
-    for p in [os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "plan.json"),
-              os.path.join(_episode_dir(clean_ep), "podcast_edit.json")]:
-        parts.append(str(os.path.getmtime(p)) if os.path.exists(p) else "0")
+    plan_p = _resolve_episode_plan_path(clean_ep)
+    for p in [plan_p, os.path.join(_episode_dir(clean_ep), "podcast_edit.json")]:
+        parts.append(str(os.path.getmtime(p)) if p and os.path.exists(p) else "0")
     for d in (_episode_beats_dir(clean_ep), ARCHETYPES_DIR):
         for p in sorted(glob.glob(os.path.join(d, "clip_*_gemini_scenes.py")) +
                         glob.glob(os.path.join(d, "clip_*_meta.json"))):

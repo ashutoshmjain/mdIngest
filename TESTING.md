@@ -17,7 +17,7 @@ in a repo with **no episode content at all**.
   workspace pointed at the empty test workspace (the rclone-mounted test folder —
   an empty workspace structure with one settings.json).
 - After a run, clean up before any fan-out check: delete generated ingest/backups/*.bak files (run residue). ingest/tests/package-lock.json is committed and mirrored — if an install ever changes it, mirror the change.
-- **Baseline (2026-11-19): 7 pass / 11 fail.** The 11 failures below are fixture
+- **Baseline (2026-11-20): 8 pass / 10 fail.** The 10 failures below are fixture
   absences, not bugs. Judge every run against this list: a failure **outside**
   the list, or a pass count **below** baseline, is a real finding. A red run
   that matches the list exactly is a healthy run.
@@ -32,15 +32,11 @@ in a repo with **no episode content at all**.
    two `✓ Cutroom ready: ` assertions live, so they only verify live in Tier 2
    (or here, if a transcription fixture ever exists).
 5. *Workspace home link* — Curator is not running on :8000 in this tier.
-6. *Right Studio Deck Synchronization* — **known issue, not a fixture absence:**
-   the test asserts the Media deck title includes `ddma`; the shipped title is
-   "Cutroom Media Controller". Expected-fail until that assertion is fixed;
-   when it is fixed, this test passes here and the baseline becomes **8 / 10**.
-7. *Research Paper Sheet* — no episode card in the ledger tree.
-8. *Reels Media Grid* — no clips in the workspace.
-9. *Episode Listen Buttons* — no episode 249 content.
-10. *DDMA Auto-Seeding* — same missing episode-247 transcription as #3.
-11. *Overwrite Guards* — `src/249.md` does not exist in a template repo.
+6. *Research Paper Sheet* — no episode card in the ledger tree.
+7. *Reels Media Grid* — no clips in the workspace.
+8. *Episode Listen Buttons* — no episode 249 content.
+9. *DDMA Auto-Seeding* — same missing episode-247 transcription as #3.
+10. *Overwrite Guards* — `src/249.md` does not exist in a template repo.
 
 ## Tier 2 — Loaded workbench (Windows, deepDive clone, real data)
 

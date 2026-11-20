@@ -30,5 +30,6 @@ node_modules/
 package-lock.json
 **/__pycache__/
 ddma/cache/
+ddma/personal_beats/
 
 settings.json

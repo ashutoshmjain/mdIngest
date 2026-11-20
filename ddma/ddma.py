@@ -211,6 +211,30 @@ def load_plan_file(plan_file, writer="ddma"):
         return data
     return []
 
+def _preserve_number_types(new_obj, old_obj):
+    """Preserve int vs whole-number float representation from old_obj so plan
+    round-trips do not produce spurious 0.0 <-> 0 diffs (D7)."""
+    if isinstance(new_obj, dict) and isinstance(old_obj, dict):
+        return {
+            k: (_preserve_number_types(v, old_obj[k]) if k in old_obj else v)
+            for k, v in new_obj.items()
+        }
+    if isinstance(new_obj, list) and isinstance(old_obj, list):
+        return [
+            _preserve_number_types(v, old_obj[i]) if i < len(old_obj) else v
+            for i, v in enumerate(new_obj)
+        ]
+    if (
+        isinstance(new_obj, (int, float))
+        and not isinstance(new_obj, bool)
+        and isinstance(old_obj, (int, float))
+        and not isinstance(old_obj, bool)
+        and new_obj == old_obj
+    ):
+        return old_obj
+    return new_obj
+
+
 def save_plan_file(plan_file, plan_data, writer="ddma", expected_rev=None):
     """Write the plan to dd_hub FIRST, then the local file (fail loudly otherwise)."""
     import datetime as _dt
@@ -232,6 +256,9 @@ def save_plan_file(plan_file, plan_data, writer="ddma", expected_rev=None):
             f"STALE plan write REFUSED for {plan_file}: hub plan_rev is {current_rev}, "
             f"you loaded {expected_rev}. Reload the hub plan, re-apply your change, and save again. "
             "No silent last-writer-wins.")
+    existing = _read_plan_list(hub_plan) or _read_plan_list(plan_file)
+    if existing:
+        plan_data = _preserve_number_types(plan_data, existing)
     new_rev = current_rev + 1
     stamp = _dt.datetime.now().astimezone().isoformat()
     os.makedirs(os.path.dirname(hub_plan), exist_ok=True)

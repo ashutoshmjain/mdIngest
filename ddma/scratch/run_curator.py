@@ -339,13 +339,16 @@ def save_plan(project_id, plan_data, writer="curator", expected_rev=None):
             f"STALE plan write REFUSED for {project_id}: hub plan_rev is {current_rev}, "
             f"you loaded {expected_rev}. Reload the hub plan, re-apply your change, and save again. "
             "No silent last-writer-wins.")
+    local_plan = os.path.join("projects", project_id, "plan.json")
+    existing = safe_load_json(hub_plan) or safe_load_json(local_plan)
+    if existing:
+        plan_data = _preserve_number_types(plan_data, existing)
     new_rev = current_rev + 1
     stamp = _dt.datetime.now().astimezone().isoformat()
     os.makedirs(os.path.dirname(hub_plan), exist_ok=True)
     safe_save_json(hub_plan, plan_data)
     safe_save_json(hub_meta, {"plan_rev": new_rev, "last_writer": writer, "updated_at": stamp})
     _plan_rev_cache[str(ep)] = new_rev
-    local_plan = os.path.join("projects", project_id, "plan.json")
     safe_save_json(local_plan, plan_data)
     safe_save_json(os.path.join("projects", project_id, PLAN_META_FILENAME),
                     {"plan_rev": new_rev, "last_writer": writer, "updated_at": stamp})
