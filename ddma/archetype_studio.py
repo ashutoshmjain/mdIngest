@@ -15,6 +15,7 @@ ARCHETYPES_DIR = os.path.join(SCRIPT_DIR, "archetypes")
 MEDIA_VIDEOS_DIR = os.path.join(GITHUB_ROOT, "media", "videos")
 SETTINGS_PATH = os.path.join(SCRIPT_DIR, "settings.json")
 GENERATED_ARCHETYPES_JSON = os.path.join(SCRIPT_DIR, "generated_archetypes.json")
+PERSONAL_BEATS_DIR = os.path.join(SCRIPT_DIR, "personal_beats")
 
 
 def _clean_ep(ep_num: str = "248") -> str:
@@ -1407,4 +1408,187 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
         "visual_source": ch.get("visual_source", "manim"),
         "locked": ch.get("visual_source") == "mosaic",
         "mosaic_file": os.path.basename((ch.get("mosaic_body") or {}).get("path", "")) or None,
+    }
+
+
+def _slugify_pb(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
+    return s[:40] or "beat"
+
+
+def list_personal_beats(query: str = "") -> List[Dict[str, Any]]:
+    """Lists saved personal beats from ddma/personal_beats/ (deepDive-only; returns [] in mdIngest)."""
+    if not os.path.isdir(PERSONAL_BEATS_DIR):
+        return []
+    q = str(query or "").strip().lower()
+    items = []
+    for fname in sorted(os.listdir(PERSONAL_BEATS_DIR)):
+        if not fname.endswith(".json"):
+            continue
+        fpath = os.path.join(PERSONAL_BEATS_DIR, fname)
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                item = json.load(f)
+            if not isinstance(item, dict):
+                continue
+            if q:
+                hay = " ".join([
+                    str(item.get("title", "")),
+                    " ".join(item.get("tags") or []),
+                    str(item.get("visual_summary", "")),
+                    str((item.get("provenance") or {}).get("ep", "")),
+                    str((item.get("provenance") or {}).get("class_name", "")),
+                ]).lower()
+                if q not in hay:
+                    continue
+            items.append(item)
+        except Exception:
+            continue
+    items.sort(key=lambda x: str((x.get("provenance") or {}).get("saved_at", "")), reverse=True)
+    return items
+
+
+def save_personal_beat(
+    ep_num: str,
+    clip_num: int,
+    beat_index: int,
+    class_name: str,
+    title: str = "",
+    tags: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Saves a single beat's visual Scene class + browsing metadata to ddma/personal_beats/."""
+    clean_ep = _clean_ep(ep_num)
+    c_num = int(clip_num)
+    py_path = _resolve_clip_py_path(c_num, clean_ep)
+    classes = extract_scene_classes_from_py(py_path)
+    cls_info = next((c for c in classes if c["class_name"] == class_name), None)
+    if not cls_info:
+        raise ValueError(f"Scene class {class_name} not found in {py_path}")
+
+    visual_summary = cls_info.get("visual_summary", "")
+    meta_path = _resolve_clip_meta_path(c_num, clean_ep)
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                m_data = json.load(f)
+            b_meta = next((b for b in m_data.get("beats", []) if b.get("class_name") == class_name), None)
+            if b_meta and b_meta.get("visual_summary"):
+                visual_summary = b_meta["visual_summary"]
+        except Exception:
+            pass
+
+    clean_title = str(title or "").strip() or cls_info.get("title") or class_name
+    clean_tags = [str(t).strip() for t in (tags or []) if str(t).strip()]
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+    pb_id = f"{_slugify_pb(clean_title)}-{int(time.time())}"
+    os.makedirs(PERSONAL_BEATS_DIR, exist_ok=True)
+    bundle = {
+        "id": pb_id,
+        "title": clean_title,
+        "tags": clean_tags,
+        "visual_summary": visual_summary,
+        "class_name": class_name,
+        "class_code": cls_info["code"],
+        "provenance": {
+            "ep": clean_ep,
+            "clip_num": c_num,
+            "beat_index": int(beat_index),
+            "class_name": class_name,
+            "saved_at": stamp,
+        },
+    }
+    out_path = os.path.join(PERSONAL_BEATS_DIR, f"{pb_id}.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(bundle, f, indent=2)
+    return bundle
+
+
+def copy_personal_beat_visual(
+    personal_beat_id: str,
+    ep_num: str,
+    clip_num: int,
+    beat_index: int,
+    target_class_name: str,
+    compile_preview: bool = True,
+) -> Dict[str, Any]:
+    """Copies ONLY the visual Scene class code from a saved personal beat into the target
+    beat in the O2 directory. Preserves the target beat's own spoken text and timing (D2)."""
+    pb_path = os.path.join(PERSONAL_BEATS_DIR, f"{os.path.basename(personal_beat_id)}.json")
+    if not os.path.exists(pb_path):
+        raise ValueError(f"Personal beat not found: {personal_beat_id}")
+    with open(pb_path, "r", encoding="utf-8") as f:
+        pb = json.load(f)
+
+    src_code = str(pb.get("class_code", "")).strip()
+    if not src_code:
+        raise ValueError(f"Personal beat {personal_beat_id} has empty class_code")
+
+    # Rename class header to target_class_name while preserving the visual implementation
+    renamed_code = re.sub(
+        r"^class\s+Scene\w+\s*\(([^\)]*)\):",
+        f"class {target_class_name}(\\1):",
+        src_code,
+        count=1,
+        flags=re.MULTILINE,
+    )
+
+    clean_ep = _clean_ep(ep_num)
+    c_num = int(clip_num)
+    beats_dir = _episode_beats_dir(clean_ep)
+    src_py_path = _resolve_clip_py_path(c_num, clean_ep)
+    src_meta_path = _resolve_clip_meta_path(c_num, clean_ep)
+    dst_py_path = os.path.join(beats_dir, f"clip_{c_num:02d}_gemini_scenes.py")
+    dst_meta_path = os.path.join(beats_dir, f"clip_{c_num:02d}_meta.json")
+    if not os.path.exists(src_py_path):
+        raise ValueError(f"Target scene file not found: {src_py_path}")
+
+    with open(src_py_path, "r", encoding="utf-8") as f:
+        full_py = f.read()
+
+    pattern = re.compile(r"(^class\s+(Scene\w+)\s*\([^\)]*\):)", re.MULTILINE)
+    matches = list(pattern.finditer(full_py))
+    target_idx = next((i for i, m in enumerate(matches) if m.group(2) == target_class_name), None)
+    if target_idx is None:
+        raise ValueError(f"Target class {target_class_name} not found in {src_py_path}")
+
+    start_pos = matches[target_idx].start()
+    end_pos = matches[target_idx + 1].start() if target_idx + 1 < len(matches) else len(full_py)
+    updated_py = full_py[:start_pos] + renamed_code + "\n\n" + full_py[end_pos:]
+    os.makedirs(beats_dir, exist_ok=True)
+    had_o2_py = os.path.exists(dst_py_path)
+    with open(dst_py_path, "w", encoding="utf-8") as f:
+        f.write(updated_py)
+
+    if compile_preview:
+        ok, msg = compile_single_scene(c_num, target_class_name, ep_num=clean_ep)
+        if not ok:
+            if had_o2_py:
+                with open(dst_py_path, "w", encoding="utf-8") as f:
+                    f.write(full_py)
+            elif os.path.exists(dst_py_path):
+                os.remove(dst_py_path)
+            raise RuntimeError(f"Manim compilation failed for {target_class_name}:\n{msg}")
+
+    # Update ONLY visual metadata in O2 clip_XX_meta.json; NEVER touch target beat's text or timing
+    if os.path.exists(src_meta_path):
+        try:
+            with open(src_meta_path, "r", encoding="utf-8") as f:
+                m_data = json.load(f)
+            for b in m_data.get("beats", []):
+                if b.get("class_name") == target_class_name or b.get("index") == int(beat_index):
+                    b["visual_summary"] = pb.get("visual_summary") or f"Personal beat: {pb.get('title', personal_beat_id)}"
+                    b["personal_beat_id"] = personal_beat_id
+                    b["last_updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+            with open(dst_meta_path, "w", encoding="utf-8") as f:
+                json.dump(m_data, f, indent=2)
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "ep_num": clean_ep,
+        "clip_num": c_num,
+        "class_name": target_class_name,
+        "personal_beat_id": personal_beat_id,
+        "code": renamed_code,
     }

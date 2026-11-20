@@ -97,6 +97,28 @@ def find_master_video(clean_id):
     return None
 
 
+def find_clip_media(clean_id, clip_num):
+    """Locate clip-level MP4 or audio segment for middle-pane Clip playback (D3)."""
+    c = int(clip_num)
+    candidates = [
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-manim.mp4",
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-mosaic.mp4",
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}-manim.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}-mosaic.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}.mp4",
+        DD_HUB_ROOT / "episodes" / clean_id / f"clip_{c}.mp3",
+        DDMA_DIR / "clips" / f"clip_{c}.mp3",
+    ]
+    for p in candidates:
+        try:
+            if p.exists():
+                return p
+        except Exception:
+            pass
+    return None
+
+
 def clean_ep(raw, default="248"):
     return str(raw or default).replace(".md", "").lstrip("_") or default
 
@@ -209,6 +231,31 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.serve_media_file(master)
             else:
                 self.send_error(404, f"Longform master MP4 not found for episode {ep}")
+            return
+
+        if path == "/api/beats/clip_media":
+            ep = clean_ep(params.get("ep", ["248"])[0])
+            try:
+                clip_num = int(params.get("clip_num", ["1"])[0])
+            except ValueError:
+                self.send_error(400, "bad clip_num")
+                return
+            clip_p = find_clip_media(ep, clip_num)
+            if clip_p:
+                self.serve_media_file(clip_p)
+            else:
+                self.send_error(404, f"Clip media not found for ep {ep} clip {clip_num}")
+            return
+
+        if path == "/api/beats/personal/list":
+            q = params.get("q", [""])[0]
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                self.send_json({"beats": archetype_studio.list_personal_beats(q)})
+            except Exception as e:
+                self.send_json({"beats": [], "error": str(e)}, status=500)
             return
 
         if path == "/api/beats/beats":
@@ -369,6 +416,61 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                     {"success": False,
                      "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
                     status=502)
+            return
+
+        if path == "/api/beats/personal/save":
+            ep = clean_ep(data.get("ep", "248"))
+            try:
+                clip_num = int(data.get("clip_num", 1))
+                beat_index = int(data.get("beat_index", 1))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num/beat_index"}, status=400)
+                return
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                tags_raw = data.get("tags", [])
+                if isinstance(tags_raw, str):
+                    tags_raw = [t.strip() for t in tags_raw.split(",") if t.strip()]
+                saved = archetype_studio.save_personal_beat(
+                    ep_num=ep,
+                    clip_num=clip_num,
+                    beat_index=beat_index,
+                    class_name=str(data.get("class_name", "")).strip(),
+                    title=str(data.get("title", "")).strip(),
+                    tags=tags_raw,
+                )
+                self.send_json({"success": True, "beat": saved})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
+        if path == "/api/beats/personal/copy":
+            ep = clean_ep(data.get("ep", "248"))
+            try:
+                clip_num = int(data.get("clip_num", 1))
+                beat_index = int(data.get("beat_index", 1))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num/beat_index"}, status=400)
+                return
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                res = archetype_studio.copy_personal_beat_visual(
+                    personal_beat_id=str(data.get("id", "")).strip(),
+                    ep_num=ep,
+                    clip_num=clip_num,
+                    beat_index=beat_index,
+                    target_class_name=str(data.get("class_name", "")).strip(),
+                    compile_preview=bool(data.get("compile_preview", True)),
+                )
+                ch = archetype_studio.get_longform_chapter_beats(ep, clip_num)
+                res["chapter_data"] = rewrite_beat_urls(ch)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
             return
 
         self.send_error(404, "Endpoint not found")
