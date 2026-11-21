@@ -130,6 +130,7 @@ a { color: #7dd3fc; }
                                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
                                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                                 <span id="lf-beat-badge" style="background: #0284c7; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 5px; font-family: var(--font-mono);">PART 1 • BEAT 1/1</span>
+                                                <span id="lf-beat-split-badge" style="display:none; background:#b45309; color:#fef3c7; font-weight:800; font-size:0.68rem; padding:2px 8px; border-radius:5px; font-family:var(--font-mono);">sentence split</span>
                                                 <span id="lf-beat-classname" style="font-family: var(--font-mono); font-weight: 800; font-size: 0.85rem; color: #0f172a;">Scene01_01</span>
                                                 <span style="color: #94a3b8;">•</span>
                                                 <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">Visual Geometry:</span>
@@ -531,8 +532,9 @@ a { color: #7dd3fc; }
                 const bg = isActive ? '#0284c7' : '#0f172a';
                 const col = isActive ? '#ffffff' : '#bae6fd';
                 const border = isActive ? '#38bdf8' : '#334155';
-                return `<button type="button" id="lf-beat-pill-${idx}" onclick="selectLfBeat(${idx}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:999px;padding:4px 10px;font-size:0.7rem;font-weight:800;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;" title="${b.class_name} (${b.longform_start.toFixed(1)}s - ${b.longform_end.toFixed(1)}s)">
-                    #${b.index} (${formatDuration(b.longform_start)})
+                const splitTag = (b.boundary_ok === false) ? ' <span class="beat-split-badge" style="background:#b45309;color:#fef3c7;padding:1px 4px;border-radius:3px;font-size:0.58rem;margin-left:3px;">sentence split</span>' : '';
+                return `<button type="button" id="lf-beat-pill-${idx}" onclick="selectLfBeat(${idx}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:999px;padding:4px 10px;font-size:0.7rem;font-weight:800;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;" title="${b.class_name} (${b.longform_start.toFixed(1)}s - ${b.longform_end.toFixed(1)}s)${b.boundary_reason ? ' — ' + escapeHtml(b.boundary_reason) : ''}">
+                    #${b.index} (${formatDuration(b.longform_start)})${splitTag}
                 </button>`;
             }).join('');
         }
@@ -570,6 +572,15 @@ a { color: #7dd3fc; }
             const codeArea = document.getElementById('lf-beat-code-textarea');
 
             if (badgeEl) badgeEl.innerText = `PART ${lfActiveClipNum} • BEAT ${b.index}/${chData.beats.length}`;
+            const splitEl = document.getElementById('lf-beat-split-badge');
+            if (splitEl) {
+                if (b.boundary_ok === false) {
+                    splitEl.style.display = 'inline-block';
+                    splitEl.innerText = b.boundary_reason ? `sentence split (${b.boundary_reason})` : 'sentence split';
+                } else {
+                    splitEl.style.display = 'none';
+                }
+            }
             if (clsEl) clsEl.innerText = b.class_name;
             if (visEl) visEl.innerText = b.visual_summary || b.title || 'Bespoke monochrome vector animation';
             if (pyEl) pyEl.innerText = chData.py_file || `archetypes/clip_${String(lfActiveClipNum).padStart(2, '0')}_gemini_scenes.py`;

@@ -118,6 +118,7 @@ def generate_pedagogical_storyboard(
                 f"5. ARCHETYPES & CREATIVE FREEDOM:\n"
                 f"   - Existing Library Archetypes: {', '.join(PEDAGOGICAL_ARCHETYPES)}\n"
                 f"   - NEW ARCHETYPES: You are explicitly ENCOURAGED to invent NEW figurative cartoon archetypes tailored to the specific dialogue and narrative! Do NOT force all scenes into the existing library. Propose bold, fresh physical analogies.\n"
+                f"6. SCENE INTEGRITY (SENTENCE BOUNDARIES): Scene boundaries fall at sentence boundaries; a scene carries complete sentences; a sentence is never split across two scenes.\n"
                 f"{('- Special instructions: ' + custom_instructions) if custom_instructions else ''}\n\n"
                 f"Return ONLY a valid JSON array of {num_scenes} objects with schema:\n"
                 f'[\n'

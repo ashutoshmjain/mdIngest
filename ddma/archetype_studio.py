@@ -854,7 +854,7 @@ def _load_mapped_longform_words(ep_num: str = "248", total_duration: float = 325
     so that each Longform beat displays the exact words spoken during [longform_start, longform_end].
     """
     clean_ep = str(ep_num).replace(".md", "").lstrip("_")
-    ep_dir = os.path.join(GITHUB_ROOT, "deepDive", "src", "ddma", "docs", "episodes", clean_ep)
+    ep_dir = _episode_dir(clean_ep)
     trans_path = os.path.join(ep_dir, "transcription.json")
     edit_path = os.path.join(ep_dir, "podcast_edit.json")
 
@@ -893,6 +893,14 @@ _LF_INTERVALS_CACHE: Dict[str, Any] = {}
 
 
 def _episode_dir(clean_ep: str) -> str:
+    hub = _resolve_dd_hub_root()
+    if hub:
+        hub_ep = os.path.join(hub, "episodes", clean_ep)
+        if os.path.exists(os.path.join(hub_ep, "transcription.json")) or os.path.exists(os.path.join(hub_ep, "podcast_edit.json")):
+            return hub_ep
+    src_ep = os.path.join(GITHUB_ROOT, "src", "ddma", "docs", "episodes", clean_ep)
+    if os.path.exists(src_ep):
+        return src_ep
     return os.path.join(GITHUB_ROOT, "deepDive", "src", "ddma", "docs", "episodes", clean_ep)
 
 
@@ -1416,6 +1424,50 @@ def get_longform_timeline_index(ep_num: str = "248") -> Dict[str, Any]:
     }
 
 
+def validate_beat_boundaries(
+    beats: List[Dict[str, Any]],
+    mapped_words: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Validates each beat [longform_start, longform_end] against mapped_words (Spec C §3.4).
+    A beat violates if it begins/ends strictly inside a word's [start, end] span or if its
+    final word is not sentence-final while another word follows."""
+    results: List[Dict[str, Any]] = []
+    eps = 0.01
+    for b in beats:
+        idx = b.get("index")
+        b_start = float(b.get("longform_start", 0.0))
+        b_end = float(b.get("longform_end", 0.0))
+        if not mapped_words:
+            results.append({"index": idx, "ok": True, "reason": ""})
+            continue
+
+        cut_word = None
+        for w in mapped_words:
+            ws = float(w.get("start", 0.0))
+            we = float(w.get("end", 0.0))
+            if (ws + eps) < b_start < (we - eps) or (ws + eps) < b_end < (we - eps):
+                cut_word = str(w.get("word", "")).strip()
+                break
+        if cut_word is not None:
+            results.append({"index": idx, "ok": False, "reason": f"cuts word '{cut_word}'"})
+            continue
+
+        in_beat = [
+            (wi, w) for wi, w in enumerate(mapped_words)
+            if b_start <= 0.5 * (float(w.get("start", 0.0)) + float(w.get("end", 0.0))) < b_end
+        ]
+        if in_beat:
+            last_wi, last_w = in_beat[-1]
+            last_txt = str(last_w.get("word", "")).strip()
+            has_next = last_wi + 1 < len(mapped_words)
+            if has_next and not re.search(r'[.!?]["\'\)\]]*$', last_txt):
+                results.append({"index": idx, "ok": False, "reason": f"sentence split after '{last_txt}'"})
+                continue
+
+        results.append({"index": idx, "ok": True, "reason": ""})
+    return results
+
+
 def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[str, Any]:
     """
     Progressively loads the ~12-18 Manim beats for a single Chapter (clip_num) mapped to
@@ -1464,6 +1516,13 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
             "visual_source": ch.get("visual_source", "manim"),
         })
 
+    boundary_flags = validate_beat_boundaries(lf_beats, mapped_words)
+    flag_by_idx = {f["index"]: f for f in boundary_flags}
+    for b in lf_beats:
+        fl = flag_by_idx.get(b["index"], {"ok": True, "reason": ""})
+        b["boundary_ok"] = fl["ok"]
+        b["boundary_reason"] = fl["reason"]
+
     return {
         "ep_num": clean_ep,
         "clip_num": c_num,
@@ -1473,6 +1532,7 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
         "chapter_end": ch["end"],
         "scenes_count": len(lf_beats),
         "beats": lf_beats,
+        "boundary_flags": boundary_flags,
         "omitted_beats": omitted,
         "visual_source": ch.get("visual_source", "mosaic"),
         "locked": bool(ch.get("locked", False)),
