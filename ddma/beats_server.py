@@ -449,30 +449,31 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/beats/manim_retrigger":
+            # Production action only — never writes visual_source (Spec C §7).
             ep = clean_ep(data.get("ep", "248"))
             try:
                 clip_num = int(data.get("clip_num", 1))
             except ValueError:
                 self.send_json({"success": False, "error": "bad clip_num"}, status=400)
                 return
+            project_id = f"episode_{ep}"
+            req = urllib.request.Request(
+                f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
+                data=json.dumps({}).encode("utf-8"),
+                headers={"Content-Type": "application/json"}, method="POST")
             try:
-                import importlib
-                import archetype_studio
-                importlib.reload(archetype_studio)
-                res = archetype_studio.set_clip_visual_source(ep, clip_num, "manim")
-                project_id = f"episode_{ep}"
-                req = urllib.request.Request(
-                    f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
-                    data=json.dumps({}).encode("utf-8"),
-                    headers={"Content-Type": "application/json"}, method="POST")
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    self.send_json(json.loads(r.read().decode("utf-8")))
+            except urllib.error.HTTPError as he:
                 try:
-                    with urllib.request.urlopen(req, timeout=30) as r:
-                        res["curator"] = json.loads(r.read().decode("utf-8"))
-                except Exception as ce:
-                    res["curator_note"] = f"visual_source set to manim; curator unreachable ({ce})"
-                self.send_json(res)
+                    detail = he.read().decode("utf-8")[:500]
+                except Exception:
+                    detail = str(he)
+                self.send_json({"success": False, "error": f"curator refused: {detail}"}, status=he.code)
             except Exception as e:
-                self.send_json({"success": False, "error": str(e)}, status=500)
+                self.send_json(
+                    {"success": False, "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
+                    status=502)
             return
 
         if path == "/api/beats/personal/save":

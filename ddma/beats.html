@@ -35,6 +35,11 @@ a { color: #7dd3fc; }
   </div>
 </header>
                 <div id="submode-view-longform" style="display: block; width: 100%; max-width: 1520px; margin: 0 auto;">
+                    <div id="beats-empty-state" style="display: none; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 48px 24px; text-align: center; color: #f8fafc;">
+                        <h2 style="margin: 0 0 8px 0; font-size: 1.15rem;">No clips rendered. Go to Cutroom!</h2>
+                        <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 16px 0;">Render at least one clip in Cutroom before engineering beats here.</p>
+                        <a class="btn-mini" data-cutroom-home data-cutroom-page="curator.html">Go to Cutroom</a>
+                    </div>
                     <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 12px; align-items: start;">
 
                         <!-- LEFT PANE: Clips / Chapters -->
@@ -63,6 +68,7 @@ a { color: #7dd3fc; }
                                             <button type="button" id="btn-playback-mode-clip" onclick="setLfPlaybackMode('clip')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Clip</button>
                                         </div>
                                         <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; background: #1e293b; padding: 3px 9px; border-radius: 5px;">00:00 / 00:00</span>
+                                        <span style="font-size:0.66rem;color:#94a3b8;font-weight:700;">Use in longform:</span>
                                         <div style="display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 6px; overflow: hidden;">
                                             <button type="button" id="btn-engine-mosaic" onclick="setClipEngine('mosaic')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Mosaic</button>
                                             <button type="button" id="btn-engine-manim" onclick="setClipEngine('manim')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Manim</button>
@@ -73,7 +79,7 @@ a { color: #7dd3fc; }
                                     </div>
                                 </div>
 
-                                <!-- Video Player + Beat Scrubber -->
+                                <!-- Video Player -->
                                 <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #334155; margin-bottom: 10px;">
                                     <video id="lf-studio-video-player" style="width: 100%; max-height: 360px; aspect-ratio: 16/9; display: block; background: #000;" controls preload="metadata"></video>
                                     <div id="lf-beat-preview-overlay" style="display: none; position: absolute; right: 12px; bottom: 48px; width: 190px; background: #090d16; border: 2px solid #8b5cf6; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.75); overflow: hidden; z-index: 15;">
@@ -84,8 +90,28 @@ a { color: #7dd3fc; }
                                         <video id="lf-beat-preview-video" style="width: 100%; aspect-ratio: 1/1; display: block; background: #000;" controls loop muted playsinline></video>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 8px 10px;">
+                            <!-- Dynamic Below-Player Surface (Spec C §3.2: Scene Editor if has_beats, else 2 Mosaic actions) -->
+                            <div id="beats-below-player"></div>
+                        </main>
+
+                        <template id="tpl-mosaic-only-actions">
+                            <div id="beats-mosaic-only-surface" style="padding: 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 12px;">
+                                <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px;">
+                                    <div style="font-size: 0.85rem; font-weight: 800; color: #0f172a; margin-bottom: 6px;">🎞️ Mosaic Render Only (No Beats Storyboard Yet)</div>
+                                    <div style="font-size: 0.78rem; color: #475569; margin-bottom: 14px;">This clip has a Mosaic render and no Manim beats working set. Choose an action:</div>
+                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                        <button type="button" id="btn-mosaic-surface-retrigger" onclick="beatsMosaicRetrigger()" style="background:#7c3aed;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Mosaic</button>
+                                        <button type="button" id="btn-mosaic-surface-switch-manim" onclick="switchClipToManim()" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Switch this clip to Manim</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template id="tpl-beats-editor">
+                            <div id="beats-editor-surface">
+                                <div style="background: #1e293b; border-top: 1px solid #334155; padding: 10px 16px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                                         <span style="font-size: 0.68rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">⏱️ Micro-Beats in Active Clip</span>
                                         <button type="button" onclick="previewIsolatedLfBeat()" style="background: rgba(139, 92, 246, 0.2); border: 1px solid #8b5cf6; color: #ddd6fe; border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-weight: 700; cursor: pointer;" title="Preview the isolated 740x740 Manim vector MP4 for this beat">👁️ Preview 740×740 MP4</button>
@@ -94,72 +120,62 @@ a { color: #7dd3fc; }
                                         <span style="color: #64748b; font-size: 0.75rem;">Select a clip to inspect beats...</span>
                                     </div>
                                 </div>
-                            </div>
-
-                        <!-- BOTTOM HALF OF HORIZONTAL SPLIT: Active Beat Inspector, Spoken Dialogue & Gemini/Manim Editor -->
-                        <div style="padding: 16px 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 14px;">
-                            <!-- Beat Identity & Spoken Dialogue Card -->
-                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                        <span id="lf-beat-badge" style="background: #0284c7; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 5px; font-family: var(--font-mono);">PART 1 • BEAT 1/18</span>
-                                        <span id="lf-beat-classname" style="font-family: var(--font-mono); font-weight: 800; font-size: 0.85rem; color: #0f172a;">Scene01_01</span>
-                                        <span style="color: #94a3b8;">•</span>
-                                        <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">Visual Geometry:</span>
-                                        <span id="lf-beat-visual-summary" style="font-size: 0.78rem; color: #0369a1; font-weight: 700; background: #f0f9ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;">Bespoke monochrome vector animation</span>
+                                <div style="padding: 16px 20px; background: #f8fafc; display: flex; flex-direction: column; gap: 14px;">
+                                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                                <span id="lf-beat-badge" style="background: #0284c7; color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 5px; font-family: var(--font-mono);">PART 1 • BEAT 1/1</span>
+                                                <span id="lf-beat-classname" style="font-family: var(--font-mono); font-weight: 800; font-size: 0.85rem; color: #0f172a;">Scene01_01</span>
+                                                <span style="color: #94a3b8;">•</span>
+                                                <span style="font-size: 0.75rem; font-weight: 700; color: #475569;">Visual Geometry:</span>
+                                                <span id="lf-beat-visual-summary" style="font-size: 0.78rem; color: #0369a1; font-weight: 700; background: #f0f9ff; padding: 2px 8px; border-radius: 4px; border: 1px solid #bae6fd;">Bespoke monochrome vector animation</span>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span id="lf-beat-pyfile-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: #0369a1; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; font-weight: 700;">archetypes/clip_01_gemini_scenes.py</span>
+                                                <span id="lf-beat-time-range" style="font-family: var(--font-mono); font-size: 0.75rem; color: #64748b; font-weight: 700;">0.0s – 7.5s</span>
+                                            </div>
+                                        </div>
+                                        <div style="font-size: 0.68rem; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
+                                            🗣️ Spoken Dialogue in This Beat (Synchronized with Burned-In Captions):
+                                        </div>
+                                        <div id="lf-beat-spoken-text" style="font-size: 0.86rem; color: #1e293b; background: #f8fafc; padding: 9px 12px; border-radius: 6px; border-left: 3px solid #0284c7; font-style: italic; line-height: 1.45;">
+                                            "Select a beat to inspect dialogue."
+                                        </div>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span id="lf-beat-pyfile-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: #0369a1; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; font-weight: 700;">archetypes/clip_01_gemini_scenes.py</span>
-                                        <span id="lf-beat-time-range" style="font-family: var(--font-mono); font-size: 0.75rem; color: #64748b; font-weight: 700;">39.7s – 47.2s (7.5s)</span>
+                                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                            <label for="lf-beat-directive-input" style="font-size: 0.78rem; font-weight: 800; color: #6d28d9; display: flex; align-items: center; gap: 6px;">
+                                                <span>✍️ Producer Feedback / Request Archetype Change:</span>
+                                            </label>
+                                            <span id="lf-beat-compile-status" style="font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: #059669;"></span>
+                                        </div>
+                                        <textarea id="lf-beat-directive-input" rows="2" placeholder="Describe what you want changed in this beat's animation..." style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 11px; font-size: 0.84rem; font-family: inherit; resize: vertical; background: #f8fafc; color: #0f172a; margin-bottom: 10px;"></textarea>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                            <button type="button" id="lf-btn-toggle-code" onclick="toggleLfCodeEditor()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
+                                                💻 Show / Edit Manim Python Code
+                                            </button>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <button type="button" id="lf-btn-save-personal" onclick="saveCurrentBeatToPersonal()" style="background: #0f766e; border: none; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 0.78rem; font-weight: 800; cursor: pointer;">
+                                                    ⭐ Save to Personal Beats
+                                                </button>
+                                                <button type="button" id="lf-btn-regen-beat" onclick="regenerateLfBeatWithAI(false)" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); border: none; color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);">
+                                                    ✨ Regenerate This Beat with AI &amp; Recompile (~3s)
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="lf-code-editor-drawer" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                                <span style="font-size: 0.72rem; font-weight: 800; color: #334155; font-family: var(--font-mono);">🐍 Direct Manim Scene Class Definition (740×740 Square Vector Canvas):</span>
+                                                <button type="button" onclick="regenerateLfBeatWithAI(true)" style="background: #0284c7; border: none; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 0.74rem; font-weight: 800; cursor: pointer;">
+                                                    💾 Save Custom Code &amp; Recompile Beat (~3s)
+                                                </button>
+                                            </div>
+                                            <textarea id="lf-beat-code-textarea" rows="12" spellcheck="false" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.76rem; line-height: 1.45; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div style="font-size: 0.68rem; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 4px;">
-                                    🗣️ Spoken Dialogue in This Beat (Synchronized with Burned-In Captions):
-                                </div>
-                                <div id="lf-beat-spoken-text" style="font-size: 0.86rem; color: #1e293b; background: #f8fafc; padding: 9px 12px; border-radius: 6px; border-left: 3px solid #0284c7; font-style: italic; line-height: 1.45;">
-                                    "Pause or scrub the Longform video above to inspect any 7.5-second beat's dialogue and Manim vector archetype."
-                                </div>
-                            </div>
-
-                            <!-- Producer Feedback / Gemini AI Regeneration + Live Manim Python Code Editor -->
-                            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                                    <label for="lf-beat-directive-input" style="font-size: 0.78rem; font-weight: 800; color: #6d28d9; display: flex; align-items: center; gap: 6px;">
-                                        <span>✍️ Producer Feedback / Request Archetype Change (Updates Shared Longform + Cutroom Short Library):</span>
-                                    </label>
-                                    <span id="lf-beat-compile-status" style="font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: #059669;"></span>
-                                </div>
-
-                                <textarea id="lf-beat-directive-input" rows="2" placeholder="Pause the video and describe what you want changed in this 7.5s animation (e.g. 'Show a commercial airplane flying across the sky', 'Show a 100m sprinter racing toward a finish line')..." style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 6px; padding: 9px 11px; font-size: 0.84rem; font-family: inherit; resize: vertical; background: #f8fafc; color: #0f172a; margin-bottom: 10px;"></textarea>
-
-                                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                    <button type="button" id="lf-btn-toggle-code" onclick="toggleLfCodeEditor()" style="background: #f1f5f9; border: 1px solid #cbd5e1; color: #334155; border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
-                                        💻 Show / Edit Manim Python Code
-                                    </button>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <button type="button" id="lf-btn-save-personal" onclick="saveCurrentBeatToPersonal()" style="background: #0f766e; border: none; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 0.78rem; font-weight: 800; cursor: pointer;">
-                                            ⭐ Save to Personal Beats
-                                        </button>
-                                        <button type="button" id="lf-btn-regen-beat" onclick="regenerateLfBeatWithAI(false)" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); border: none; color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);">
-                                            ✨ Regenerate This Beat with AI &amp; Recompile (~3s)
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <!-- Collapsible Manim Python Code Editor -->
-                                <div id="lf-code-editor-drawer" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #cbd5e1;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                        <span style="font-size: 0.72rem; font-weight: 800; color: #334155; font-family: var(--font-mono);">🐍 Direct Manim Scene Class Definition (740×740 Square Vector Canvas):</span>
-                                        <button type="button" onclick="regenerateLfBeatWithAI(true)" style="background: #0284c7; border: none; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 0.74rem; font-weight: 800; cursor: pointer;">
-                                            💾 Save Custom Code &amp; Recompile Beat (~3s)
-                                        </button>
-                                    </div>
-                                    <textarea id="lf-beat-code-textarea" rows="12" spellcheck="false" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.76rem; line-height: 1.45; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
                                 </div>
                             </div>
-                        </div>
-                        </main>
+                        </template>
 
                         <!-- RIGHT PANE: Personal Beats Selection -->
                         <aside id="beats-right-pane" style="background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; gap: 8px;">
@@ -239,7 +255,19 @@ a { color: #7dd3fc; }
                 }
 
                 renderLfChapterStrip();
-                await selectLfChapter(lfActiveClipNum || 1, false);
+                const openables = (lfTimelineIndex.chapters || []).filter(c => c.openable);
+                const gridEl = document.getElementById('beats-workspace-grid');
+                const emptyEl = document.getElementById('beats-empty-state');
+                if (openables.length === 0) {
+                    if (gridEl) gridEl.style.display = 'none';
+                    if (emptyEl) emptyEl.style.display = 'block';
+                    loadPersonalBeats();
+                    return;
+                }
+                if (gridEl) gridEl.style.display = 'grid';
+                if (emptyEl) emptyEl.style.display = 'none';
+                const targetCh = openables.find(c => c.clip_num === lfActiveClipNum) || openables[0];
+                await selectLfChapter(targetCh.clip_num, false);
                 loadPersonalBeats();
             } catch (err) {
                 console.error("Failed to initialize Longform Beat Studio:", err);
@@ -284,26 +312,62 @@ a { color: #7dd3fc; }
             if (!strip || !lfTimelineIndex || !lfTimelineIndex.chapters) return;
 
             strip.innerHTML = lfTimelineIndex.chapters.map(ch => {
-                const isActive = ch.clip_num === lfActiveClipNum;
+                const isOpenable = ch.openable !== false;
+                const isActive = ch.clip_num === lfActiveClipNum && isOpenable;
                 const isMosaic = ch.visual_source === 'mosaic';
-                const bg = isActive ? '#7c3aed' : (isMosaic ? '#0c2340' : '#0f172a');
-                const col = isActive ? '#ffffff' : (isMosaic ? '#7dd3fc' : '#cbd5e1');
-                const border = isActive ? '#a78bfa' : (isMosaic ? '#0284c7' : '#334155');
+                const bg = !isOpenable ? '#0f172a' : (isActive ? '#7c3aed' : (isMosaic ? '#0c2340' : '#0f172a'));
+                const col = !isOpenable ? '#64748b' : (isActive ? '#ffffff' : (isMosaic ? '#7dd3fc' : '#cbd5e1'));
+                const border = !isOpenable ? '#1e293b' : (isActive ? '#a78bfa' : (isMosaic ? '#0284c7' : '#334155'));
                 const prefix = isMosaic ? '🎞 ' : '';
-                return `<button type="button" id="lf-ch-btn-${ch.clip_num}" onclick="selectLfChapter(${ch.clip_num}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;transition:all 0.12s;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)} - ${formatDuration(ch.end)}) [${isMosaic ? 'Mosaic Master' : 'Manim Master'}]">
-                    ${prefix}P${ch.clip_num}: ${escapeHtml(ch.title.slice(0, 18))}
+                const pubBadge = ch.published ? '<span class="ch-published-badge" style="background:#065f46;color:#a7f3d0;padding:1px 5px;border-radius:4px;font-size:0.6rem;margin-left:4px;">Published</span>' : '';
+                const tip = !isOpenable
+                    ? 'not rendered yet — render it in Cutroom'
+                    : `Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)} - ${formatDuration(ch.end)}) [${isMosaic ? 'Mosaic Master' : 'Manim Master'}]`;
+                const clickAttr = isOpenable ? `onclick="selectLfChapter(${ch.clip_num}, true)"` : 'disabled';
+                const extraStyle = isOpenable ? 'cursor:pointer;' : 'opacity:0.45;cursor:not-allowed;';
+                return `<button type="button" id="lf-ch-btn-${ch.clip_num}" ${clickAttr} style="background:${bg};color:${col};border:1px solid ${border};border-radius:5px;padding:4px 8px;font-size:0.68rem;font-weight:700;${extraStyle}font-family:var(--font-mono);white-space:nowrap;text-align:left;transition:all 0.12s;" title="${tip}">
+                    ${prefix}P${ch.clip_num}: ${escapeHtml(ch.title.slice(0, 18))}${pubBadge}
                 </button>`;
             }).join('');
         }
 
+        function renderBelowPlayerSurface(chData) {
+            const container = document.getElementById('beats-below-player');
+            if (!container) return;
+            const hasBeats = Boolean(chData && (chData.has_beats || (chData.beats && chData.beats.length > 0)));
+            const tpl = document.getElementById(hasBeats ? 'tpl-beats-editor' : 'tpl-mosaic-only-actions');
+            container.innerHTML = '';
+            if (tpl) container.appendChild(tpl.content.cloneNode(true));
+        }
+
+        async function switchClipToManim() {
+            const cNum = lfActiveClipNum || 1;
+            try {
+                showToast(`🔄 Switching Part ${cNum} to Manim...`);
+                const res = await fetch('/api/beats/manim_retrigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ep: beatsEpisode(), clip_num: cNum })
+                });
+                const data = await res.json();
+                if (!res.ok || data.success === false) throw new Error(data.error || 'Manim generation failed');
+                lfChapterLRU.delete(cNum);
+                await selectLfChapter(cNum, false);
+                showToast(`✅ Manim storyboard ready for Part ${cNum}`);
+            } catch (e) {
+                showToast('❌ Switch to Manim failed: ' + e.message);
+            }
+        }
+
         async function selectLfChapter(clipNum, seekVideo = false) {
             const cNum = parseInt(clipNum, 10) || 1;
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
+            if (chInfo && chInfo.openable === false) return;
             lfActiveClipNum = cNum;
             renderLfChapterStrip();
             if (lfPlaybackMode === 'clip') applyPlaybackSource();
 
             const metaEl = document.getElementById('lf-active-chapter-meta');
-            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
             const isMosaicCh = chInfo?.visual_source === 'mosaic';
             const btnEMos = document.getElementById('btn-engine-mosaic');
             const btnEMan = document.getElementById('btn-engine-manim');
@@ -322,10 +386,10 @@ a { color: #7dd3fc; }
 
             try {
                 const chData = await fetchLfChapterProgressive(cNum);
+                renderBelowPlayerSurface(chData);
                 const beats = chData.beats || [];
-                renderLfBeatPills(beats);
-
                 if (beats.length > 0) {
+                    renderLfBeatPills(beats);
                     selectLfBeat(0, seekVideo);
                 }
             } catch (err) {
@@ -395,54 +459,6 @@ a { color: #7dd3fc; }
             if (!isTyping || (videoEl && videoEl.paused)) {
                 if (dirInput && document.activeElement !== dirInput) dirInput.value = b.user_notes || '';
                 if (codeArea && document.activeElement !== codeArea) codeArea.value = b.code || '';
-            }
-
-            // Handle Mosaic vs Manim Master state (Greys out beat editing for Mosaic master chapters)
-            const isMosaic = chData.visual_source === 'mosaic' || chData.locked;
-            const regenBtn = document.getElementById('lf-btn-regen-beat');
-            const toggleCodeBtn = document.getElementById('lf-btn-toggle-code');
-            const codeDrawer = document.getElementById('lf-code-editor-drawer');
-
-            if (isMosaic) {
-                if (dirInput) {
-                    dirInput.disabled = true;
-                    dirInput.value = "";
-                    dirInput.placeholder = "Chapter uses Mosaic as Active Master — set Manim as Active Master in Cutroom to edit beats.";
-                    dirInput.style.opacity = '0.55';
-                    dirInput.style.cursor = 'not-allowed';
-                }
-                if (regenBtn) {
-                    regenBtn.disabled = true;
-                    regenBtn.style.opacity = '0.4';
-                    regenBtn.style.cursor = 'not-allowed';
-                    regenBtn.title = "Chapter uses Mosaic as Active Master — set Manim as Active Master in Cutroom to edit beats";
-                }
-                if (toggleCodeBtn) {
-                    toggleCodeBtn.disabled = true;
-                    toggleCodeBtn.style.opacity = '0.4';
-                    toggleCodeBtn.style.cursor = 'not-allowed';
-                    toggleCodeBtn.title = "Chapter uses Mosaic as Active Master";
-                }
-                if (codeDrawer) codeDrawer.style.display = 'none';
-            } else {
-                if (dirInput) {
-                    dirInput.disabled = false;
-                    dirInput.placeholder = "Pause the video and describe what you want changed in this 7.5s animation (e.g. 'Show a commercial airplane flying across the sky', 'Show a 100m sprinter racing toward a finish line')...";
-                    dirInput.style.opacity = '1';
-                    dirInput.style.cursor = '';
-                }
-                if (regenBtn) {
-                    regenBtn.disabled = false;
-                    regenBtn.style.opacity = '1';
-                    regenBtn.style.cursor = 'pointer';
-                    regenBtn.title = "Regenerate this beat with Gemini AI";
-                }
-                if (toggleCodeBtn) {
-                    toggleCodeBtn.disabled = false;
-                    toggleCodeBtn.style.opacity = '1';
-                    toggleCodeBtn.style.cursor = 'pointer';
-                    toggleCodeBtn.title = "Show / Edit Manim Python Code";
-                }
             }
 
             if (seekVideo && videoEl) {

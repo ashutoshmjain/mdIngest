@@ -4127,10 +4127,6 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             self.end_headers()
                             self.wfile.write(json.dumps({"success": False, "error": f"Clip {clip_num} is unlocked. Lock clip before compiling."}).encode("utf-8"))
                             return
-                        if req_source in ("mosaic", "infographic") and t_clip.get("visual_source") != req_source:
-                            t_clip["visual_source"] = req_source
-                            with open(plan_path, "w", encoding="utf-8") as pf_w:
-                                json.dump(p_data_chk, pf_w, indent=4)
                         curr_audio_sig = hashlib.md5((json.dumps(t_clip.get("segments", []), sort_keys=True) + str(audio_file)).encode("utf-8")).hexdigest()
                         curr_compile_sig = hashlib.md5(json.dumps({
                             "title": t_clip.get("title", ""),
@@ -4698,8 +4694,6 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 t_clip["_audio_sig"] = curr_audio_sig
                 t_clip["audio_duration"] = round(body_dur, 2)
-                if not t_clip.get("visual_source"):
-                    t_clip["visual_source"] = "manim"
                 t_clip["infographic_ready"] = True
                 t_clip["_infographic_version"] = INFOGRAPHIC_ENGINE_VERSION
                 with open(plan_path, "w", encoding="utf-8") as pf_w:

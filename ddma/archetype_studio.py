@@ -48,18 +48,20 @@ def _episode_beats_dir(ep_num: str = "248") -> str:
 
 def _resolve_clip_py_path(clip_num: int, ep_num: str = "248") -> str:
     c_num = int(clip_num)
+    clean_ep = _clean_ep(ep_num)
     fname = f"clip_{c_num:02d}_gemini_scenes.py"
-    o2_path = os.path.join(_episode_beats_dir(ep_num), fname)
-    if os.path.exists(o2_path):
+    o2_path = os.path.join(_episode_beats_dir(clean_ep), fname)
+    if os.path.exists(o2_path) or clean_ep != "248":
         return o2_path
     return os.path.join(ARCHETYPES_DIR, fname)
 
 
 def _resolve_clip_meta_path(clip_num: int, ep_num: str = "248") -> str:
     c_num = int(clip_num)
+    clean_ep = _clean_ep(ep_num)
     fname = f"clip_{c_num:02d}_meta.json"
-    o2_path = os.path.join(_episode_beats_dir(ep_num), fname)
-    if os.path.exists(o2_path):
+    o2_path = os.path.join(_episode_beats_dir(clean_ep), fname)
+    if os.path.exists(o2_path) or clean_ep != "248":
         return o2_path
     return os.path.join(ARCHETYPES_DIR, fname)
 
@@ -1192,6 +1194,33 @@ def resolve_mosaic_body(clean_ep: str, clip_num: int, plan_clip: Optional[Dict[s
     return None
 
 
+def _has_clip_media(clean_ep: str, clip_num: int) -> bool:
+    c = int(clip_num)
+    hub = _resolve_dd_hub_root()
+    cands = [
+        os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-manim.mp4"),
+        os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-mosaic.mp4"),
+        os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}.mp4"),
+        os.path.join(SCRIPT_DIR, "clips", f"clip_{c}.mp3"),
+    ]
+    if hub:
+        cands.extend([
+            os.path.join(hub, "episodes", clean_ep, f"{clean_ep}-{c}-manim.mp4"),
+            os.path.join(hub, "episodes", clean_ep, f"{clean_ep}-{c}-mosaic.mp4"),
+            os.path.join(hub, "episodes", clean_ep, f"{clean_ep}-{c}.mp4"),
+            os.path.join(hub, "episodes", clean_ep, f"clip_{c}.mp3"),
+        ])
+    return any(os.path.exists(p) for p in cands)
+
+
+def _has_master_video(clean_ep: str) -> bool:
+    hub = _resolve_dd_hub_root()
+    cands = [os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-longform-master.mp4")]
+    if hub:
+        cands.insert(0, os.path.join(hub, "video", f"podcast_{clean_ep}.mp4"))
+    return any(os.path.exists(p) for p in cands)
+
+
 def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optional[float] = None) -> Dict[str, Any]:
     """
     Single source of truth for Longform visual alignment (used by Beat Studio, full render and hot-patch).
@@ -1210,6 +1239,7 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         total_duration = 3254.21
     mapped_words = _load_mapped_longform_words(clean_ep)
 
+    has_master = _has_master_video(clean_ep)
     chapters: Dict[int, Dict[str, Any]] = {}
     order: List[int] = []
     for idx, clip in enumerate(plan_data):
@@ -1226,13 +1256,29 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         else:
             c_start = map_t(float(clip.get("start", 0.0)))
         chapters[c_num] = {"start": round(c_start, 2), "beats": beats, "title": str(clip.get("title", f"Part {c_num}")).strip()}
-        # Active Master: plan.json visual_source ("mosaic" | "manim", default "mosaic" per D5)
+        actual_mosaic_body = resolve_mosaic_body(clean_ep, c_num, clip)
+        has_beats = len(beats) > 0
+        has_rendered_beat = any(b.get("beat", {}).get("mp4_exists") for b in beats)
+        openable = bool(actual_mosaic_body) or _has_clip_media(clean_ep, c_num) or (has_beats and has_rendered_beat) or has_master
+        published = bool(clip.get("published", False))
+
         raw_vs = str(clip.get("visual_source") or "").strip().lower()
-        configured_vs = raw_vs if raw_vs in ("mosaic", "manim") else "mosaic"
-        mosaic_body = resolve_mosaic_body(clean_ep, c_num, clip) if configured_vs == "mosaic" else None
+        if raw_vs in ("mosaic", "manim"):
+            configured_vs = raw_vs
+        elif actual_mosaic_body and not has_beats:
+            configured_vs = "mosaic"
+        elif has_beats and not actual_mosaic_body:
+            configured_vs = "manim"
+        else:
+            configured_vs = "mosaic"
+
+        mosaic_body = actual_mosaic_body if configured_vs == "mosaic" else None
         chapters[c_num]["visual_source"] = configured_vs
         chapters[c_num]["mosaic_body"] = mosaic_body
         chapters[c_num]["locked"] = bool(configured_vs == "mosaic" and mosaic_body)
+        chapters[c_num]["has_beats"] = has_beats
+        chapters[c_num]["openable"] = openable
+        chapters[c_num]["published"] = published
         order.append(c_num)
 
     for i, c_num in enumerate(order):
@@ -1355,6 +1401,9 @@ def get_longform_timeline_index(ep_num: str = "248") -> Dict[str, Any]:
             "py_file": f"archetypes/clip_{c_num:02d}_gemini_scenes.py",
             "visual_source": ch.get("visual_source", "mosaic"),
             "locked": bool(ch.get("locked", False)),
+            "has_beats": bool(ch.get("has_beats", False)),
+            "openable": bool(ch.get("openable", False)),
+            "published": bool(ch.get("published", False)),
         })
 
     return {
@@ -1427,6 +1476,9 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
         "omitted_beats": omitted,
         "visual_source": ch.get("visual_source", "mosaic"),
         "locked": bool(ch.get("locked", False)),
+        "has_beats": bool(ch.get("has_beats", False)),
+        "openable": bool(ch.get("openable", False)),
+        "published": bool(ch.get("published", False)),
         "mosaic_file": os.path.basename((ch.get("mosaic_body") or {}).get("path", "")) or None,
     }
 
