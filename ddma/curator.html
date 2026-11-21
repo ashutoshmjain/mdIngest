@@ -1536,7 +1536,7 @@
                 ⚙️ Settings
             </button>
 
-            <a data-workspace-home target="deepdive-workspace" id="topWorkspaceBtn" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open the Workspace home page (landing page)">
+            <a data-workspace-home id="topWorkspaceBtn" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open the Workspace home page (landing page)">
                 <span>🏠</span> Workspace
             </a>
         </div>
@@ -2163,8 +2163,7 @@
                     const res = await fetch('/api/cockpit/launch', {method: 'POST'});
                     const data = await res.json();
                     if (data && data.success && data.cockpit_url) {
-                        window.open(data.cockpit_url, 'deepdive-workspace');
-                        updateStateBar('Workspace home page opened.');
+                        window.location.href = data.cockpit_url;
                     } else {
                         throw new Error((data && data.error) || 'Workspace server is not running.');
                     }

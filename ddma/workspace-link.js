@@ -4,7 +4,7 @@
 // window.location.hostname. Mirrored copies (ingest/ and ddma/) are
 // byte-identical; to change the port or path, edit here and mirror.
 // Usage in app HTML:
-//   <a data-workspace-home target="deepdive-workspace" ...>... label ...</a>
+//   <a data-workspace-home ...>... label ...</a>
 //   <a data-workspace-home data-workspace-page="cockpit.html" ...>cockpit</a>
 // plus one include per page: <script src="workspace-link.js"></script>
 (function () {

@@ -209,6 +209,16 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             self.serve_file(DDMA_DIR / fname, mime=mime)
             return
 
+        if path == "/api/beats/episodes":
+            try:
+                import importlib
+                import archetype_studio
+                importlib.reload(archetype_studio)
+                self.send_json({"episodes": archetype_studio.list_workspace_episodes()})
+            except Exception as e:
+                self.send_json({"episodes": [], "error": str(e)}, status=500)
+            return
+
         if path == "/api/beats/index":
             ep = clean_ep(params.get("ep", ["248"])[0])
             try:

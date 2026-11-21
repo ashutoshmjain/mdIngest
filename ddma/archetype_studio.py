@@ -92,6 +92,25 @@ def _resolve_episode_plan_path(ep_num: str = "248") -> Optional[str]:
             return cand
     return None
 
+
+def list_workspace_episodes() -> List[str]:
+    """Lists episode IDs that have a resolvable plan.json (hub-first, then local projects),
+    sorted ascending (Spec C §5)."""
+    eps = set()
+    hub = _resolve_dd_hub_root()
+    if hub:
+        hub_eps = os.path.join(hub, "episodes")
+        if os.path.isdir(hub_eps):
+            for name in os.listdir(hub_eps):
+                if os.path.isfile(os.path.join(hub_eps, name, "plan.json")):
+                    eps.add(_clean_ep(name))
+    proj_dir = os.path.join(SCRIPT_DIR, "projects")
+    if os.path.isdir(proj_dir):
+        for name in os.listdir(proj_dir):
+            if name.startswith("episode_") and os.path.isfile(os.path.join(proj_dir, name, "plan.json")):
+                eps.add(_clean_ep(name[len("episode_"):]))
+    return sorted(eps, key=lambda x: (0, int(x)) if x.isdigit() else (1, x))
+
 PRIMARY_MODELS = [
     "models/gemini-3.5-flash-lite",
     "models/gemini-flash-lite-latest",

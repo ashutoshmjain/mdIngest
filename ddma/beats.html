@@ -22,12 +22,13 @@ a { color: #7dd3fc; }
     <span class="brand-wordmark">SHUTRI&nbsp;BEATS</span>
     <div class="ep-pill">
       <label for="beats-ep">EPISODE:</label>
-      <input id="beats-ep" size="6" value="248">
-      <button type="button" class="btn-mini" onclick="beatsLoad()">Load</button>
+      <select id="beats-ep" onchange="beatsLoad()" style="background: transparent; border: none; color: #f8fafc; font-size: 0.78rem; font-weight: 700; outline: none; font-family: var(--font-mono); cursor: pointer;">
+        <option value="248">248</option>
+      </select>
     </div>
   </div>
   <div style="display: flex; align-items: center; gap: 0.5rem;">
-    <a class="btn-mini" data-workspace-home target="deepdive-workspace" title="Open the Workspace home page (landing page)">🏠 Workspace</a>
+    <a class="btn-mini" data-workspace-home title="Open the Workspace home page (landing page)">🏠 Workspace</a>
     <a class="btn-mini" data-workspace-home data-workspace-page="cockpit.html">cockpit</a>
     <a class="btn-mini" data-cutroom-home data-cutroom-page="curator.html" title="Open Cutroom (Curator)">Cutroom</a>
     <span id="beats-toast"></span>
@@ -784,10 +785,35 @@ async function beatsMosaicRetrigger() {
         showToast((!res.ok || data.success === false) ? ('Mosaic retrigger refused: ' + (data.error || res.status)) : 'Mosaic run started for Part ' + cNum);
     } catch (e) { if (st) st.innerText = 'error: ' + e.message; }
 }
-document.addEventListener('DOMContentLoaded', () => {
+async function initBeatsEpisodeSelect() {
+    const sel = document.getElementById('beats-ep');
+    if (!sel) return;
+    const q = (new URLSearchParams(location.search).get('ep') || '').replace('.md', '').replace(/^_/, '');
+    let eps = [];
+    try {
+        const res = await fetch('/api/beats/episodes');
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.episodes)) eps = data.episodes.map(String);
+        }
+    } catch (e) { /* fallback to current episode only */ }
+    if (eps.length === 0) {
+        eps = [q || '248'];
+    } else if (q && !eps.includes(q)) {
+        eps.push(q);
+    }
+    sel.innerHTML = eps.map(ep => `<option value="${escapeHtml(ep)}" style="background:#0f172a;color:#f8fafc;">${escapeHtml(ep)}</option>`).join('');
+    if (q && eps.includes(q)) {
+        sel.value = q;
+    } else if (eps.includes('248') && !q) {
+        sel.value = '248';
+    } else {
+        sel.value = eps[0];
+    }
+}
+document.addEventListener('DOMContentLoaded', async () => {
+    await initBeatsEpisodeSelect();
     initLongformBeatStudio();
-    const inp = document.getElementById('beats-ep');
-    if (inp) inp.addEventListener('input', () => { inp.dataset.touched = '1'; });
 });
 </script>
 <script src="workspace-link.js"></script>
