@@ -64,9 +64,11 @@ a { color: #7dd3fc; }
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                         <div style="display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 6px; overflow: hidden;">
-                                            <button type="button" id="btn-playback-mode-master" onclick="setLfPlaybackMode('master')" style="background:#0284c7;color:#fff;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Master</button>
-                                            <button type="button" id="btn-playback-mode-clip" onclick="setLfPlaybackMode('clip')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Clip</button>
+                                            <button type="button" id="btn-playback-mode-clip" onclick="setLfPlaybackMode('clip')" style="background:#0284c7;color:#fff;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Play Clip</button>
+                                            <button type="button" id="btn-playback-mode-master" onclick="setLfPlaybackMode('master')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Play Full</button>
                                         </div>
+                                        <span id="lf-player-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:#fbbf24;"></span>
+                                        <button type="button" id="lf-span-replay-btn" onclick="replayActiveSpan()" style="display:none;background:#0f766e;color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">↺ Replay Span</button>
                                         <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: #cbd5e1; background: #1e293b; padding: 3px 9px; border-radius: 5px;">00:00 / 00:00</span>
                                         <span style="font-size:0.66rem;color:#94a3b8;font-weight:700;">Use in longform:</span>
                                         <div style="display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 6px; overflow: hidden;">
@@ -80,8 +82,9 @@ a { color: #7dd3fc; }
                                 </div>
 
                                 <!-- Video Player -->
-                                <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #334155; margin-bottom: 10px;">
+                                <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #334155; margin-bottom: 8px;">
                                     <video id="lf-studio-video-player" style="width: 100%; max-height: 360px; aspect-ratio: 16/9; display: block; background: #000;" controls preload="metadata"></video>
+                                    <div id="lf-no-media-hint" style="display:none; padding:24px; text-align:center; color:#94a3b8; font-size:0.82rem; font-family:var(--font-mono);">No clip render or longform master available for this clip yet.</div>
                                     <div id="lf-beat-preview-overlay" style="display: none; position: absolute; right: 12px; bottom: 48px; width: 190px; background: #090d16; border: 2px solid #8b5cf6; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.75); overflow: hidden; z-index: 15;">
                                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: #6d28d9; color: #fff; font-size: 0.65rem; font-weight: 800; font-family: var(--font-mono);">
                                             <span id="lf-beat-preview-label">✨ UPDATED BEAT</span>
@@ -90,6 +93,8 @@ a { color: #7dd3fc; }
                                         <video id="lf-beat-preview-video" style="width: 100%; aspect-ratio: 1/1; display: block; background: #000;" controls loop muted playsinline></video>
                                     </div>
                                 </div>
+                                <!-- Chapter Span Strip + Beat Boundary Ticks (Spec C §3.1) -->
+                                <div id="lf-span-strip" style="display:flex; gap:2px; align-items:stretch; height:22px; background:#020617; border:1px solid #334155; border-radius:6px; padding:2px; overflow:hidden;"></div>
                             </div>
 
                             <!-- Dynamic Below-Player Surface (Spec C §3.2: Scene Editor if has_beats, else 2 Mosaic actions) -->
@@ -201,33 +206,137 @@ a { color: #7dd3fc; }
         let lfActiveBeatIdx = 0;
         let lfLoadingChapter = false;
         let lfVideoListenerBound = false;
-        let lfPlaybackMode = 'master';
+        let lfPlaybackMode = 'clip';
+        let lfPendingSeek = null;
+
+        function seekVideoSafely(videoEl, targetTime) {
+            if (!videoEl || targetTime == null || isNaN(targetTime)) return;
+            lfPendingSeek = targetTime;
+            if (videoEl.readyState >= 1) {
+                try { videoEl.currentTime = targetTime; } catch (e) {}
+            }
+        }
+
+        function replayActiveSpan() {
+            const videoEl = document.getElementById('lf-studio-video-player');
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === lfActiveClipNum);
+            const replayBtn = document.getElementById('lf-span-replay-btn');
+            if (replayBtn) replayBtn.style.display = 'none';
+            if (videoEl && chInfo) {
+                seekVideoSafely(videoEl, lfTimelineIndex?.has_video ? chInfo.start : 0);
+                videoEl.play().catch(() => {});
+            }
+        }
 
         function applyPlaybackSource() {
             const cleanId = beatsEpisode();
             const videoEl = document.getElementById('lf-studio-video-player');
-            if (!videoEl) return;
-            const targetSrc = (lfPlaybackMode === 'clip')
-                ? `/api/beats/clip_media?ep=${encodeURIComponent(cleanId)}&clip_num=${lfActiveClipNum}`
-                : (lfTimelineIndex?.video_url || `/api/beats/video?ep=${encodeURIComponent(cleanId)}`);
-            if (videoEl.getAttribute('src') !== targetSrc) {
-                videoEl.src = targetSrc;
+            const noMediaEl = document.getElementById('lf-no-media-hint');
+            const hintEl = document.getElementById('lf-player-hint');
+            const btnMaster = document.getElementById('btn-playback-mode-master');
+            const btnClip = document.getElementById('btn-playback-mode-clip');
+            const replayBtn = document.getElementById('lf-span-replay-btn');
+            if (replayBtn) replayBtn.style.display = 'none';
+
+            const hasMaster = Boolean(lfTimelineIndex && lfTimelineIndex.has_video);
+            if (btnMaster) {
+                btnMaster.disabled = !hasMaster;
+                btnMaster.style.opacity = hasMaster ? '1' : '0.45';
+                btnMaster.style.cursor = hasMaster ? 'pointer' : 'not-allowed';
+                btnMaster.title = hasMaster ? 'Play full longform master' : 'No longform master yet';
+                btnMaster.style.background = (lfPlaybackMode === 'master' && hasMaster) ? '#0284c7' : 'transparent';
+                btnMaster.style.color = (lfPlaybackMode === 'master' && hasMaster) ? '#fff' : '#cbd5e1';
             }
+            if (btnClip) {
+                btnClip.style.background = (lfPlaybackMode === 'clip' || !hasMaster) ? '#0284c7' : 'transparent';
+                btnClip.style.color = (lfPlaybackMode === 'clip' || !hasMaster) ? '#fff' : '#cbd5e1';
+            }
+            if (hintEl) {
+                if (!hasMaster) {
+                    hintEl.style.display = 'inline';
+                    hintEl.innerText = 'No longform master yet';
+                } else {
+                    hintEl.style.display = 'none';
+                    hintEl.innerText = '';
+                }
+            }
+            if (!videoEl) return;
+
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === lfActiveClipNum);
+            if (hasMaster) {
+                if (noMediaEl) noMediaEl.style.display = 'none';
+                videoEl.style.display = 'block';
+                const targetSrc = lfTimelineIndex.video_url || `/api/beats/video?ep=${encodeURIComponent(cleanId)}`;
+                if (videoEl.getAttribute('src') !== targetSrc) {
+                    videoEl.src = targetSrc;
+                }
+                if (lfPlaybackMode === 'clip' && chInfo) {
+                    seekVideoSafely(videoEl, chInfo.start);
+                }
+            } else {
+                const targetSrc = `/api/beats/clip_media?ep=${encodeURIComponent(cleanId)}&clip_num=${lfActiveClipNum}`;
+                if (chInfo && chInfo.openable === false) {
+                    videoEl.style.display = 'none';
+                    if (noMediaEl) noMediaEl.style.display = 'block';
+                } else {
+                    videoEl.style.display = 'block';
+                    if (noMediaEl) noMediaEl.style.display = 'none';
+                    if (videoEl.getAttribute('src') !== targetSrc) {
+                        videoEl.src = targetSrc;
+                    }
+                }
+            }
+            renderLfSpanStrip();
         }
 
         function setLfPlaybackMode(mode) {
-            lfPlaybackMode = (mode === 'clip') ? 'clip' : 'master';
-            const btnMaster = document.getElementById('btn-playback-mode-master');
-            const btnClip = document.getElementById('btn-playback-mode-clip');
-            if (btnMaster) {
-                btnMaster.style.background = (lfPlaybackMode === 'master') ? '#0284c7' : 'transparent';
-                btnMaster.style.color = (lfPlaybackMode === 'master') ? '#fff' : '#cbd5e1';
-            }
-            if (btnClip) {
-                btnClip.style.background = (lfPlaybackMode === 'clip') ? '#0284c7' : 'transparent';
-                btnClip.style.color = (lfPlaybackMode === 'clip') ? '#fff' : '#cbd5e1';
-            }
+            const hasMaster = Boolean(lfTimelineIndex && lfTimelineIndex.has_video);
+            if (mode === 'master' && !hasMaster) return;
+            lfPlaybackMode = (mode === 'master') ? 'master' : 'clip';
             applyPlaybackSource();
+            const videoEl = document.getElementById('lf-studio-video-player');
+            if (lfPlaybackMode === 'master' && videoEl && hasMaster) {
+                seekVideoSafely(videoEl, 0);
+            }
+        }
+
+        function renderLfSpanStrip() {
+            const strip = document.getElementById('lf-span-strip');
+            if (!strip || !lfTimelineIndex || !lfTimelineIndex.chapters) return;
+            const chs = lfTimelineIndex.chapters;
+            const activeChData = lfChapterLRU.get(lfActiveClipNum);
+            strip.innerHTML = chs.map(ch => {
+                const spanDur = Math.max(1, (ch.end || 1) - (ch.start || 0));
+                const isActive = ch.clip_num === lfActiveClipNum;
+                const shaded = isActive;
+                const bg = shaded ? '#0284c7' : (ch.openable ? '#1e293b' : '#0f172a');
+                const op = ch.openable ? '1' : '0.4';
+                let ticksHtml = '';
+                if (lfPlaybackMode === 'clip' && isActive && activeChData && Array.isArray(activeChData.beats) && activeChData.beats.length > 0) {
+                    ticksHtml = activeChData.beats.map(b => {
+                        const pct = Math.max(0, Math.min(99, ((b.longform_start - ch.start) / spanDur) * 100));
+                        return `<span class="lf-beat-tick" style="position:absolute;left:${pct.toFixed(1)}%;top:0;bottom:0;width:2px;background:#fbbf24;pointer-events:none;" title="Beat #${b.index}"></span>`;
+                    }).join('');
+                }
+                return `<div class="lf-span-seg${shaded ? ' is-shaded' : ''}" data-clip-num="${ch.clip_num}" onclick="onSpanStripClick(${ch.clip_num}, ${ch.start})" style="position:relative;flex:${spanDur.toFixed(2)};background:${bg};opacity:${op};border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-family:var(--font-mono);color:#e2e8f0;overflow:hidden;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)}–${formatDuration(ch.end)})">
+                    <span style="z-index:1;">${ch.clip_num}</span>${ticksHtml}
+                </div>`;
+            }).join('');
+        }
+
+        function onSpanStripClick(clipNum, spanStart) {
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === clipNum);
+            if (!chInfo || chInfo.openable === false) return;
+            if (lfPlaybackMode === 'master' && lfTimelineIndex?.has_video) {
+                lfActiveClipNum = clipNum;
+                renderLfChapterStrip();
+                renderLfSpanStrip();
+                const videoEl = document.getElementById('lf-studio-video-player');
+                seekVideoSafely(videoEl, spanStart);
+                selectLfChapter(clipNum, false);
+            } else {
+                selectLfChapter(clipNum, true);
+            }
         }
 
         async function initLongformBeatStudio() {
@@ -244,14 +353,25 @@ a { color: #7dd3fc; }
                 const phEl = document.getElementById('lf-studio-playhead-badge');
                 if (phEl) phEl.innerText = `00:00 / ${formatDuration(lfTimelineIndex.total_duration || 0)}`;
 
-                if (videoEl) {
-                    applyPlaybackSource();
-                    if (!lfVideoListenerBound) {
-                        lfVideoListenerBound = true;
-                        videoEl.addEventListener('timeupdate', () => {
-                            if (lfPlaybackMode === 'master') onLfVideoTimeUpdate(videoEl.currentTime);
-                        });
-                    }
+                if (videoEl && !lfVideoListenerBound) {
+                    lfVideoListenerBound = true;
+                    videoEl.addEventListener('loadedmetadata', () => {
+                        if (lfPendingSeek != null) {
+                            const t = lfPendingSeek;
+                            lfPendingSeek = null;
+                            try { videoEl.currentTime = t; } catch (e) {}
+                        }
+                    });
+                    videoEl.addEventListener('error', () => {
+                        const noMediaEl = document.getElementById('lf-no-media-hint');
+                        if (!lfTimelineIndex?.has_video && noMediaEl) {
+                            videoEl.style.display = 'none';
+                            noMediaEl.style.display = 'block';
+                        }
+                    });
+                    videoEl.addEventListener('timeupdate', () => {
+                        onLfVideoTimeUpdate(videoEl.currentTime);
+                    });
                 }
 
                 renderLfChapterStrip();
@@ -267,6 +387,7 @@ a { color: #7dd3fc; }
                 if (gridEl) gridEl.style.display = 'grid';
                 if (emptyEl) emptyEl.style.display = 'none';
                 const targetCh = openables.find(c => c.clip_num === lfActiveClipNum) || openables[0];
+                lfPlaybackMode = 'clip';
                 await selectLfChapter(targetCh.clip_num, false);
                 loadPersonalBeats();
             } catch (err) {
@@ -365,7 +486,7 @@ a { color: #7dd3fc; }
             if (chInfo && chInfo.openable === false) return;
             lfActiveClipNum = cNum;
             renderLfChapterStrip();
-            if (lfPlaybackMode === 'clip') applyPlaybackSource();
+            applyPlaybackSource();
 
             const metaEl = document.getElementById('lf-active-chapter-meta');
             const isMosaicCh = chInfo?.visual_source === 'mosaic';
@@ -387,6 +508,7 @@ a { color: #7dd3fc; }
             try {
                 const chData = await fetchLfChapterProgressive(cNum);
                 renderBelowPlayerSurface(chData);
+                renderLfSpanStrip();
                 const beats = chData.beats || [];
                 if (beats.length > 0) {
                     renderLfBeatPills(beats);
@@ -462,9 +584,8 @@ a { color: #7dd3fc; }
             }
 
             if (seekVideo && videoEl) {
-                videoEl.currentTime = (lfPlaybackMode === 'clip')
-                    ? (b.short_video_start || 0)
-                    : (b.longform_start + 0.08);
+                const useShort = (lfPlaybackMode === 'clip' && !lfTimelineIndex?.has_video);
+                seekVideoSafely(videoEl, useShort ? (b.short_video_start || 0) : (b.longform_start + 0.08));
             }
         }
 
@@ -583,22 +704,30 @@ a { color: #7dd3fc; }
 
             if (!lfTimelineIndex || !lfTimelineIndex.chapters) return;
 
-            // Find which chapter covers currentTime
-            const activeCh = lfTimelineIndex.chapters.find(c => currentTime >= c.start && currentTime < c.end);
-            if (!activeCh) return;
-
-            if (activeCh.clip_num !== lfActiveClipNum && !lfLoadingChapter) {
-                lfLoadingChapter = true;
-                lfActiveClipNum = activeCh.clip_num;
-                renderLfChapterStrip();
-                try {
-                    const chData = await fetchLfChapterProgressive(activeCh.clip_num);
-                    renderLfBeatPills(chData.beats || []);
-                    // Also prefetch the next chapter in background if within 20s of chapter end
-                } catch (e) {
-                    console.warn("Progressive chapter switch failed:", e);
-                } finally {
-                    lfLoadingChapter = false;
+            if (lfPlaybackMode === 'clip' && lfTimelineIndex.has_video) {
+                const chSpan = lfTimelineIndex.chapters.find(c => c.clip_num === lfActiveClipNum);
+                const videoEl = document.getElementById('lf-studio-video-player');
+                if (chSpan && videoEl && !videoEl.paused && currentTime >= chSpan.end - 0.05) {
+                    videoEl.pause();
+                    const replayBtn = document.getElementById('lf-span-replay-btn');
+                    if (replayBtn) replayBtn.style.display = 'inline-block';
+                }
+            } else if (lfPlaybackMode === 'master') {
+                const activeCh = lfTimelineIndex.chapters.find(c => currentTime >= c.start && currentTime < c.end);
+                if (activeCh && activeCh.clip_num !== lfActiveClipNum && !lfLoadingChapter) {
+                    lfLoadingChapter = true;
+                    lfActiveClipNum = activeCh.clip_num;
+                    renderLfChapterStrip();
+                    renderLfSpanStrip();
+                    try {
+                        const chData = await fetchLfChapterProgressive(activeCh.clip_num);
+                        renderBelowPlayerSurface(chData);
+                        renderLfBeatPills(chData.beats || []);
+                    } catch (e) {
+                        console.warn("Progressive chapter switch failed:", e);
+                    } finally {
+                        lfLoadingChapter = false;
+                    }
                 }
             }
 
