@@ -1181,13 +1181,18 @@ def resolve_mosaic_body(clean_ep: str, clip_num: int, plan_clip: Optional[Dict[s
     Intro title card, so body t=0 sits at intro_offset seconds).
     Returns {"path","offset","kind": "square"|"vertical","fps","duration","width","height"} or None.
     """
-    clips_dir = os.path.join(SCRIPT_DIR, "clips")
+    dirs = []
+    hub = _resolve_dd_hub_root()
+    if hub:
+        dirs.append(os.path.join(hub, "episodes", clean_ep))
+    dirs.append(os.path.join(SCRIPT_DIR, "clips"))
     cands = []
     run_id = (plan_clip or {}).get("mosaic_run_id")
-    if run_id:
-        cands.append((os.path.join(clips_dir, f"{clean_ep}-{int(clip_num)}-mosaic-{run_id}.mp4"), 0.0))
     intro = float((plan_clip or {}).get("intro_offset") or 1.5)
-    cands.append((os.path.join(clips_dir, f"{clean_ep}-{int(clip_num)}-mosaic.mp4"), intro))
+    for d in dirs:
+        if run_id:
+            cands.append((os.path.join(d, f"{clean_ep}-{int(clip_num)}-mosaic-{run_id}.mp4"), 0.0))
+        cands.append((os.path.join(d, f"{clean_ep}-{int(clip_num)}-mosaic.mp4"), intro))
     for path, offset in cands:
         if os.path.exists(path) and os.path.getsize(path) > 10000:
             g = _probe_video_geometry(path)
@@ -1285,6 +1290,7 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         chapters[c_num]["mosaic_body"] = mosaic_body
         chapters[c_num]["locked"] = bool(configured_vs == "mosaic" and mosaic_body)
         chapters[c_num]["has_beats"] = has_beats
+        chapters[c_num]["has_mosaic"] = bool(actual_mosaic_body)
         chapters[c_num]["openable"] = openable
         chapters[c_num]["published"] = published
         order.append(c_num)
@@ -1410,6 +1416,7 @@ def get_longform_timeline_index(ep_num: str = "248") -> Dict[str, Any]:
             "visual_source": ch.get("visual_source", "mosaic"),
             "locked": bool(ch.get("locked", False)),
             "has_beats": bool(ch.get("has_beats", False)),
+            "has_mosaic": bool(ch.get("has_mosaic", False)),
             "openable": bool(ch.get("openable", False)),
             "published": bool(ch.get("published", False)),
         })
@@ -1537,6 +1544,7 @@ def get_longform_chapter_beats(ep_num: str = "248", clip_num: int = 1) -> Dict[s
         "visual_source": ch.get("visual_source", "mosaic"),
         "locked": bool(ch.get("locked", False)),
         "has_beats": bool(ch.get("has_beats", False)),
+        "has_mosaic": bool(ch.get("has_mosaic", False)),
         "openable": bool(ch.get("openable", False)),
         "published": bool(ch.get("published", False)),
         "mosaic_file": os.path.basename((ch.get("mosaic_body") or {}).get("path", "")) or None,

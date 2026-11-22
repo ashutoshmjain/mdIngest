@@ -76,6 +76,7 @@ a { color: #7dd3fc; }
                                             <button type="button" id="btn-engine-mosaic" onclick="setClipEngine('mosaic')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Mosaic</button>
                                             <button type="button" id="btn-engine-manim" onclick="setClipEngine('manim')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Manim</button>
                                         </div>
+                                        <span id="lf-engine-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:#fbbf24;"></span>
                                         <button type="button" id="btn-beats-mosaic-retry" onclick="beatsMosaicRetrigger()" style="background:#7c3aed;color:#ffffff;border:1px solid #6d28d9;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:800;cursor:pointer;" title="Fresh Mosaic RUN for this part — double-confirmed, explicit only">Mosaic Retrigger</button>
                                         <span id="beats-mosaic-status" style="font-size:0.7rem;color:#a78bfa;"></span>
                                         <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: #0284c7; color: #fff; border: 1px solid #0369a1; border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button>
@@ -483,15 +484,41 @@ a { color: #7dd3fc; }
 
             const metaEl = document.getElementById('lf-active-chapter-meta');
             const isMosaicCh = chInfo?.visual_source === 'mosaic';
+            const hasMosaic = Boolean(chInfo?.has_mosaic);
+            const hasBeats = Boolean(chInfo?.has_beats);
             const btnEMos = document.getElementById('btn-engine-mosaic');
             const btnEMan = document.getElementById('btn-engine-manim');
+            const engHint = document.getElementById('lf-engine-hint');
             if (btnEMos) {
+                btnEMos.disabled = !hasMosaic;
                 btnEMos.style.background = isMosaicCh ? '#0284c7' : 'transparent';
                 btnEMos.style.color = isMosaicCh ? '#fff' : '#cbd5e1';
+                btnEMos.style.opacity = hasMosaic ? '1' : '0.4';
+                btnEMos.style.cursor = hasMosaic ? 'pointer' : 'not-allowed';
+                btnEMos.title = hasMosaic ? 'Use Mosaic in longform' : 'No Mosaic render yet — render it in Cutroom';
             }
             if (btnEMan) {
+                btnEMan.disabled = !hasBeats;
                 btnEMan.style.background = !isMosaicCh ? '#7c3aed' : 'transparent';
                 btnEMan.style.color = !isMosaicCh ? '#fff' : '#cbd5e1';
+                btnEMan.style.opacity = hasBeats ? '1' : '0.4';
+                btnEMan.style.cursor = hasBeats ? 'pointer' : 'not-allowed';
+                btnEMan.title = hasBeats ? 'Use Manim in longform' : 'No Manim yet — switch this clip to Manim first';
+            }
+            if (engHint) {
+                if (!hasBeats && hasMosaic) {
+                    engHint.style.display = 'inline';
+                    engHint.innerText = 'No Manim yet — switch this clip to Manim first';
+                } else if (!hasMosaic && hasBeats) {
+                    engHint.style.display = 'inline';
+                    engHint.innerText = 'No Mosaic render yet — render it in Cutroom';
+                } else if (!hasMosaic && !hasBeats) {
+                    engHint.style.display = 'inline';
+                    engHint.innerText = 'No Mosaic or Manim render yet';
+                } else {
+                    engHint.style.display = 'none';
+                    engHint.innerText = '';
+                }
             }
             if (metaEl && chInfo) {
                 const badge = isMosaicCh ? '<span style="background:#0284c7;color:#fff;font-size:0.64rem;padding:2px 7px;border-radius:4px;margin-left:8px;font-weight:800;letter-spacing:0.5px;">🎞 MOSAIC MASTER</span>' : '';
@@ -594,6 +621,9 @@ a { color: #7dd3fc; }
 
         async function setClipEngine(vs) {
             const cNum = lfActiveClipNum || 1;
+            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
+            if (vs === 'manim' && !chInfo?.has_beats) return;
+            if (vs === 'mosaic' && !chInfo?.has_mosaic) return;
             try {
                 const res = await fetch('/api/beats/set_engine', {
                     method: 'POST',
