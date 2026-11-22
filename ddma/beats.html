@@ -77,7 +77,6 @@ a { color: #7dd3fc; }
                                             <button type="button" id="btn-engine-manim" onclick="setClipEngine('manim')" style="background:transparent;color:#cbd5e1;border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Manim</button>
                                         </div>
                                         <span id="lf-engine-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:#fbbf24;"></span>
-                                        <button type="button" id="btn-beats-mosaic-retry" onclick="beatsMosaicRetrigger()" style="background:#7c3aed;color:#ffffff;border:1px solid #6d28d9;border-radius:6px;padding:5px 11px;font-size:0.72rem;font-weight:800;cursor:pointer;" title="Fresh Mosaic RUN for this part — double-confirmed, explicit only">Mosaic Retrigger</button>
                                         <span id="beats-mosaic-status" style="font-size:0.7rem;color:#a78bfa;"></span>
                                         <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: #0284c7; color: #fff; border: 1px solid #0369a1; border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button>
                                     </div>
@@ -321,7 +320,7 @@ a { color: #7dd3fc; }
                         return `<span class="lf-beat-tick" style="position:absolute;left:${pct.toFixed(1)}%;top:0;bottom:0;width:2px;background:#fbbf24;pointer-events:none;" title="Beat #${b.index}"></span>`;
                     }).join('');
                 }
-                return `<div class="lf-span-seg${shaded ? ' is-shaded' : ''}" data-clip-num="${ch.clip_num}" onclick="onSpanStripClick(${ch.clip_num}, ${ch.start})" style="position:relative;flex:${spanDur.toFixed(2)};background:${bg};opacity:${op};border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-family:var(--font-mono);color:#e2e8f0;overflow:hidden;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)}–${formatDuration(ch.end)})">
+                return `<div class="lf-span-seg${shaded ? ' is-shaded' : ''}" data-clip-num="${ch.clip_num}" onclick="onSpanStripClick(${ch.clip_num}, ${ch.start})" style="position:relative;flex:1;min-width:0;background:${bg};opacity:${op};border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-family:var(--font-mono);color:#e2e8f0;overflow:hidden;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)}–${formatDuration(ch.end)})">
                     <span style="z-index:1;">${ch.clip_num}</span>${ticksHtml}
                 </div>`;
             }).join('');
