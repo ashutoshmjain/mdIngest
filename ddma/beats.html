@@ -45,10 +45,12 @@ a { color: #7dd3fc; }
                     <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 12px; align-items: start;">
 
                         <!-- LEFT PANE: Clips / Chapters -->
+                        <button type="button" id="tab-expand-left" onclick="toggleSidePane('left', false)" title="Expand Clips pane" style="display:none;background:#0f172a;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">▶</button>
                         <aside id="beats-left-pane" style="background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; max-height: calc(100vh - 84px); display: flex; flex-direction: column;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 4px;">
                                 <span id="lf-chapter-count-label" style="font-size: 0.72rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">📚 Clips (0)</span>
                                 <span id="lf-active-chapter-meta" style="font-family: var(--font-mono); font-size: 0.68rem; color: #a78bfa; font-weight: 700;">Part 1</span>
+                                <button type="button" id="btn-collapse-left" onclick="toggleSidePane('left', true)" title="Collapse Clips pane" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:0.72rem;padding:2px 4px;">◀</button>
                             </div>
                             <div id="lf-chapter-strip" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; padding-right: 4px; flex: 1;">
                                 <span style="color: #64748b; font-size: 0.75rem;">Loading chapters...</span>
@@ -186,7 +188,8 @@ a { color: #7dd3fc; }
 
                         <!-- RIGHT PANE: Personal Beats Selection -->
                         <aside id="beats-right-pane" style="background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
+                                <button type="button" id="btn-collapse-right" onclick="toggleSidePane('right', true)" title="Collapse Personal Beats pane" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:0.72rem;padding:2px 4px;">▶</button>
                                 <span style="font-size: 0.72rem; font-weight: 800; color: #f8fafc; text-transform: uppercase; letter-spacing: 0.5px;">⭐ Personal Beats</span>
                                 <span id="pb-count-badge" style="font-family: var(--font-mono); font-size: 0.68rem; color: #5eead4;">0</span>
                             </div>
@@ -195,6 +198,7 @@ a { color: #7dd3fc; }
                                 <span style="color: #64748b; font-size: 0.74rem;">No personal beats saved yet.</span>
                             </div>
                         </aside>
+                        <button type="button" id="tab-expand-right" onclick="toggleSidePane('right', false)" title="Expand Personal Beats pane" style="display:none;background:#0f172a;color:#94a3b8;border:1px solid #334155;border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">◀</button>
                     </div>
                 </div>
 <script>
@@ -210,6 +214,26 @@ a { color: #7dd3fc; }
         let lfVideoListenerBound = false;
         let lfPlaybackMode = 'clip';
         let lfPendingSeek = null;
+        let lfPaneState = { left: false, right: false };
+
+        function toggleSidePane(side, collapse) {
+            lfPaneState[side] = Boolean(collapse);
+            const grid = document.getElementById('beats-workspace-grid');
+            const leftPane = document.getElementById('beats-left-pane');
+            const rightPane = document.getElementById('beats-right-pane');
+            const tabL = document.getElementById('tab-expand-left');
+            const tabR = document.getElementById('tab-expand-right');
+            if (leftPane) leftPane.style.display = lfPaneState.left ? 'none' : 'flex';
+            if (tabL) tabL.style.display = lfPaneState.left ? 'flex' : 'none';
+            if (rightPane) rightPane.style.display = lfPaneState.right ? 'none' : 'flex';
+            if (tabR) tabR.style.display = lfPaneState.right ? 'flex' : 'none';
+            if (grid) {
+                const lCol = lfPaneState.left ? '18px' : '260px';
+                const rCol = lfPaneState.right ? '18px' : '300px';
+                grid.style.gap = (lfPaneState.left && lfPaneState.right) ? '4px' : '12px';
+                grid.style.gridTemplateColumns = `${lCol} minmax(0, 1fr) ${rCol}`;
+            }
+        }
 
         function seekVideoSafely(videoEl, targetTime) {
             if (!videoEl || targetTime == null || isNaN(targetTime)) return;
