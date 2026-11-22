@@ -53,6 +53,12 @@
 
   <div class="card" id="launcher-card">
     <h2>Apps</h2>
+    <div id="suite-tiles" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.5rem; margin-bottom:0.7rem;">
+      <a class="btn secondary suite-tile" data-app="cockpit" href="/cockpit.html" style="display:flex;justify-content:space-between;align-items:center;"><span>Cockpit</span><span class="tile-state" data-state-for="cockpit">Running</span></a>
+      <a class="btn secondary suite-tile" data-app="docs" href="http://localhost:3000/" onclick="return handleSuiteTileClick(event, 'docs')" style="display:flex;justify-content:space-between;align-items:center;"><span>Docs</span><span class="tile-state" data-state-for="docs">Starting</span></a>
+      <a class="btn secondary suite-tile" data-app="cutroom" href="http://localhost:8000/curator.html" onclick="return handleSuiteTileClick(event, 'cutroom')" style="display:flex;justify-content:space-between;align-items:center;"><span>Cutroom</span><span class="tile-state" data-state-for="cutroom">Starting</span></a>
+      <a class="btn secondary suite-tile" data-app="beats" href="http://127.0.0.1:8001/beats.html" onclick="return handleSuiteTileClick(event, 'beats')" style="display:flex;justify-content:space-between;align-items:center;"><span>Beats Studio</span><span class="tile-state" data-state-for="beats">Starting</span></a>
+    </div>
     <div class="row">
       <a class="btn secondary" href="/cockpit.html">Open mdIngest Cockpit</a>
       <button onclick="launchDdMa()">Launch Cutroom</button>
@@ -322,7 +328,51 @@ async function syncLandingInputs() {
   }
 }
 
+let _suiteStateMap = {};
+async function pollSuiteStatus() {
+  try {
+    const res = await fetch('/api/suite/status');
+    const data = await res.json();
+    const apps = data.apps || {};
+    _suiteStateMap = apps;
+    let anyStarting = false;
+    for (const [k, info] of Object.entries(apps)) {
+      const badge = document.querySelector(`[data-state-for="${k}"]`);
+      if (badge) {
+        const st = info.state || 'starting';
+        badge.textContent = st.charAt(0).toUpperCase() + st.slice(1);
+        badge.style.color = st === 'running' ? 'var(--ok)' : (st === 'failed' ? 'var(--err)' : 'var(--muted)');
+      }
+      if (info.state === 'starting') anyStarting = true;
+    }
+    if (anyStarting) setTimeout(pollSuiteStatus, 1000);
+  } catch (e) {}
+}
+
+async function handleSuiteTileClick(ev, app) {
+  const info = _suiteStateMap[app];
+  if (!info || info.state === 'running') return true;
+  ev.preventDefault();
+  setStatus('launcher-status', `Retrying ${app}…`);
+  try {
+    await fetch('/api/suite/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app }) });
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 800));
+      await pollSuiteStatus();
+      if (_suiteStateMap[app]?.state === 'running') {
+        window.location.href = _suiteStateMap[app].url;
+        return false;
+      }
+    }
+    setStatus('launcher-status', `✗ ${app} failed: ${_suiteStateMap[app]?.error || 'timeout'}`, 'err');
+  } catch (err) {
+    setStatus('launcher-status', `✗ ${app} retry failed: ${err.message}`, 'err');
+  }
+  return false;
+}
+
 loadWorkspace();
+pollSuiteStatus();
 </script>
 </body>
 </html>

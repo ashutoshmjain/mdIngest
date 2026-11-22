@@ -48,6 +48,133 @@ SETTINGS_FILE = INGEST_DIR / "settings.json"
 mdserve_process = None
 ddma_curator_process = None
 beats_studio_process = None
+_suite_state = {
+    "docs": {"state": "starting", "started_at": 0.0, "error": ""},
+    "cutroom": {"state": "starting", "started_at": 0.0, "error": ""},
+    "beats": {"state": "starting", "started_at": 0.0, "error": ""},
+}
+
+
+def _ensure_mdserve_running():
+    """Starts mdbook serve (:3000) if not already serving. Never restarts an existing server."""
+    global mdserve_process
+    if is_mdserve_running():
+        _suite_state["docs"] = {"state": "running", "started_at": time.time(), "error": ""}
+        return True, ""
+    try:
+        mdserve_process = subprocess.Popen(
+            ["mdbook", "serve", "--hostname", "0.0.0.0", "-p", "3000"],
+            cwd=str(PROD_ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _suite_state["docs"] = {"state": "starting", "started_at": time.time(), "error": ""}
+        return True, ""
+    except Exception as e:
+        _suite_state["docs"] = {"state": "failed", "started_at": time.time(), "error": str(e)}
+        print(f"[suite] Failed to start Docs (mdbook :3000): {e}", flush=True)
+        return False, str(e)
+
+
+def _ensure_curator_running():
+    """Starts Cutroom/Curator (:8000) if not already serving. Never restarts an existing server."""
+    global ddma_curator_process
+    if is_ddma_curator_running():
+        _suite_state["cutroom"] = {"state": "running", "started_at": time.time(), "error": ""}
+        return True, ""
+    ddma_dir = PROJECT_ROOT / "ddma"
+    curator_script = ddma_dir / "scratch" / "run_curator.py"
+    if not curator_script.exists():
+        err = f"Missing {curator_script}"
+        _suite_state["cutroom"] = {"state": "failed", "started_at": time.time(), "error": err}
+        print(f"[suite] Failed to start Cutroom (:8000): {err}", flush=True)
+        return False, err
+    try:
+        ddma_curator_process = subprocess.Popen(
+            [sys.executable, str(curator_script)],
+            cwd=str(ddma_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _suite_state["cutroom"] = {"state": "starting", "started_at": time.time(), "error": ""}
+        return True, ""
+    except Exception as e:
+        _suite_state["cutroom"] = {"state": "failed", "started_at": time.time(), "error": str(e)}
+        print(f"[suite] Failed to start Cutroom (:8000): {e}", flush=True)
+        return False, str(e)
+
+
+def _ensure_beats_running():
+    """Starts Beats Studio (:8001) if not already serving. Never restarts an existing server."""
+    global beats_studio_process
+    if is_beats_studio_running():
+        _suite_state["beats"] = {"state": "running", "started_at": time.time(), "error": ""}
+        return True, ""
+    ddma_dir = PROJECT_ROOT / "ddma"
+    beats_script = ddma_dir / "beats_server.py"
+    if not beats_script.exists():
+        err = f"Missing {beats_script}"
+        _suite_state["beats"] = {"state": "failed", "started_at": time.time(), "error": err}
+        print(f"[suite] Failed to start Beats Studio (:8001): {err}", flush=True)
+        return False, err
+    try:
+        beats_studio_process = subprocess.Popen(
+            [sys.executable, str(beats_script)],
+            cwd=str(ddma_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _suite_state["beats"] = {"state": "starting", "started_at": time.time(), "error": ""}
+        return True, ""
+    except Exception as e:
+        _suite_state["beats"] = {"state": "failed", "started_at": time.time(), "error": str(e)}
+        print(f"[suite] Failed to start Beats Studio (:8001): {e}", flush=True)
+        return False, str(e)
+
+
+def _port_open(port: int) -> bool:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.05)
+            return s.connect_ex(("127.0.0.1", port)) == 0
+    except Exception:
+        return False
+
+
+def get_suite_status() -> dict:
+    """Returns live Running / Starting / Failed state for all four suite servers."""
+    specs = [
+        ("docs", 3000, mdserve_process),
+        ("cutroom", 8000, ddma_curator_process),
+        ("beats", 8001, beats_studio_process),
+    ]
+    now = time.time()
+    out = {"cockpit": {"state": "running", "url": "/cockpit.html", "error": ""}}
+    urls = {"docs": "http://localhost:3000/", "cutroom": "http://localhost:8000/curator.html", "beats": "http://127.0.0.1:8001/beats.html"}
+    for key, port, proc in specs:
+        entry = dict(_suite_state.get(key, {"state": "starting", "started_at": now, "error": ""}))
+        if _port_open(port):
+            entry["state"] = "running"
+            entry["error"] = ""
+        elif entry.get("state") != "failed":
+            if proc is not None and proc.poll() is not None:
+                entry["state"] = "failed"
+                entry["error"] = entry.get("error") or f"Exited with code {proc.returncode}"
+            elif entry.get("started_at") and (now - entry["started_at"] > 12.0):
+                entry["state"] = "failed"
+                entry["error"] = entry.get("error") or f"Port {port} did not respond within 12s"
+            else:
+                entry["state"] = "starting"
+        _suite_state[key] = entry
+        out[key] = {"state": entry["state"], "url": urls[key], "error": entry.get("error", "")}
+    return out
+
+
+def _start_suite_background():
+    """Auto-starts :8000, :8001, and :3000 if not already running (Spec D Phase 1)."""
+    _ensure_curator_running()
+    _ensure_beats_running()
+    _ensure_mdserve_running()
 
 def is_ddma_curator_running() -> bool:
     """Checks if DDMA Curator server is running on port 8000."""
@@ -4032,6 +4159,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, f"Failed to generate flow preview for {sting_file} @ {at_sec}s")
             return
 
+        if path == "/api/suite/status":
+            self.send_json({"apps": get_suite_status()})
+            return
+
         if path == "/api/settings":
             self.send_json(load_settings())
             return
@@ -4676,9 +4807,27 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 })
             return
 
+        if path == "/api/suite/status":
+            self.send_json({"apps": get_suite_status()})
+            return
+
         if path == "/api/settings":
             save_settings(data)
             self.send_json({"success": True, "settings": data})
+            return
+
+        if path == "/api/suite/retry":
+            app_name = str(data.get("app", "")).strip().lower()
+            if app_name == "docs":
+                ok, err = _ensure_mdserve_running()
+            elif app_name == "cutroom":
+                ok, err = _ensure_curator_running()
+            elif app_name == "beats":
+                ok, err = _ensure_beats_running()
+            else:
+                self.send_json({"success": False, "error": f"Unknown app: {app_name}"}, status=400)
+                return
+            self.send_json({"success": ok, "error": err, "apps": get_suite_status()})
             return
 
         if path == "/api/mdserve":
@@ -4690,18 +4839,12 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 kill_mdserve()
                 self.send_json({"success": True, "is_serving": False})
             else:
-                try:
-                    # Kill any stale instance first
-                    kill_mdserve()
-                    mdserve_process = subprocess.Popen(
-                        ["mdbook", "serve", "--hostname", "0.0.0.0", "-p", "3000"],
-                        cwd=str(PROD_ROOT),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
+                kill_mdserve()
+                ok, err = _ensure_mdserve_running()
+                if ok:
                     self.send_json({"success": True, "is_serving": True, "url": "http://localhost:3000"})
-                except Exception as e:
-                    self.send_json({"success": False, "error": str(e)})
+                else:
+                    self.send_json({"success": False, "error": err})
             return
 
         if path == "/api/audio/upload":
@@ -5025,17 +5168,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             ddma_dir = PROJECT_ROOT / "ddma"
             curator_script = ddma_dir / "scratch" / "run_curator.py"
             
-            if not is_ddma_curator_running() and curator_script.exists():
-                try:
-                    ddma_curator_process = subprocess.Popen(
-                        [sys.executable, str(curator_script)],
-                        cwd=str(ddma_dir),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                except Exception as e:
-                    self.send_json({"success": False, "error": str(e)})
-                    return
+            ok, err = _ensure_curator_running()
+            if not ok:
+                self.send_json({"success": False, "error": err})
+                return
 
             self.send_json({
                 "success": True,
@@ -5061,17 +5197,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             ddma_dir = PROJECT_ROOT / "ddma"
             beats_script = ddma_dir / "beats_server.py"
 
-            if not is_beats_studio_running() and beats_script.exists():
-                try:
-                    beats_studio_process = subprocess.Popen(
-                        [sys.executable, str(beats_script)],
-                        cwd=str(ddma_dir),
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL
-                    )
-                except Exception as e:
-                    self.send_json({"success": False, "error": str(e)})
-                    return
+            ok, err = _ensure_beats_running()
+            if not ok:
+                self.send_json({"success": False, "error": err})
+                return
 
             self.send_json({
                 "success": True,
@@ -5364,6 +5493,7 @@ def run_server():
         print(f"  URL: http://localhost:{port}")
         print(f"  Root: {PROJECT_ROOT}")
         print(f"==================================================\n")
+        _start_suite_background()
         if not os.environ.get("NO_BROWSER"):
             webbrowser.open(f"http://localhost:{port}")
         try:
