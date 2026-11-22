@@ -13,7 +13,9 @@ a { color: #7dd3fc; }
 .ep-pill label { font-size: 0.72rem; font-weight: 700; color: #fbbf24; font-family: var(--font-mono); }
 .ep-pill input { background: transparent; border: none; color: #f8fafc; font-size: 0.78rem; font-weight: 700; outline: none; font-family: var(--font-mono); width: 4em; }
 .btn-mini { background: #0c2340; color: #7dd3fc; border: 1px solid #0284c7; border-radius: 5px; padding: 0.25rem 0.65rem; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; text-decoration: none; font-family: var(--font-mono); }
-#beats-toast { min-height: 1.2em; font-size: 0.75rem; color: #a5f3fc; }
+#beats-toast-container { position: fixed; right: 16px; bottom: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 460px; pointer-events: none; }
+.beats-toast-item { min-width: 320px; padding: 10px 14px; border-radius: 8px; font-family: var(--font-mono); font-size: 0.76rem; line-height: 1.4; white-space: normal; word-break: break-word; pointer-events: auto; background: #0f172a; color: #e2e8f0; border: 1px solid #334155; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+.beats-toast-item.is-err { background: #450a0a; color: #fecaca; border-color: #dc2626; }
 </style>
 </head>
 <body>
@@ -31,9 +33,9 @@ a { color: #7dd3fc; }
     <a class="btn-mini" data-workspace-home title="Open the Workspace home page (landing page)">🏠 Workspace</a>
     <a class="btn-mini" data-workspace-home data-workspace-page="cockpit.html">cockpit</a>
     <a class="btn-mini" data-cutroom-home data-cutroom-page="curator.html" title="Open Cutroom (Curator)">Cutroom</a>
-    <span id="beats-toast"></span>
   </div>
 </header>
+<div id="beats-toast-container" aria-live="polite"></div>
                 <div id="submode-view-longform" style="display: block; width: 100%; max-width: 1520px; margin: 0 auto;">
                     <div id="beats-empty-state" style="display: none; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 48px 24px; text-align: center; color: #f8fafc;">
                         <h2 style="margin: 0 0 8px 0; font-size: 1.15rem;">No clips rendered. Go to Cutroom!</h2>
@@ -60,7 +62,6 @@ a { color: #7dd3fc; }
                                     <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                         <span style="background: #7c3aed; color: #ffffff; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 800; padding: 3px 8px; border-radius: 5px;">BEATS STUDIO</span>
                                         <span id="lf-studio-header-title" style="color: #f8fafc; font-weight: 800; font-size: 0.9rem;">Beat Timeline &amp; Editor</span>
-                                        <span id="lf-studio-mem-badge" style="font-family: var(--font-mono); font-size: 0.66rem; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(56, 189, 248, 0.3);">⚡ RAM Cache: 0/3</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                         <div style="display: inline-flex; background: #1e293b; border: 1px solid #334155; border-radius: 6px; overflow: hidden;">
@@ -396,13 +397,6 @@ a { color: #7dd3fc; }
             }
         }
 
-        function updateLfMemBadge() {
-            const badge = document.getElementById('lf-studio-mem-badge');
-            if (!badge) return;
-            const keys = Array.from(lfChapterLRU.keys()).map(k => `Part ${k}`);
-            badge.innerText = `⚡ RAM Cache: ${keys.length}/${LF_MAX_LRU_CHAPTERS} Chapters (${keys.join(', ') || 'empty'})`;
-        }
-
         async function fetchLfChapterProgressive(clipNum) {
             const cNum = parseInt(clipNum, 10) || 1;
             if (lfChapterLRU.has(cNum)) {
@@ -410,7 +404,6 @@ a { color: #7dd3fc; }
                 const cached = lfChapterLRU.get(cNum);
                 lfChapterLRU.delete(cNum);
                 lfChapterLRU.set(cNum, cached);
-                updateLfMemBadge();
                 return cached;
             }
 
@@ -425,7 +418,6 @@ a { color: #7dd3fc; }
                 lfChapterLRU.delete(oldestKey);
             }
             lfChapterLRU.set(cNum, data);
-            updateLfMemBadge();
             return data;
         }
 
@@ -906,9 +898,16 @@ function beatsEpisode() {
     if (q && inp && !inp.dataset.touched) inp.value = q;
     return ((inp && inp.value) || q || '248').replace('.md', '').replace(/^_/, '') || '248';
 }
-function showToast(msg) {
-    const t = document.getElementById('beats-toast');
-    if (t) t.innerText = msg;
+function showToast(msg, durationMs) {
+    const c = document.getElementById('beats-toast-container');
+    if (!c) return;
+    const isErr = /❌|error|failed|refused|unreachable/i.test(String(msg || ''));
+    const ttl = Number.isFinite(durationMs) ? durationMs : (isErr ? 7000 : 3500);
+    const el = document.createElement('div');
+    el.className = 'beats-toast-item' + (isErr ? ' is-err' : '');
+    el.textContent = String(msg == null ? '' : msg);
+    c.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, ttl);
 }
 function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
