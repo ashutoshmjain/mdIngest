@@ -13,8 +13,8 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
   .card h2 { font-size: 0.95rem; margin: 0 0 0.7rem; }
   label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--muted); margin: 0.6rem 0 0.25rem; }
-  input[type=text], input[type=number] { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; font-family: ui-monospace, monospace; }
-  input[type=number] { font-family: inherit; }
+  input[type=text], input[type=number], select { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; font-family: ui-monospace, monospace; background: #fff; color: var(--ink); }
+  input[type=number], select { font-family: inherit; }
   .row { display: flex; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; }
   button, .btn { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; text-decoration: none; }
   button.secondary { background: var(--accent-bg); color: var(--accent); }
@@ -24,7 +24,8 @@
   .status { font-size: 0.82rem; margin-top: 0.6rem; min-height: 1.2em; }
   .status.ok { color: var(--ok); }
   .status.err { color: var(--err); }
-  #landing-drop-zone { padding: 1rem; border: 2px dashed #c7d2fe; border-radius: 10px; background: #f8fafc; text-align: center; cursor: pointer; margin-top: 0.5rem; }
+  .drop-zone { padding: 1rem; border: 2px dashed #c7d2fe; border-radius: 10px; background: #f8fafc; text-align: center; cursor: pointer; margin-top: 0.5rem; transition: opacity 0.15s; }
+  .drop-zone.disabled { opacity: 0.55; cursor: not-allowed; background: #f1f5f9; border-color: #cbd5e1; }
   .fine { font-size: 0.72rem; color: var(--muted); margin-top: 0.7rem; }
   a.inline { color: var(--accent); }
 </style>
@@ -67,28 +68,53 @@
     <div class="status" id="launcher-status"></div>
   </div>
 
-  <div class="card" id="drop-card">
-    <h2>Inputs — one drop point</h2>
-    <p class="fine" style="margin-top:0">The Python payload + the base audio land in <code>dd_hub/inputs/&lt;ep&gt;/</code>, where the cockpit's triggers already read them.</p>
-    <label for="landing-ep">Episode number (new or existing)</label>
-    <input type="number" id="landing-ep" min="1" placeholder="e.g. 250">
-    <label for="landing-slug" style="margin-top:0.5rem">Slug (optional — named input folder)</label>
-    <input type="text" id="landing-slug" placeholder="e.g. my-topic (saves to inputs/my-topic/)">
-    <div id="landing-drop-zone"
-         onclick="document.getElementById('landing-file-input').click()"
-         ondragover="event.preventDefault(); this.style.borderColor='#4f46e5'; this.style.background='#eef2ff';"
-         ondragleave="this.style.borderColor='#c7d2fe'; this.style.background='#f8fafc';"
-         ondrop="handleLandingDropEvent(event)"
-         title="Drop to ingest any .py payload or .m4a/.mp3/.wav audio into dd_hub/inputs/">
-      <div style="font-size: 1.15rem; line-height: 1;">📥</div>
-      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop .py or Audio</div>
-      <div style="font-size: 0.68rem; color: #64748b;">Auto-saves to dd_hub/inputs &amp; transcribes</div>
+  <div class="card" id="research-drop-card">
+    <h2>Research — save to mempool</h2>
+    <p class="fine" style="margin-top:0">Drop any <code>.py</code>, <code>.md</code>, or <code>.txt</code> payload. Stored verbatim under <code>dd_hub/inputs/&lt;slug&gt;/</code>.</p>
+    <label for="research-slug-select">Slug folder</label>
+    <select id="research-slug-select" onchange="onResearchSlugChange()">
+      <option value="">-- Select slug --</option>
+      <option value="__new__">New slug…</option>
+    </select>
+    <div id="research-new-slug-wrap" style="display:none; margin-top:0.45rem;">
+      <input type="text" id="research-new-slug" placeholder="e.g. my-topic (leave blank to derive from filename)" oninput="updateDropZonesState()">
     </div>
-    <input type="file" id="landing-file-input" accept=".py,.md,.m4a,.mp3,.wav,.ogg,.aac" style="display:none" onchange="handleLandingFileSelected(event)">
+    <div id="research-drop-zone" class="drop-zone disabled" aria-disabled="true"
+         onclick="if(!this.classList.contains('disabled')) document.getElementById('research-file-input').click(); else setStatus('research-drop-status', 'Select a slug or choose New slug… first.', 'err');"
+         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='#4f46e5'; this.style.background='#eef2ff'; }"
+         ondragleave="this.style.borderColor=''; this.style.background='';"
+         ondrop="handleResearchDropEvent(event)"
+         title="Drop .py, .md, or .txt research payload into dd_hub/inputs/<slug>/">
+      <div style="font-size: 1.15rem; line-height: 1;">📥</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop .py, .md, or .txt</div>
+      <div id="research-drop-hint" style="font-size: 0.68rem; color: #64748b;">Select a slug or choose New slug… first.</div>
+    </div>
+    <input type="file" id="research-file-input" accept=".py,.md,.txt" style="display:none" onchange="handleResearchFileSelected(event)">
     <div class="row">
       <button class="secondary" id="btn-sync-landing" onclick="syncLandingInputs()">⚡ Sync dd_hub/inputs</button>
     </div>
-    <div class="status" id="drop-status"></div>
+    <div class="status" id="research-drop-status"></div>
+  </div>
+
+  <div class="card" id="audio-drop-card">
+    <h2>Audio — add to an episode</h2>
+    <p class="fine" style="margin-top:0">Drop <code>.m4a</code>, <code>.mp3</code>, <code>.wav</code>, <code>.ogg</code>, or <code>.aac</code>. Saved under the selected episode in <code>dd_hub/inputs/&lt;ep&gt;/</code>.</p>
+    <label for="audio-ep-select">Episode</label>
+    <select id="audio-ep-select" onchange="updateDropZonesState()">
+      <option value="">No episodes yet</option>
+    </select>
+    <div id="audio-drop-zone" class="drop-zone disabled" aria-disabled="true"
+         onclick="if(!this.classList.contains('disabled')) document.getElementById('audio-file-input').click(); else setStatus('audio-drop-status', 'Audio belongs to an episode — pick the episode it belongs to.', 'err');"
+         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='#4f46e5'; this.style.background='#eef2ff'; }"
+         ondragleave="this.style.borderColor=''; this.style.background='';"
+         ondrop="handleAudioDropEvent(event)"
+         title="Drop audio into dd_hub/inputs/<ep>/">
+      <div style="font-size: 1.15rem; line-height: 1;">🎙️</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop Audio (.m4a, .mp3, .wav, .ogg, .aac)</div>
+      <div id="audio-drop-hint" style="font-size: 0.68rem; color: #64748b;">Audio belongs to an episode — pick the episode it belongs to.</div>
+    </div>
+    <input type="file" id="audio-file-input" accept=".m4a,.mp3,.wav,.ogg,.aac" style="display:none" onchange="handleAudioFileSelected(event)">
+    <div class="status" id="audio-drop-status"></div>
   </div>
 
   <p class="fine">Research + podcast work continues in the <a class="inline" href="/cockpit.html">cockpit</a>. No input drop UI lives there anymore — this page is the only drop point.</p>
@@ -222,63 +248,141 @@ async function launchBeats() {
   }
 }
 
-function handleLandingDropEvent(event) {
-  event.preventDefault();
-  const zone = document.getElementById('landing-drop-zone');
-  zone.style.borderColor = '#c7d2fe';
-  zone.style.background = '#f8fafc';
-  const files = event.dataTransfer && event.dataTransfer.files;
-  if (files && files.length > 0) processLandingFile(files[0]);
+async function loadInputsLists(selectSlug) {
+  const slugSel = document.getElementById('research-slug-select');
+  const epSel = document.getElementById('audio-ep-select');
+  if (!slugSel || !epSel) return;
+  const prevSlug = selectSlug !== undefined ? selectSlug : slugSel.value;
+  const prevEp = epSel.value;
+  try {
+    const res = await fetch('/api/dd_hub/inputs');
+    const data = await res.json();
+    const slugs = Array.isArray(data.slugs) ? data.slugs : [];
+    const episodes = Array.isArray(data.episodes) ? data.episodes : [];
+
+    slugSel.innerHTML = '';
+    const slugDefault = document.createElement('option');
+    slugDefault.value = '';
+    slugDefault.textContent = '-- Select slug --';
+    slugSel.appendChild(slugDefault);
+    for (const s of slugs) {
+      const opt = document.createElement('option');
+      opt.value = s;
+      opt.textContent = s;
+      slugSel.appendChild(opt);
+    }
+    const newOpt = document.createElement('option');
+    newOpt.value = '__new__';
+    newOpt.textContent = 'New slug…';
+    slugSel.appendChild(newOpt);
+    if (prevSlug && Array.from(slugSel.options).some(o => o.value === prevSlug)) {
+      slugSel.value = prevSlug;
+    }
+
+    epSel.innerHTML = '';
+    if (episodes.length === 0) {
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'No episodes yet';
+      epSel.appendChild(emptyOpt);
+    } else {
+      const epDefault = document.createElement('option');
+      epDefault.value = '';
+      epDefault.textContent = '-- Select episode --';
+      epSel.appendChild(epDefault);
+      for (const ep of episodes) {
+        const opt = document.createElement('option');
+        opt.value = String(ep);
+        opt.textContent = 'Episode ' + ep;
+        epSel.appendChild(opt);
+      }
+      if (prevEp && Array.from(epSel.options).some(o => o.value === prevEp)) {
+        epSel.value = prevEp;
+      }
+    }
+  } catch (_) {}
+  onResearchSlugChange();
 }
 
-function handleLandingFileSelected(event) {
+function onResearchSlugChange() {
+  const slugSel = document.getElementById('research-slug-select');
+  const wrap = document.getElementById('research-new-slug-wrap');
+  if (slugSel && wrap) {
+    wrap.style.display = (slugSel.value === '__new__') ? 'block' : 'none';
+  }
+  updateDropZonesState();
+}
+
+function updateDropZonesState() {
+  const slugSel = document.getElementById('research-slug-select');
+  const rZone = document.getElementById('research-drop-zone');
+  const rHint = document.getElementById('research-drop-hint');
+  if (slugSel && rZone) {
+    const rEnabled = !!slugSel.value;
+    rZone.classList.toggle('disabled', !rEnabled);
+    rZone.setAttribute('aria-disabled', rEnabled ? 'false' : 'true');
+    if (rHint) {
+      rHint.textContent = rEnabled
+        ? 'Drop to save verbatim to dd_hub/inputs/<slug>/'
+        : 'Select a slug or choose New slug… first.';
+    }
+  }
+
+  const epSel = document.getElementById('audio-ep-select');
+  const aZone = document.getElementById('audio-drop-zone');
+  const aHint = document.getElementById('audio-drop-hint');
+  if (epSel && aZone) {
+    const aEnabled = !!epSel.value;
+    aZone.classList.toggle('disabled', !aEnabled);
+    aZone.setAttribute('aria-disabled', aEnabled ? 'false' : 'true');
+    if (aHint) {
+      aHint.textContent = aEnabled
+        ? 'Drop audio to save to dd_hub/inputs/' + epSel.value + '/ & transcribe'
+        : 'Audio belongs to an episode — pick the episode it belongs to.';
+    }
+  }
+}
+
+function handleResearchDropEvent(event) {
+  event.preventDefault();
+  const zone = document.getElementById('research-drop-zone');
+  zone.style.borderColor = '';
+  zone.style.background = '';
+  const files = event.dataTransfer && event.dataTransfer.files;
+  if (files && files.length > 0) processResearchFile(files[0]);
+}
+
+function handleResearchFileSelected(event) {
   const file = event.target.files && event.target.files[0];
   if (file) {
-    processLandingFile(file);
+    processResearchFile(file);
     event.target.value = '';
   }
 }
 
-async function processLandingFile(file) {
+async function processResearchFile(file) {
   if (!file) return;
+  const slugSel = document.getElementById('research-slug-select');
+  const selVal = slugSel ? slugSel.value : '';
+  if (!selVal) {
+    setStatus('research-drop-status', 'Select a slug or choose New slug… first.', 'err');
+    return;
+  }
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  const isResearch = (ext === 'py' || ext === 'md');
-  const isAudio = ['m4a', 'mp3', 'wav', 'ogg', 'aac'].includes(ext);
-  if (!isResearch && !isAudio) {
-    setStatus('drop-status', '❌ Unsupported file type: .' + ext, 'err');
+  if (!['py', 'md', 'txt'].includes(ext)) {
+    setStatus('research-drop-status', '❌ Unsupported file type for Research: .' + ext + ' (expected .py, .md, or .txt)', 'err');
     return;
   }
-  const ep = (document.getElementById('landing-ep').value || '').trim();
-  const slugField = ((document.getElementById('landing-slug') || {}).value || '').trim();
-  if (!ep && !slugField) {
-    setStatus('drop-status', 'Enter the episode number first.', 'err');
+  let slugChoice = selVal;
+  if (selVal === '__new__') {
+    slugChoice = ((document.getElementById('research-new-slug') || {}).value || '').trim();
+  }
+  if (slugChoice && (slugChoice.includes('/') || slugChoice.includes('\\') || slugChoice.startsWith('.'))) {
+    setStatus('research-drop-status', 'Invalid slug: no path separators or leading dots.', 'err');
     return;
   }
-  if (slugField && (slugField.includes('/') || slugField.includes('\\') || slugField.startsWith('.'))) {
-    setStatus('drop-status', 'Invalid slug: no path separators or leading dots.', 'err');
-    return;
-  }
-  const slug = slugField || '';
-  if (!ep && !isResearch) {
-    setStatus('drop-status', 'Enter the episode number first.', 'err');
-    return;
-  }
-  const epForName = ep || slug;
-  let sendFile = file;
-  let slugChoice = slug;
-  if (isResearch) {
-    if (!slugChoice) slugChoice = ep;
-  } else {
-    // The drop endpoint routes digit-named audio to that episode; rename so the
-    // target is always the episode typed above, whatever the file was called.
-    const stem = file.name.replace(/\.[^.]+$/, '');
-    if (!/^\d+$/.test(stem)) {
-      sendFile = new File([file], ep + '.' + ext, { type: file.type });
-    }
-  }
-  // Audio drops ignore slug server-side (they route by episode number); show the real target.
-  const targetFolder = isAudio ? ep : (slugChoice || epForName);
-  setStatus('drop-status', '📥 Ingesting ' + file.name + ' to dd_hub/inputs/' + targetFolder + '…');
+  const targetLabel = slugChoice || '(from filename)';
+  setStatus('research-drop-status', '📥 Saving ' + file.name + ' to dd_hub/inputs/' + targetLabel + '…');
   const reader = new FileReader();
   reader.onload = async function(e) {
     const dataUrl = e.target.result || '';
@@ -288,41 +392,100 @@ async function processLandingFile(file) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orig_filename: sendFile.name,
-          active_filename: epForName + '.md',
+          orig_filename: file.name,
           slug: slugChoice,
           base64_data: base64Data
         })
       });
       const data = await res.json();
       if (data.success) {
-        setStatus('drop-status', '✅ Saved to inputs/' + targetFolder + '/ — ' + data.message, 'ok');
+        setStatus('research-drop-status', '✅ Saved to inputs/' + data.clean_id + '/ — ' + data.message, 'ok');
+        await loadInputsLists(data.clean_id);
       } else {
-        setStatus('drop-status', '❌ Drop failed: ' + (data.error || 'Server error'), 'err');
+        setStatus('research-drop-status', '❌ Drop failed: ' + (data.error || 'Server error'), 'err');
       }
     } catch (err) {
-      setStatus('drop-status', '❌ Drop error: ' + err.message, 'err');
+      setStatus('research-drop-status', '❌ Drop error: ' + err.message, 'err');
     }
   };
-  reader.readAsDataURL(sendFile);
+  reader.readAsDataURL(file);
+}
+
+function handleAudioDropEvent(event) {
+  event.preventDefault();
+  const zone = document.getElementById('audio-drop-zone');
+  zone.style.borderColor = '';
+  zone.style.background = '';
+  const files = event.dataTransfer && event.dataTransfer.files;
+  if (files && files.length > 0) processAudioFile(files[0]);
+}
+
+function handleAudioFileSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (file) {
+    processAudioFile(file);
+    event.target.value = '';
+  }
+}
+
+async function processAudioFile(file) {
+  if (!file) return;
+  const epSel = document.getElementById('audio-ep-select');
+  const ep = epSel ? epSel.value.trim() : '';
+  if (!ep) {
+    setStatus('audio-drop-status', 'Audio belongs to an episode — pick the episode it belongs to.', 'err');
+    return;
+  }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!['m4a', 'mp3', 'wav', 'ogg', 'aac'].includes(ext)) {
+    setStatus('audio-drop-status', '❌ Unsupported file type for Audio: .' + ext + ' (expected .m4a, .mp3, .wav, .ogg, or .aac)', 'err');
+    return;
+  }
+  setStatus('audio-drop-status', '📥 Saving ' + file.name + ' to dd_hub/inputs/' + ep + '…');
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const dataUrl = e.target.result || '';
+    const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    try {
+      const res = await fetch('/api/dd_hub/unified_drop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orig_filename: file.name,
+          episode: ep,
+          base64_data: base64Data
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setStatus('audio-drop-status', '✅ Saved to inputs/' + ep + '/ — ' + data.message, 'ok');
+      } else {
+        setStatus('audio-drop-status', '❌ Drop failed: ' + (data.error || 'Server error'), 'err');
+      }
+    } catch (err) {
+      setStatus('audio-drop-status', '❌ Drop error: ' + err.message, 'err');
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 async function syncLandingInputs() {
   const btn = document.getElementById('btn-sync-landing');
   btn.disabled = true;
-  setStatus('drop-status', '⏳ Syncing dd_hub/inputs…');
+  setStatus('research-drop-status', '⏳ Syncing dd_hub/inputs…');
   try {
     const res = await fetch('/api/dd_hub/sync_inputs', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
     });
     const data = await res.json();
     if (data.success) {
-      setStatus('drop-status', '✅ ' + data.message, 'ok');
+      setStatus('research-drop-status', '✅ ' + data.message, 'ok');
+      await loadInputsLists();
     } else {
-      setStatus('drop-status', '❌ Sync failed: ' + (data.error || 'Unknown error'), 'err');
+      setStatus('research-drop-status', '❌ Sync failed: ' + (data.error || 'Unknown error'), 'err');
     }
   } catch (err) {
-    setStatus('drop-status', '❌ Sync error: ' + err.message, 'err');
+    setStatus('research-drop-status', '❌ Sync error: ' + err.message, 'err');
   } finally {
     btn.disabled = false;
   }
@@ -372,6 +535,7 @@ async function handleSuiteTileClick(ev, app) {
 }
 
 loadWorkspace();
+loadInputsLists();
 pollSuiteStatus();
 </script>
 </body>
