@@ -209,6 +209,20 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             self.serve_file(DDMA_DIR / fname, mime=mime)
             return
 
+        if path == "/api/settings":
+            hub_root = resolve_dd_hub_root()
+            vault_file = hub_root / "vault" / "settings.json"
+            local_file = DDMA_DIR / "settings.json"
+            settings_data = {}
+            for p in (local_file, vault_file):
+                if p.exists():
+                    try:
+                        settings_data.update(json.loads(p.read_text(encoding="utf-8")))
+                    except Exception:
+                        pass
+            self.send_json(settings_data)
+            return
+
         if path == "/api/beats/episodes":
             try:
                 import importlib
@@ -338,6 +352,25 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 data = json.loads(self.rfile.read(length).decode("utf-8"))
             except Exception:
                 data = {}
+
+        if path == "/api/settings":
+            hub_root = resolve_dd_hub_root()
+            vault_file = hub_root / "vault" / "settings.json"
+            local_file = DDMA_DIR / "settings.json"
+            merged = {}
+            for p in (local_file, vault_file):
+                if p.exists():
+                    try:
+                        merged.update(json.loads(p.read_text(encoding="utf-8")))
+                    except Exception:
+                        pass
+            merged.update(data or {})
+            local_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            if hub_root.exists():
+                vault_file.parent.mkdir(parents=True, exist_ok=True)
+                vault_file.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+            self.send_json({"success": True, "settings": merged})
+            return
 
         if path == "/api/beats/update_beat":
             ep = clean_ep(data.get("ep", "248"))

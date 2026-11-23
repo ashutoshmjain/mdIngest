@@ -1540,11 +1540,6 @@
                 <span>🚀</span> Publish
             </button>
 
-            <!-- Settings -->
-            <button class="btn-cmd" onclick="openModal('settings-modal')">
-                <span>⚙️</span> Settings
-            </button>
-
             <!-- Workspace home page (landing page, same-tab navigation) -->
 
             <a class="btn-cmd" data-workspace-home id="btn-workspace" title="Open the Workspace home page">
@@ -1570,6 +1565,11 @@
 
             <div class="tree-scroll-area" id="tree-scroll-area">
                 <!-- Dynamically populated with active Mempool drafts & Block Template episodes only -->
+            </div>
+            <div style="border-top: 1px solid var(--border-color); padding: 0.65rem 0.75rem; background: var(--panel-bg);">
+                <button type="button" id="settingsBtn" onclick="openModal('settings-modal')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--panel-bg-darker); color: var(--text-main); font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                    <span>⚙️</span><span>System Settings</span>
+                </button>
             </div>
         </aside>
 
@@ -4413,18 +4413,21 @@ if __name__ == '__main__':
 
         function openModal(id) {
             document.getElementById(id).classList.add('active');
-            if (id === 'settings-modal' && currentStatus?.settings) {
-                document.getElementById('setting-spotify').value = currentStatus.settings.spotify_url || '';
-                document.getElementById('setting-apple').value = currentStatus.settings.apple_podcasts_url || '';
-                document.getElementById('setting-yt-music').value = currentStatus.settings.youtube_music_url || '';
-                document.getElementById('setting-fountain').value = currentStatus.settings.fountain_url || '';
-                document.getElementById('setting-lightning').value = currentStatus.settings.lightning_address || '';
-                if (document.getElementById('setting-whisper-model')) {
-                    document.getElementById('setting-whisper-model').value = currentStatus.settings.whisper_model || 'large-v3-turbo';
-                }
-                if (document.getElementById('setting-external-editor')) {
-                    document.getElementById('setting-external-editor').value = currentStatus.settings.external_editor || 'gvim';
-                }
+            if (id === 'settings-modal') {
+                fetch('/api/settings').then(r => r.json()).then(s => {
+                    if (currentStatus) currentStatus.settings = s;
+                    document.getElementById('setting-spotify').value = s.spotify_url || '';
+                    document.getElementById('setting-apple').value = s.apple_podcasts_url || '';
+                    document.getElementById('setting-yt-music').value = s.youtube_music_url || '';
+                    document.getElementById('setting-fountain').value = s.fountain_url || '';
+                    document.getElementById('setting-lightning').value = s.lightning_address || '';
+                    if (document.getElementById('setting-whisper-model')) {
+                        document.getElementById('setting-whisper-model').value = s.whisper_model || 'large-v3-turbo';
+                    }
+                    if (document.getElementById('setting-external-editor')) {
+                        document.getElementById('setting-external-editor').value = s.external_editor || 'gvim';
+                    }
+                }).catch(() => {});
             }
         }
 

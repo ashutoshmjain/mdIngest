@@ -1524,21 +1524,12 @@
             </div>
         </div>
 
-        <!-- Right: Docs + Settings -->
+        <!-- Right: Unified Header Links (Workspace, Cockpit, Beats Studio, Docs) -->
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <a href="/docs/documentation.html" target="_blank" style="text-decoration: none;">
-                <button class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem;" title="Open documentation">
-                    <span>📖</span> Docs
-                </button>
-            </a>
-
-            <button class="btn btn-secondary btn-mini" id="topSettingsBtn" style="padding: 0.25rem 0.65rem; font-size: 0.72rem; font-weight: 600; display: flex; align-items: center; gap: 0.3rem;" title="Open Studio System Settings">
-                ⚙️ Settings
-            </button>
-
-            <a data-workspace-home id="topWorkspaceBtn" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open the Workspace home page (landing page)">
-                <span>🏠</span> Workspace
-            </a>
+            <a data-workspace-home id="topWorkspaceBtn" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open the Workspace home page (landing page)">Workspace</a>
+            <a data-workspace-home data-workspace-page="cockpit.html" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open mdIngest Cockpit">Cockpit</a>
+            <a data-beats-home data-beats-page="beats.html" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open Beats Studio">Beats Studio</a>
+            <a href="/docs/documentation.html" target="_blank" class="btn btn-secondary btn-mini" style="font-weight: 600; padding: 0.25rem 0.65rem; display: flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; text-decoration: none;" title="Open documentation">Docs</a>
         </div>
     </header>
 
@@ -2823,8 +2814,20 @@
                 settingsModalOverlay.classList.remove('active');
             }
         }
-        function openSettingsModal() {
+        async function openSettingsModal() {
             const defaults = window.serverDefaultPrompts || {};
+            try {
+                const res = await fetch('/get-settings');
+                if (res.ok) {
+                    const d = await res.json();
+                    localStorage.setItem('ddma-mosaic-api-key', d.mosaic_api_key || '');
+                    localStorage.setItem('ddma-mosaic-agent-id', d.mosaic_agent_id || '');
+                    localStorage.setItem('ddma-mosaic-mogr-node-id', d.mosaic_mogr_node_id || '');
+                    localStorage.setItem('ddma-mosaic-captions-node-id', d.mosaic_captions_node_id || '');
+                    localStorage.setItem('ddma-gemini-api-key', d.gemini_api_key || '');
+                    localStorage.setItem('ddma-mosaic-default-prompt', d.mosaic_default_prompt || defaults.mosaic || '');
+                }
+            } catch (_) {}
             document.getElementById('settingsMosaicApiKey').value = localStorage.getItem('ddma-mosaic-api-key') || '';
             document.getElementById('settingsMosaicAgentId').value = localStorage.getItem('ddma-mosaic-agent-id') || '';
             document.getElementById('settingsMosaicMogrNodeId').value = localStorage.getItem('ddma-mosaic-mogr-node-id') || '';
@@ -2841,8 +2844,6 @@
         // Settings Modal Setup
         function setupSettingsModal() {
             settingsBtn.addEventListener('click', openSettingsModal);
-            const topSettingsBtn = document.getElementById('topSettingsBtn');
-            if (topSettingsBtn) topSettingsBtn.addEventListener('click', openSettingsModal);
 
             closeSettingsModalBtn.addEventListener('click', () => {
                 closeSettingsModalWithCheck();

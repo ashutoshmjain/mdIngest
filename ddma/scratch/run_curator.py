@@ -2454,9 +2454,24 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             try:
                 json_data = json.loads(post_data.decode('utf-8'))
+                vault_path = vault_settings_path()
                 settings_path = "settings.json"
+                merged = {}
+                for p in (settings_path, vault_path):
+                    if os.path.exists(p):
+                        try:
+                            with open(p, "r", encoding="utf-8") as rf:
+                                merged.update(json.load(rf))
+                        except Exception:
+                            pass
+                merged.update(json_data or {})
                 with open(settings_path, "w", encoding="utf-8") as f:
-                    json.dump(json_data, f, indent=4)
+                    json.dump(merged, f, indent=4)
+                hub_root = os.path.dirname(os.path.dirname(vault_path))
+                if hub_root and os.path.isdir(hub_root):
+                    os.makedirs(os.path.dirname(vault_path), exist_ok=True)
+                    with open(vault_path, "w", encoding="utf-8") as vf:
+                        json.dump(merged, vf, indent=4)
                     
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -5498,9 +5513,13 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif parsed_url.path == '/get-settings':
             try:
-                settings_path = "settings.json"
                 settings_data = {}
-                if os.path.exists(settings_path):
+                vault_path = vault_settings_path()
+                settings_path = "settings.json"
+                if os.path.exists(vault_path):
+                    with open(vault_path, "r", encoding="utf-8") as f:
+                        settings_data = json.load(f)
+                elif os.path.exists(settings_path):
                     with open(settings_path, "r", encoding="utf-8") as f:
                         settings_data = json.load(f)
                 else:

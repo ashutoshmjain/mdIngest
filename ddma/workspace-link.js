@@ -14,12 +14,18 @@
   function cutroomBaseUrl() {
     return 'http://' + window.location.hostname + ':8000/';
   }
+  function beatsBaseUrl() {
+    return 'http://' + window.location.hostname + ':8001/';
+  }
   function applyWorkspaceLinks() {
     document.querySelectorAll('a[data-workspace-home]').forEach(function (a) {
       a.href = workspaceBaseUrl() + (a.getAttribute('data-workspace-page') || '');
     });
     document.querySelectorAll('a[data-cutroom-home]').forEach(function (a) {
       a.href = cutroomBaseUrl() + (a.getAttribute('data-cutroom-page') || 'curator.html');
+    });
+    document.querySelectorAll('a[data-beats-home]').forEach(function (a) {
+      a.href = beatsBaseUrl() + (a.getAttribute('data-beats-page') || 'beats.html');
     });
   }
   // Shared helper for app code (e.g. the Curator Workspace button handler).

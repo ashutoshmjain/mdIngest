@@ -150,7 +150,7 @@ def get_suite_status() -> dict:
     ]
     now = time.time()
     out = {"cockpit": {"state": "running", "url": "/cockpit.html", "error": ""}}
-    urls = {"docs": "http://localhost:3000/", "cutroom": "http://localhost:8000/curator.html", "beats": "http://127.0.0.1:8001/beats.html"}
+    urls = {"docs": "http://localhost:8000/docs/documentation.html", "cutroom": "http://localhost:8000/curator.html", "beats": "http://127.0.0.1:8001/beats.html"}
     for key, port, proc in specs:
         entry = dict(_suite_state.get(key, {"state": "starting", "started_at": now, "error": ""}))
         if _port_open(port):
@@ -328,8 +328,29 @@ def load_settings():
     return merged
 
 def save_settings(settings_data):
+    hub_root = get_dd_hub_root()
+    vault_file = hub_root / "vault" / "settings.json"
+    merged = {}
+    if vault_file.exists():
+        try:
+            merged.update(json.loads(vault_file.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    elif SETTINGS_FILE.exists():
+        try:
+            merged.update(json.loads(SETTINGS_FILE.read_text(encoding="utf-8")))
+        except Exception:
+            pass
+    merged.update(settings_data or {})
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(settings_data, f, indent=2)
+        json.dump(merged, f, indent=2)
+    if hub_root.exists():
+        try:
+            vault_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(vault_file, "w", encoding="utf-8") as f:
+                json.dump(merged, f, indent=2)
+        except Exception:
+            pass
 
 def sanitize_katex_markdown(text: str, title_override: str = None, word_limit: int = 5) -> tuple[str, str, int]:
     r"""

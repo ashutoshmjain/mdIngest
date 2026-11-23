@@ -97,7 +97,7 @@
     <h2>Apps</h2>
     <div id="suite-tiles" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.5rem;">
       <a class="btn secondary suite-tile" data-app="cockpit" href="/cockpit.html" style="display:flex;justify-content:space-between;align-items:center;"><span>Cockpit</span><span class="tile-state" data-state-for="cockpit">Running</span></a>
-      <a class="btn secondary suite-tile" data-app="docs" href="http://localhost:3000/" onclick="return handleSuiteTileClick(event, 'docs')" style="display:flex;justify-content:space-between;align-items:center;"><span>Docs</span><span class="tile-state" data-state-for="docs">Starting</span></a>
+      <a class="btn secondary suite-tile" data-app="docs" href="http://localhost:8000/docs/documentation.html" onclick="return handleSuiteTileClick(event, 'docs')" style="display:flex;justify-content:space-between;align-items:center;"><span>Docs</span><span class="tile-state" data-state-for="docs">Starting</span></a>
       <a class="btn secondary suite-tile" data-app="cutroom" href="http://localhost:8000/curator.html" onclick="return handleSuiteTileClick(event, 'cutroom')" style="display:flex;justify-content:space-between;align-items:center;"><span>Cutroom</span><span class="tile-state" data-state-for="cutroom">Starting</span></a>
       <a class="btn secondary suite-tile" data-app="beats" href="http://127.0.0.1:8001/beats.html" onclick="return handleSuiteTileClick(event, 'beats')" style="display:flex;justify-content:space-between;align-items:center;"><span>Beats Studio</span><span class="tile-state" data-state-for="beats">Starting</span></a>
     </div>
@@ -582,36 +582,41 @@ async function pollSuiteStatus() {
     for (const [k, info] of Object.entries(apps)) {
       const tile = document.querySelector(`.suite-tile[data-app="${k}"]`);
       if (tile && info.url) tile.href = info.url;
+      const effInfo = (k === 'docs' && apps.cutroom) ? apps.cutroom : info;
       const badge = document.querySelector(`[data-state-for="${k}"]`);
       if (badge) {
-        const st = info.state || 'starting';
+        const st = effInfo.state || 'starting';
         badge.textContent = st.charAt(0).toUpperCase() + st.slice(1);
-        badge.style.color = st === 'running' ? 'var(--ok)' : (st === 'failed' ? 'var(--err)' : 'var(--muted)');
+        badge.style.color = st === 'running' ? 'var(--accent-emerald-dark)' : (st === 'failed' ? 'var(--danger-hover)' : 'var(--text-muted)');
       }
-      if (info.state === 'starting') anyStarting = true;
+      if (effInfo.state === 'starting') anyStarting = true;
     }
     if (anyStarting) setTimeout(pollSuiteStatus, 1000);
   } catch (e) {}
 }
 
 async function handleSuiteTileClick(ev, app) {
-  const info = _suiteStateMap[app];
+  const targetApp = (app === 'docs') ? 'cutroom' : app;
+  const info = _suiteStateMap[targetApp];
   if (!info || info.state === 'running') return true;
   ev.preventDefault();
-  setStatus('launcher-status', `Retrying ${app}…`);
+  setStatus('launcher-status', `Retrying ${targetApp}…`);
   try {
-    await fetch('/api/suite/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app }) });
+    await fetch('/api/suite/retry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ app: targetApp }) });
     for (let i = 0; i < 15; i++) {
       await new Promise(r => setTimeout(r, 800));
       await pollSuiteStatus();
-      if (_suiteStateMap[app]?.state === 'running') {
-        window.location.href = _suiteStateMap[app].url;
+      if (_suiteStateMap[targetApp]?.state === 'running') {
+        const destUrl = (app === 'docs')
+          ? (_suiteStateMap.docs?.url || 'http://localhost:8000/docs/documentation.html')
+          : _suiteStateMap[targetApp].url;
+        window.location.href = destUrl;
         return false;
       }
     }
-    setStatus('launcher-status', `✗ ${app} failed: ${_suiteStateMap[app]?.error || 'timeout'}`, 'err');
+    setStatus('launcher-status', `✗ ${targetApp} failed: ${_suiteStateMap[targetApp]?.error || 'timeout'}`, 'err');
   } catch (err) {
-    setStatus('launcher-status', `✗ ${app} retry failed: ${err.message}`, 'err');
+    setStatus('launcher-status', `✗ ${targetApp} retry failed: ${err.message}`, 'err');
   }
   return false;
 }
