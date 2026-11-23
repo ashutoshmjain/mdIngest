@@ -32,7 +32,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🏠 mdIngest Workspace</h1>
+  <h1>mdIngest Workspace</h1>
   <p class="sub">One plan + one settings source in one workspace folder, read by every environment. This page is the shell — the work happens in the apps below.</p>
 
   <div class="card" id="workspace-card">
@@ -43,7 +43,8 @@
       <button id="btn-choose-folder" onclick="openFolderBrowser()">Choose folder…</button>
       <button id="btn-test-workspace" class="secondary" onclick="testWorkspace()">Test</button>
     </div>
-    <div id="workspace-sync-nudge" class="fine" style="margin-top:0.55rem;"></div>
+    <div id="workspace-switch-caution" class="fine" style="margin-top:0.5rem;">Choosing a folder switches the whole workspace to it. Restart the apps afterwards so every app reads the same folder — your previous folder is not changed.</div>
+    <div id="workspace-sync-nudge" class="fine" style="margin-top:0.45rem;"></div>
     <div id="folder-browser" style="display:none; margin-top:0.75rem; border:1px solid var(--line); border-radius:8px; padding:0.75rem; background:#f8fafc;">
       <div class="kv" style="margin-top:0"><b>Browsing:</b> <code id="fb-current-path">—</code></div>
       <div id="fb-roots" class="row" style="margin-top:0.4rem;"></div>
@@ -163,6 +164,7 @@ async function testWorkspace(quiet) {
     const data = await res.json();
     document.getElementById('workspace-local-path').textContent =
       (data.local_path || '—') + (data.readable ? '  (readable ✓)' : '  (NOT readable)');
+    window._currentWorkspacePath = data.local_path || '';
     document.getElementById('workspace-env').textContent =
       window.location.host + '  →  ' + (data.local_path || 'unresolved');
     renderSyncNudge(data.local_path || '');
@@ -249,6 +251,14 @@ function browseUp() {
 
 async function pickCurrentFolder() {
   if (!_fbCurrentPath) return;
+  if (_fbCurrentPath === (window._currentWorkspacePath || '')) {
+    closeFolderBrowser();
+    return;
+  }
+  const ok = window.confirm(
+    `Switch workspace to "${_fbCurrentPath}"?\n\nChoosing a folder switches the whole workspace to it. Restart the apps afterwards so every app reads the same folder — your previous folder is not changed.`
+  );
+  if (!ok) return;
   try {
     const cur = await (await fetch('/api/settings')).json();
     cur.dd_hub_root = _fbCurrentPath;
