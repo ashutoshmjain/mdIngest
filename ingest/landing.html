@@ -5,29 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mdIngest Workspace</title>
 <style>
-  :root { --bg: #f8fafc; --card: #ffffff; --ink: #0f172a; --muted: #64748b; --accent: #4338ca; --accent-bg: #eef2ff; --line: #e2e8f0; --ok: #15803d; --err: #b91c1c; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 2rem 1rem 4rem; }
+  :root {
+    --bg-light: #fbf9f5;
+    --bg-color: #fbf9f5;
+    --card-bg: #ffffff;
+    --panel-bg: #ffffff;
+    --panel-bg-darker: #f5f5f4;
+    --border-light: #e7e5e4;
+    --border-color: #e7e5e4;
+    --border-light-hover: #d6d3d1;
+    --border-color-hover: #d6d3d1;
+    --text-dark-primary: #1c1917;
+    --text-main: #1c1917;
+    --text-heading: #1c1917;
+    --text-dark-secondary: #44403c;
+    --text-dark-muted: #78716c;
+    --text-muted: #78716c;
+    --accent-amber: #d97706;
+    --accent-amber-dark: #b45309;
+    --primary: #d97706;
+    --primary-hover: #b45309;
+    --accent-emerald: #059669;
+    --accent-emerald-dark: #047857;
+    --accent: #059669;
+    --accent-hover: #047857;
+    --accent-indigo: #4f46e5;
+    --accent-indigo-hover: #4338ca;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --tag-bg: #f5f5f4;
+    --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-main: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  body { font-family: var(--font-sans); background: var(--bg-color); color: var(--text-main); margin: 0; padding: 2rem 1rem 4rem; }
   .wrap { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-  .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 1.5rem; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
-  .card h2 { font-size: 0.95rem; margin: 0 0 0.7rem; }
-  label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--muted); margin: 0.6rem 0 0.25rem; }
-  input[type=text], input[type=number], select { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid var(--line); border-radius: 8px; font-size: 0.85rem; font-family: ui-monospace, monospace; background: #fff; color: var(--ink); }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; color: var(--text-heading); }
+  .sub { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 1.5rem; }
+  .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+  .card h2 { font-size: 0.95rem; margin: 0 0 0.7rem; color: var(--text-heading); }
+  label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin: 0.6rem 0 0.25rem; }
+  input[type=text], input[type=number], select { width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.85rem; font-family: var(--font-mono); background: var(--card-bg); color: var(--text-main); }
   input[type=number], select { font-family: inherit; }
   .row { display: flex; gap: 0.5rem; margin-top: 0.7rem; flex-wrap: wrap; }
-  button, .btn { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; text-decoration: none; }
-  button.secondary { background: var(--accent-bg); color: var(--accent); }
+  button, .btn { display: inline-block; padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--accent-indigo-hover); background: var(--accent-indigo-hover); color: var(--card-bg); font-size: 0.82rem; font-weight: 700; cursor: pointer; text-decoration: none; }
+  button.secondary, .btn.secondary { background: var(--panel-bg-darker); color: var(--accent-indigo-hover); border-color: var(--border-color-hover); }
   button:disabled { opacity: 0.55; cursor: wait; }
   .kv { font-size: 0.8rem; margin-top: 0.45rem; word-break: break-all; }
-  .kv b { color: var(--muted); font-weight: 700; }
+  .kv b { color: var(--text-muted); font-weight: 700; }
   .status { font-size: 0.82rem; margin-top: 0.6rem; min-height: 1.2em; }
-  .status.ok { color: var(--ok); }
-  .status.err { color: var(--err); }
-  .drop-zone { padding: 1rem; border: 2px dashed #c7d2fe; border-radius: 10px; background: #f8fafc; text-align: center; cursor: pointer; margin-top: 0.5rem; transition: opacity 0.15s; }
-  .drop-zone.disabled { opacity: 0.55; cursor: not-allowed; background: #f1f5f9; border-color: #cbd5e1; }
-  .fine { font-size: 0.72rem; color: var(--muted); margin-top: 0.7rem; }
-  a.inline { color: var(--accent); }
+  .status.ok { color: var(--accent-emerald-dark); }
+  .status.err { color: var(--danger-hover); }
+  .drop-zone { padding: 1rem; border: 2px dashed var(--border-color-hover); border-radius: 10px; background: var(--bg-color); text-align: center; cursor: pointer; margin-top: 0.5rem; transition: opacity 0.15s; }
+  .drop-zone.disabled { opacity: 0.55; cursor: not-allowed; background: var(--panel-bg-darker); border-color: var(--border-color); }
+  .fine { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.7rem; }
+  a.inline { color: var(--accent-indigo-hover); }
 </style>
 </head>
 <body>
@@ -45,10 +77,10 @@
     </div>
     <div id="workspace-switch-caution" class="fine" style="margin-top:0.5rem;">Choosing a folder switches the whole workspace to it. Restart the apps afterwards so every app reads the same folder — your previous folder is not changed.</div>
     <div id="workspace-sync-nudge" class="fine" style="margin-top:0.45rem;"></div>
-    <div id="folder-browser" style="display:none; margin-top:0.75rem; border:1px solid var(--line); border-radius:8px; padding:0.75rem; background:#f8fafc;">
+    <div id="folder-browser" style="display:none; margin-top:0.75rem; border:1px solid var(--border-color); border-radius:8px; padding:0.75rem; background:var(--bg-color);">
       <div class="kv" style="margin-top:0"><b>Browsing:</b> <code id="fb-current-path">—</code></div>
       <div id="fb-roots" class="row" style="margin-top:0.4rem;"></div>
-      <div id="fb-dirs" style="max-height:180px; overflow-y:auto; margin-top:0.5rem; border:1px solid var(--line); border-radius:6px; background:#fff; padding:0.25rem;"></div>
+      <div id="fb-dirs" style="max-height:180px; overflow-y:auto; margin-top:0.5rem; border:1px solid var(--border-color); border-radius:6px; background:var(--card-bg); padding:0.25rem;"></div>
       <div class="row" style="margin-top:0.5rem;">
         <button id="fb-up-btn" class="secondary" onclick="browseUp()">⬆ Up</button>
         <button id="fb-select-btn" onclick="pickCurrentFolder()">Select this folder</button>
@@ -85,13 +117,13 @@
     </div>
     <div id="research-drop-zone" class="drop-zone disabled" aria-disabled="true"
          onclick="if(!this.classList.contains('disabled')) document.getElementById('research-file-input').click(); else setStatus('research-drop-status', 'Select a slug or choose New slug… first.', 'err');"
-         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='#4f46e5'; this.style.background='#eef2ff'; }"
+         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='var(--accent-indigo)'; this.style.background='var(--panel-bg-darker)'; }"
          ondragleave="this.style.borderColor=''; this.style.background='';"
          ondrop="handleResearchDropEvent(event)"
          title="Drop .py, .md, or .txt research payload into dd_hub/inputs/<slug>/">
       <div style="font-size: 1.15rem; line-height: 1;">📥</div>
-      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop .py, .md, or .txt</div>
-      <div id="research-drop-hint" style="font-size: 0.68rem; color: #64748b;">Select a slug or choose New slug… first.</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: var(--text-heading);">Drop .py, .md, or .txt</div>
+      <div id="research-drop-hint" style="font-size: 0.68rem; color: var(--text-muted);">Select a slug or choose New slug… first.</div>
     </div>
     <input type="file" id="research-file-input" accept=".py,.md,.txt" style="display:none" onchange="handleResearchFileSelected(event)">
     <div class="row">
@@ -109,13 +141,13 @@
     </select>
     <div id="audio-drop-zone" class="drop-zone disabled" aria-disabled="true"
          onclick="if(!this.classList.contains('disabled')) document.getElementById('audio-file-input').click(); else setStatus('audio-drop-status', 'Audio belongs to an episode — pick the episode it belongs to.', 'err');"
-         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='#4f46e5'; this.style.background='#eef2ff'; }"
+         ondragover="event.preventDefault(); if(!this.classList.contains('disabled')){ this.style.borderColor='var(--accent-indigo)'; this.style.background='var(--panel-bg-darker)'; }"
          ondragleave="this.style.borderColor=''; this.style.background='';"
          ondrop="handleAudioDropEvent(event)"
          title="Drop audio into dd_hub/inputs/<ep>/">
       <div style="font-size: 1.15rem; line-height: 1;">🎙️</div>
-      <div style="font-size: 0.8rem; font-weight: 800; color: #312e81;">Drop Audio (.m4a, .mp3, .wav, .ogg, .aac)</div>
-      <div id="audio-drop-hint" style="font-size: 0.68rem; color: #64748b;">Audio belongs to an episode — pick the episode it belongs to.</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: var(--text-heading);">Drop Audio (.m4a, .mp3, .wav, .ogg, .aac)</div>
+      <div id="audio-drop-hint" style="font-size: 0.68rem; color: var(--text-muted);">Audio belongs to an episode — pick the episode it belongs to.</div>
     </div>
     <input type="file" id="audio-file-input" accept=".m4a,.mp3,.wav,.ogg,.aac" style="display:none" onchange="handleAudioFileSelected(event)">
     <div class="status" id="audio-drop-status"></div>
@@ -234,7 +266,7 @@ async function browseTo(dirPath) {
         item.style.fontSize = '0.82rem';
         item.style.borderRadius = '4px';
         item.textContent = '📁 ' + d.name;
-        item.onmouseenter = () => { item.style.background = '#eef2ff'; };
+        item.onmouseenter = () => { item.style.background = 'var(--panel-bg-darker)'; };
         item.onmouseleave = () => { item.style.background = ''; };
         item.onclick = () => browseTo(d.path);
         dirsEl.appendChild(item);
@@ -584,6 +616,14 @@ async function handleSuiteTileClick(ev, app) {
   return false;
 }
 
+function applyTheme(themeName, save = false) {
+  document.documentElement.className = '';
+  if (save) {
+    try { localStorage.setItem('ddma-theme', themeName || 'warm'); } catch (e) {}
+  }
+}
+
+try { applyTheme(localStorage.getItem('ddma-theme') || 'warm', false); } catch (e) {}
 loadWorkspace();
 loadInputsLists();
 pollSuiteStatus();
