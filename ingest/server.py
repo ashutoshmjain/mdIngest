@@ -3674,6 +3674,39 @@ def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_pytho
     }
 
 
+def _episode_has_audio_readonly(clean_id: str) -> bool:
+    """Read-only check for episode audio in hub inputs or local episode dirs."""
+    hub_root = get_dd_hub_root()
+    exts = (".m4a", ".mp3", ".wav", ".ogg", ".aac")
+    for d in [
+        hub_root / "inputs" / str(clean_id),
+        SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id),
+        PROJECT_ROOT / "ddma" / "docs" / "episodes" / str(clean_id),
+    ]:
+        if d.is_dir():
+            for ext in exts:
+                if any(d.glob(f"*{ext}")):
+                    return True
+    return False
+
+
+def _episode_has_transcription_readonly(clean_id: str) -> bool:
+    """Read-only check for non-empty transcription.json in hub or local episode dirs."""
+    hub_root = get_dd_hub_root()
+    for c in [
+        hub_root / "episodes" / str(clean_id) / "transcription.json",
+        SRC_DIR / "ddma" / "docs" / "episodes" / str(clean_id) / "transcription.json",
+        PROJECT_ROOT / "ddma" / "docs" / "episodes" / str(clean_id) / "transcription.json",
+        PROJECT_ROOT / "ddma" / "projects" / f"episode_{clean_id}" / "transcription.json",
+    ]:
+        try:
+            if c.exists() and c.stat().st_size > 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def list_dd_hub_inputs() -> dict:
     """
     Read-only listing of the current hub's inputs/ folders split into slugs
@@ -3704,10 +3737,19 @@ def list_dd_hub_inputs() -> dict:
     except Exception:
         pass
 
+    ep_entries = [
+        {
+            "number": str(n),
+            "has_audio": _episode_has_audio_readonly(str(n)),
+            "has_transcription": _episode_has_transcription_readonly(str(n)),
+        }
+        for n in sorted(episodes)
+    ]
+
     return {
         "success": True,
         "slugs": sorted(slugs, key=lambda s: s.lower()),
-        "episodes": [str(n) for n in sorted(episodes)],
+        "episodes": ep_entries,
     }
 
 
@@ -3766,11 +3808,9 @@ def sync_dd_hub_inputs() -> dict:
                 dest_aud = dest_dir / f"{slug}{ext}"
                 if not dest_aud.exists() or src_aud.stat().st_size != dest_aud.stat().st_size:
                     shutil.copy2(str(src_aud), str(dest_aud))
-                    ingested_audios.append({"slug": slug, "audio": dest_aud.name})
-                if not get_episode_transcription_json_path(slug):
-                    start_auto_transcription_pipeline(slug, audio_path=dest_aud)
-                    if not any(a["slug"] == slug for a in ingested_audios):
-                        ingested_audios.append({"slug": slug, "audio": dest_aud.name})
+                    ingested_audios.append({"slug": slug, "audio": dest_aud.name, "transcribed": bool(get_episode_transcription_json_path(slug))})
+                elif not get_episode_transcription_json_path(slug):
+                    ingested_audios.append({"slug": slug, "audio": dest_aud.name, "transcribed": False})
                 if not latest_filename:
                     latest_filename = f"{slug}.md" if (SRC_DIR / f"{slug}.md").exists() else f"_{slug}.md"
                 break
@@ -3780,7 +3820,7 @@ def sync_dd_hub_inputs() -> dict:
         "ingested_payloads": ingested_payloads,
         "ingested_audios": ingested_audios,
         "latest_filename": latest_filename,
-        "message": f"Synced dd_hub/inputs: {len(ingested_payloads)} payload(s), {len(ingested_audios)} audio track(s)."
+        "message": f"Synced dd_hub/inputs: {len(ingested_payloads)} payload(s), {len(ingested_audios)} audio track(s) (transcription starts from the Cockpit)."
     }
 
 
@@ -3855,6 +3895,16 @@ def handle_unified_drop(data: dict) -> dict:
         target_ep_id = selected_ep
         target_md_filename = f"{target_ep_id}.md"
 
+        # Overwrite guard: never silently desync an existing transcription.
+        if _episode_has_transcription_readonly(target_ep_id) and not bool(data.get("force")):
+            return {
+                "success": False,
+                "error": (
+                    f"Episode {target_ep_id} already has a transcription based on its current audio. "
+                    "Confirm replacement (force=true) to overwrite the audio, then re-transcribe from the Cockpit."
+                ),
+            }
+
         # Save to dd_hub/inputs/<target_ep_id>/<target_ep_id><ext>
         try:
             hub_in_dir = get_dd_hub_root() / "inputs" / target_ep_id
@@ -3870,16 +3920,13 @@ def handle_unified_drop(data: dict) -> dict:
         local_audio_file = ep_dir / f"{target_ep_id}{ext}"
         local_audio_file.write_bytes(raw_bytes)
 
-        # Immediately trigger auto-transcription + Gemini review + DDMA seeding
-        start_auto_transcription_pipeline(target_ep_id, audio_path=local_audio_file, force=True)
-
         return {
             "success": True,
             "drop_type": "audio",
             "clean_id": target_ep_id,
             "filename": target_md_filename,
             "audio_filename": local_audio_file.name,
-            "message": f"Saved to dd_hub/inputs/{target_ep_id}/{target_ep_id}{ext} & started Whisper large-v3-turbo transcription!"
+            "message": f"Audio saved for episode {target_ep_id} — transcription starts from the Cockpit podcast tab."
         }
 
     return {"success": False, "error": f"Unsupported file extension: {ext}"}
@@ -4016,9 +4063,6 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
                 narrative_text, _ = smart_streamline_narrative(transcript_text, title=ep_title, ep_num=clean_id, lightning_addr=ln_addr)
 
             job = transcription_jobs.get(clean_id, {"status": "idle", "progress": ""})
-            if audio_path and audio_path.exists() and not get_episode_transcription_json_path(clean_id) and job.get("status") not in ("processing", "done"):
-                start_auto_transcription_pipeline(clean_id, audio_path=audio_path)
-                job = transcription_jobs.get(clean_id, {"status": "processing", "progress": "Auto-transcribing with faster-whisper large-v3-turbo..."})
 
             audio_rel_url = None
             if audio_path:

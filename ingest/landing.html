@@ -269,6 +269,7 @@ async function pickCurrentFolder() {
   }
 }
 
+let _episodeMetaMap = {};
 async function loadInputsLists(selectSlug) {
   const slugSel = document.getElementById('research-slug-select');
   const epSel = document.getElementById('audio-ep-select');
@@ -280,6 +281,7 @@ async function loadInputsLists(selectSlug) {
     const data = await res.json();
     const slugs = Array.isArray(data.slugs) ? data.slugs : [];
     const episodes = Array.isArray(data.episodes) ? data.episodes : [];
+    _episodeMetaMap = {};
 
     slugSel.innerHTML = '';
     const slugDefault = document.createElement('option');
@@ -311,10 +313,12 @@ async function loadInputsLists(selectSlug) {
       epDefault.value = '';
       epDefault.textContent = '-- Select episode --';
       epSel.appendChild(epDefault);
-      for (const ep of episodes) {
+      for (const entry of episodes) {
+        const num = typeof entry === 'object' ? String(entry.number) : String(entry);
+        _episodeMetaMap[num] = typeof entry === 'object' ? entry : { number: num, has_audio: false, has_transcription: false };
         const opt = document.createElement('option');
-        opt.value = String(ep);
-        opt.textContent = 'Episode ' + ep;
+        opt.value = num;
+        opt.textContent = 'Episode ' + num;
         epSel.appendChild(opt);
       }
       if (prevEp && Array.from(epSel.options).some(o => o.value === prevEp)) {
@@ -462,6 +466,18 @@ async function processAudioFile(file) {
     setStatus('audio-drop-status', '❌ Unsupported file type for Audio: .' + ext + ' (expected .m4a, .mp3, .wav, .ogg, or .aac)', 'err');
     return;
   }
+  const epMeta = _episodeMetaMap[ep] || {};
+  let forceReplace = false;
+  if (epMeta.has_transcription) {
+    const ok = window.confirm(
+      `Episode ${ep} already has a transcription based on its current audio. Replace the audio? The transcription will no longer match until you re-transcribe from the Cockpit.`
+    );
+    if (!ok) {
+      setStatus('audio-drop-status', 'Cancelled — existing audio and transcription left unchanged.');
+      return;
+    }
+    forceReplace = true;
+  }
   setStatus('audio-drop-status', '📥 Saving ' + file.name + ' to dd_hub/inputs/' + ep + '…');
   const reader = new FileReader();
   reader.onload = async function(e) {
@@ -474,6 +490,7 @@ async function processAudioFile(file) {
         body: JSON.stringify({
           orig_filename: file.name,
           episode: ep,
+          force: forceReplace,
           base64_data: base64Data
         })
       });
