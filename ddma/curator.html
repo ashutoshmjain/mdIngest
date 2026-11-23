@@ -138,56 +138,30 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s, background-color 0.3s;
             flex-shrink: 0;
-        }
-        
-        .sidebar-panel.collapsed {
-            width: 0px !important;
-            border-right-color: transparent;
         }
 
         .collapsed-tab {
-            width: 30px;
-            background-color: var(--panel-bg-darker);
-            border-right: 1px solid var(--border-color);
+            width: 18px;
+            min-height: 80px;
+            background: var(--panel-bg);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 2px;
+            font-size: 0.7rem;
+            cursor: pointer;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            user-select: none;
-            transition: background-color 0.2s, width 0.2s;
-            z-index: 10;
-            gap: 0.8rem;
-            padding: 1rem 0;
             flex-shrink: 0;
+            align-self: flex-start;
+            margin: 6px 2px;
+            user-select: none;
         }
         .collapsed-tab:hover {
             background-color: var(--card-bg);
-        }
-        .collapsed-tab-right {
-            border-right: none;
-            border-left: 1px solid var(--border-color);
-        }
-        .collapsed-tab .tab-text {
-            writing-mode: vertical-rl;
-            transform: rotate(180deg);
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            font-family: var(--font-mono);
-        }
-        .collapsed-tab:hover .tab-text {
             color: var(--text-main);
-        }
-        .collapsed-tab .tab-icon {
-            font-size: 0.85rem;
-        }
-        .collapsed-tab .tab-arrow {
-            font-size: 0.6rem;
-            color: var(--primary);
         }
 
         .project-list-container {
@@ -1536,15 +1510,11 @@
     
 
     <div class="main-container">
-        <!-- Left Collapsed Tab Indicator (Projects Switcher) -->
-        <div id="leftCollapsedTab" class="collapsed-tab collapsed-tab-left">
-            <span class="tab-icon">📁</span>
-            <span class="tab-text">PROJECTS</span>
-            <span class="tab-arrow">▶</span>
-        </div>
+        <!-- Left Collapsed Tab Indicator (18px edge tab matching Beats Studio) -->
+        <button type="button" id="leftCollapsedTab" class="collapsed-tab collapsed-tab-left" title="Expand Projects pane" style="display: none;">▶</button>
 
         <!-- Panel 1: Far Left Sidebar (Project Switcher) -->
-        <div class="sidebar-panel collapsed">
+        <div class="sidebar-panel">
             <div class="panel-header">
                 <h2>PROJECTS</h2>
                 <button id="collapseSidebarBtn" class="icon-btn" title="Collapse Sidebar" style="font-size: 0.7rem;">◀</button>
@@ -1603,7 +1573,7 @@
         <div id="panelResizer" class="panel-resizer" title="Drag to Resize panels" style="display: none;"></div>
 
         <!-- Panel 3: Right Pane (Transcription) -->
-        <div class="right-panel collapsed">
+        <div class="right-panel" style="display: none;">
             <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between;">
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <button id="collapseTranscriptBtn" class="icon-btn" title="Collapse Transcript" style="font-size: 0.7rem; padding: 0.2rem; cursor: pointer;">▶</button>
@@ -1640,12 +1610,8 @@
             </div>
         </div>
 
-        <!-- Right Collapsed Tab Indicator (Transcription View) -->
-        <div id="rightCollapsedTab" class="collapsed-tab collapsed-tab-right">
-            <span class="tab-arrow">◀</span>
-            <span class="tab-text">TRANSCRIPT</span>
-            <span class="tab-icon">📝</span>
-        </div>
+        <!-- Right Collapsed Tab Indicator (18px edge tab matching Beats Studio) -->
+        <button type="button" id="rightCollapsedTab" class="collapsed-tab collapsed-tab-right" title="Expand Transcript pane">◀</button>
     </div>
 
     
@@ -3087,7 +3053,7 @@
                     mainContainer.classList.remove('dock-bottom');
                     if (dockToggleBtn) dockToggleBtn.innerHTML = '⊟ Dock Bottom';
                     if (resizer) resizer.style.cursor = 'col-resize';
-                    if (leftPanel && !rightPanel.classList.contains('collapsed')) {
+                    if (leftPanel && !curatorPaneState.right) {
                         leftPanel.style.width = `${lastLeftPanelWidth || 640}px`;
                         leftPanel.style.flex = 'none';
                     }
@@ -3119,29 +3085,48 @@
             });
         }
 
+        // Unified Beats-style pane collapse state (session-only)
+        let curatorPaneState = { left: false, right: true };
+        function toggleCuratorPane(side, collapse) {
+            curatorPaneState[side] = Boolean(collapse);
+            if (side === 'left') {
+                if (sidebarPanel) sidebarPanel.style.display = curatorPaneState.left ? 'none' : 'flex';
+                if (leftCollapsedTab) leftCollapsedTab.style.display = curatorPaneState.left ? 'flex' : 'none';
+            } else if (side === 'right') {
+                if (rightPanel) rightPanel.style.display = curatorPaneState.right ? 'none' : 'flex';
+                if (rightCollapsedTab) rightCollapsedTab.style.display = curatorPaneState.right ? 'flex' : 'none';
+                if (resizer) resizer.style.display = curatorPaneState.right ? 'none' : 'block';
+                if (leftPanel) {
+                    if (curatorPaneState.right) {
+                        leftPanel.style.width = 'auto';
+                        leftPanel.style.flex = '1';
+                    } else {
+                        leftPanel.style.flex = 'none';
+                        leftPanel.style.width = `${lastLeftPanelWidth}px`;
+                    }
+                }
+            }
+        }
+
         // Sidebar collapse logic
         function setupSidebarCollapse() {
+            toggleCuratorPane('left', false);
             if (collapseSidebarBtn) {
                 collapseSidebarBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    sidebarPanel.classList.add('collapsed');
-                    leftCollapsedTab.style.display = 'flex';
+                    toggleCuratorPane('left', true);
                 });
             }
-            
             if (leftCollapsedTab) {
                 leftCollapsedTab.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    sidebarPanel.classList.remove('collapsed');
-                    leftCollapsedTab.style.display = 'none';
+                    toggleCuratorPane('left', false);
                 });
             }
-            
             if (expandSidebarBtn) {
                 expandSidebarBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    sidebarPanel.classList.remove('collapsed');
-                    leftCollapsedTab.style.display = 'none';
+                    toggleCuratorPane('left', false);
                 });
             }
         }
@@ -3149,36 +3134,19 @@
         // Transcript panel collapse logic
         let lastLeftPanelWidth = 640;
         function setupTranscriptCollapse() {
+            toggleCuratorPane('right', true);
             collapseTranscriptBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                lastLeftPanelWidth = leftPanel.offsetWidth;
-                
-                rightPanel.classList.add('collapsed');
-                resizer.style.display = 'none';
-                rightCollapsedTab.style.display = 'flex';
-                
-                leftPanel.style.width = 'auto';
-                leftPanel.style.flex = '1';
+                if (leftPanel) lastLeftPanelWidth = leftPanel.offsetWidth || lastLeftPanelWidth;
+                toggleCuratorPane('right', true);
             });
-            
             rightCollapsedTab.addEventListener('click', function(e) {
                 e.stopPropagation();
-                leftPanel.style.flex = 'none';
-                leftPanel.style.width = `${lastLeftPanelWidth}px`;
-                
-                rightPanel.classList.remove('collapsed');
-                resizer.style.display = 'block';
-                rightCollapsedTab.style.display = 'none';
+                toggleCuratorPane('right', false);
             });
-            
             expandTranscriptBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                leftPanel.style.flex = 'none';
-                leftPanel.style.width = `${lastLeftPanelWidth}px`;
-                
-                rightPanel.classList.remove('collapsed');
-                resizer.style.display = 'block';
-                rightCollapsedTab.style.display = 'none';
+                toggleCuratorPane('right', false);
             });
         }
 
@@ -4649,17 +4617,8 @@
 
         // Global helpers for segment playback and panel visibility
         function ensureTranscriptPanelExpanded() {
-            const rightPanel = document.querySelector('.right-panel');
-            const leftPanel = document.querySelector('.left-panel');
-            const resizer = document.getElementById('panelResizer');
-            const rightCollapsedTab = document.getElementById('rightCollapsedTab');
-            
-            if (rightPanel.classList.contains('collapsed')) {
-                leftPanel.style.flex = 'none';
-                leftPanel.style.width = `${lastLeftPanelWidth}px`;
-                rightPanel.classList.remove('collapsed');
-                if (resizer) resizer.style.display = 'block';
-                if (rightCollapsedTab) rightCollapsedTab.style.display = 'none';
+            if (curatorPaneState.right) {
+                toggleCuratorPane('right', false);
             }
         }
 
