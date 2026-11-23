@@ -3729,7 +3729,11 @@ def list_dd_hub_inputs() -> dict:
                 slugs.add(name)
 
     try:
-        _, template_items, _, _ = parse_summary_structure()
+        mempool_items, template_items, _, _ = parse_summary_structure()
+        for m in mempool_items:
+            s = str(m.get("slug", "")).strip()
+            if s and not s.isdigit():
+                slugs.add(s)
         for item in template_items:
             num = item.get("number")
             if num is not None:
