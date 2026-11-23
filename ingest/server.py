@@ -3567,9 +3567,9 @@ def start_auto_transcription_pipeline(clean_id: str, audio_path: Path | None = N
     return True, f"Auto-transcription started with faster-whisper ({mname})"
 
 
-def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_python: bool = True, title_override: str = "") -> dict:
+def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_python: bool = True, title_override: str = "", orig_filename: str = "") -> dict:
     """
-    Saves raw payload to dd_hub/inputs/<slug>/payload.py and creates or updates either:
+    Saves raw payload to dd_hub/inputs/<slug>/ (verbatim file + payload.py) and creates or updates either:
     - src/<num>.md (if slug_or_id is digits or already in Block Template)
     - src/_<slug>.md (if Mempool draft)
     """
@@ -3583,10 +3583,14 @@ def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_pytho
     if not clean_slug:
         clean_slug = re.sub(r'[^a-zA-Z0-9_-]', '-', clean_title.lower()).strip('-') or "draft"
 
-    # Save to dd_hub/inputs/<clean_slug>/payload.py
+    # Save to dd_hub/inputs/<clean_slug>/ verbatim
     try:
         hub_in_dir = get_dd_hub_root() / "inputs" / clean_slug
         hub_in_dir.mkdir(parents=True, exist_ok=True)
+        if orig_filename:
+            verbatim_name = Path(orig_filename).name
+            if verbatim_name:
+                (hub_in_dir / verbatim_name).write_text(raw_text, encoding="utf-8")
         payload_file = hub_in_dir / "payload.py"
         if is_python:
             payload_file.write_text(raw_text, encoding="utf-8")
@@ -3759,18 +3763,18 @@ def sync_dd_hub_inputs() -> dict:
 
 def handle_unified_drop(data: dict) -> dict:
     """
-    Unified Smart Drop handler for .py, .md, and audio (.m4a, .mp3, .wav) files:
-    - Automatically saves inputs to dd_hub/inputs/<slug_or_ep>/
-    - Assigns a slug (for new research payloads) or episode number (mining Mempool draft if needed when audio is dropped)
-    - Automatically triggers faster-whisper large-v3-turbo transcription + Gemini audio review on audio drop.
+    Unified drop handler for research (.py, .md, .txt) and audio (.m4a, .mp3, .wav, .ogg, .aac) files:
+    - Research drops save verbatim under dd_hub/inputs/<slug>/ and create/update a Mempool draft.
+    - Audio drops resolve ONLY to the caller-selected existing episode under dd_hub/inputs/<ep>/ and trigger transcription.
+      Dropping audio never promotes a Mempool draft or creates an episode.
     """
     orig_filename = str(data.get("orig_filename", "")).strip()
     active_filename = str(data.get("active_filename", "")).strip()
     slug_override = str(data.get("slug", "")).strip()
     ext = Path(orig_filename).suffix.lower()
 
-    # CASE 1: Research Payload (.py or .md)
-    if ext in (".py", ".md"):
+    # CASE 1: Research Payload (.py, .md, or .txt)
+    if ext in (".py", ".md", ".txt"):
         text_content = data.get("text_content", "")
         if not text_content and data.get("base64_data"):
             text_content = base64.b64decode(data["base64_data"]).decode("utf-8", errors="replace")
@@ -3786,9 +3790,10 @@ def handle_unified_drop(data: dict) -> dict:
             elif active_filename:
                 target_slug = active_filename.replace(".md", "").lstrip("_")
 
-        res = _ingest_research_payload_to_episode(target_slug, text_content, is_python=is_py)
+        res = _ingest_research_payload_to_episode(target_slug, text_content, is_python=is_py, orig_filename=orig_filename)
         res["drop_type"] = "research"
-        res["message"] = f"Saved to dd_hub/inputs/{res['clean_id']}/payload.py & ingested {res['filename']}"
+        saved_name = Path(orig_filename).name or "payload.py"
+        res["message"] = f"Saved to dd_hub/inputs/{res['clean_id']}/{saved_name} & ingested {res['filename']}"
         return res
 
     # CASE 2: Audio File (.m4a, .mp3, .wav, .ogg, .aac)
@@ -3798,60 +3803,34 @@ def handle_unified_drop(data: dict) -> dict:
             return {"success": False, "error": "Missing audio base64_data"}
         raw_bytes = base64.b64decode(b64_data)
 
-        # Determine episode number / ID:
-        # 1. If filename is digits (e.g. 250.m4a), use 250.
-        # 2. If active episode is a Mempool draft (_slug.md), auto-mine it to next_episode_number!
-        # 3. Otherwise use active episode number or next_episode_number.
-        stem = Path(orig_filename).stem.strip()
-        ep_match = re.match(r'^(\d+)$', stem)
-        mempool, template, _, next_num = parse_summary_structure()
+        # Resolve ONLY to the caller-selected episode (no auto-promotion, no digit-filename shortcut).
+        selected_ep = str(data.get("episode", "")).strip()
+        if not selected_ep and active_filename and not active_filename.startswith("_"):
+            cand = active_filename.replace(".md", "").strip()
+            if cand.isdigit():
+                selected_ep = cand
 
-        target_ep_id = ""
-        target_md_filename = active_filename
+        _, template, _, _ = parse_summary_structure()
+        hub_root = get_dd_hub_root()
+        ep_exists = False
+        if selected_ep and selected_ep.isdigit():
+            ep_num = int(selected_ep)
+            in_template = any(t.get("number") == ep_num or t.get("filename") == f"{selected_ep}.md" for t in template)
+            in_hub = (hub_root / "inputs" / selected_ep).is_dir()
+            in_local = (SRC_DIR / "ddma" / "docs" / "episodes" / selected_ep).is_dir()
+            ep_exists = in_template or in_hub or in_local
 
-        if ep_match:
-            target_ep_id = ep_match.group(1)
-            target_md_filename = f"{target_ep_id}.md"
-        elif active_filename and active_filename.startswith("_"):
-            # Auto-mine Mempool draft to next episode number when audio is dropped!
-            target_ep_id = str(next_num)
-            src_path = SRC_DIR / active_filename
-            dest_filename = f"{target_ep_id}.md"
-            dest_path = SRC_DIR / dest_filename
-            if src_path.exists():
-                settings = load_settings()
-                word_limit = settings.get("title_word_limit", 5)
-                existing_text = src_path.read_text(encoding="utf-8")
-                sanitized_md, clean_title, _ = sanitize_katex_markdown(existing_text, "", word_limit)
-                sanitized_md = ensure_syndication_and_wallet_blocks(sanitized_md, settings)
-                formatted_title = f"{target_ep_id} : {clean_title}"
-                sidebar_tag = f"<!-- SIDEBAR_TITLE: {clean_title} -->"
-                full_content = f"# {formatted_title}\n\n{sidebar_tag}\n\n{sanitized_md}\n" if "<!-- SIDEBAR_TITLE:" not in sanitized_md else f"# {formatted_title}\n\n{sanitized_md}\n"
-                dest_path.write_text(full_content, encoding="utf-8")
-                if src_path != dest_path:
-                    src_path.unlink()
-                old_slug = active_filename.replace(".md", "").lstrip("_")
-                # Also copy payload.py from dd_hub/inputs/<old_slug> to dd_hub/inputs/<target_ep_id>
-                try:
-                    old_hub_in = get_dd_hub_root() / "inputs" / old_slug
-                    new_hub_in = get_dd_hub_root() / "inputs" / target_ep_id
-                    if old_hub_in.exists() and old_hub_in != new_hub_in:
-                        new_hub_in.mkdir(parents=True, exist_ok=True)
-                        for item in old_hub_in.iterdir():
-                            if item.is_file():
-                                shutil.copy2(str(item), str(new_hub_in / item.name))
-                except Exception:
-                    pass
-                mempool = [m for m in mempool if m["filename"] != active_filename]
-                template.insert(0, {"title": formatted_title, "filename": dest_filename, "number": int(target_ep_id)})
-                sync_summary_file(mempool, template)
-                target_md_filename = dest_filename
-        elif active_filename:
-            target_ep_id = active_filename.replace(".md", "").lstrip("_")
-            target_md_filename = active_filename
-        else:
-            target_ep_id = str(next_num)
-            target_md_filename = f"{target_ep_id}.md"
+        if not ep_exists:
+            return {
+                "success": False,
+                "error": (
+                    "Episode does not exist as a Template episode or episode folder. "
+                    "Create the episode first by moving the draft from Mempool to Template in the mdIngest Cockpit before dropping audio."
+                ),
+            }
+
+        target_ep_id = selected_ep
+        target_md_filename = f"{target_ep_id}.md"
 
         # Save to dd_hub/inputs/<target_ep_id>/<target_ep_id><ext>
         try:
