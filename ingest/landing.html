@@ -37,17 +37,25 @@
 
   <div class="card" id="workspace-card">
     <h2>Workspace</h2>
-    <label for="workspace-url">Workspace URL (optional — only for a synced folder, e.g. Google Drive; it identifies this workspace on every machine)</label>
-    <input type="text" id="workspace-url" spellcheck="false" placeholder="https://drive.google.com/drive/folders/<folder-id>">
-    <div class="kv"><b>Folder ID:</b> <span id="workspace-folder-id">—</span></div>
     <div class="kv"><b>Local path:</b> <span id="workspace-local-path">—</span></div>
     <div class="kv"><b>Talking to:</b> <span id="workspace-env">—</span></div>
     <div class="row">
+      <button id="btn-choose-folder" onclick="openFolderBrowser()">Choose folder…</button>
       <button id="btn-test-workspace" class="secondary" onclick="testWorkspace()">Test</button>
-      <button id="btn-save-workspace" onclick="saveWorkspaceUrl()">Save URL</button>
+    </div>
+    <div id="workspace-sync-nudge" class="fine" style="margin-top:0.55rem;"></div>
+    <div id="folder-browser" style="display:none; margin-top:0.75rem; border:1px solid var(--line); border-radius:8px; padding:0.75rem; background:#f8fafc;">
+      <div class="kv" style="margin-top:0"><b>Browsing:</b> <code id="fb-current-path">—</code></div>
+      <div id="fb-roots" class="row" style="margin-top:0.4rem;"></div>
+      <div id="fb-dirs" style="max-height:180px; overflow-y:auto; margin-top:0.5rem; border:1px solid var(--line); border-radius:6px; background:#fff; padding:0.25rem;"></div>
+      <div class="row" style="margin-top:0.5rem;">
+        <button id="fb-up-btn" class="secondary" onclick="browseUp()">⬆ Up</button>
+        <button id="fb-select-btn" onclick="pickCurrentFolder()">Select this folder</button>
+        <button class="secondary" onclick="closeFolderBrowser()">Cancel</button>
+      </div>
     </div>
     <div class="status" id="workspace-status"></div>
-    <div class="fine">Saving writes the URL to settings via <code>/api/settings</code>. While the vault is reachable, the <em>effective</em> workspace stays the vault's — the values re-read below always show what is actually in force.</div>
+    <div class="fine">Choosing a folder saves <code>dd_hub_root</code> to settings via <code>/api/settings</code>.</div>
   </div>
 
   <p class="fine" style="margin: -0.25rem 0 1rem; padding: 0 0.25rem;">New here? The workspace runs with no API keys at all. Add keys later, in the app's Settings, when you want what they unlock: a Gemini API key powers the AI assistance (co-pilot prompts, storyboard and remix agents, sting review); a Mosaic API key renders motion-graphics clips. Transcription, editing, and publishing need no key.</p>
@@ -121,7 +129,9 @@
 </div>
 
 <script>
-const DEFAULT_WORKSPACE_URL = "https://drive.google.com/drive/folders/1TTutE1z5ukqqZZcP65JLf8s0MsaGQ3kN";
+const SYNC_MARKERS = ['My Drive', 'Google Drive', 'OneDrive', 'Dropbox', 'iCloud Drive'];
+let _fbCurrentPath = '';
+let _fbParentPath = null;
 
 function setStatus(id, msg, kind) {
   const el = document.getElementById(id);
@@ -129,18 +139,22 @@ function setStatus(id, msg, kind) {
   el.className = 'status' + (kind ? ' ' + kind : '');
 }
 
-function folderIdFromUrl(url) {
-  const m = String(url || '').match(/\/folders\/([A-Za-z0-9_-]+)/);
-  return m ? m[1] : '';
+function renderSyncNudge(pathStr) {
+  const el = document.getElementById('workspace-sync-nudge');
+  if (!el) return;
+  if (!pathStr || pathStr === '—') { el.textContent = ''; return; }
+  const parts = String(pathStr).split(/[\\/]+/).filter(Boolean);
+  const matched = SYNC_MARKERS.find(m => parts.includes(m));
+  if (matched) {
+    el.textContent = '☁️ Synced via ' + matched + ' — other devices sharing this folder will see the same workspace.';
+  } else {
+    el.textContent = '💡 Using this app on more than one device? Put the workspace folder inside a synced folder (Google Drive, OneDrive, Dropbox…) — the sync service keeps the copies in step; this app only reads the folder.';
+  }
 }
 
 async function loadWorkspace() {
   try {
-    const res = await fetch('/api/settings');
-    const s = await res.json();
-    const urlInput = document.getElementById('workspace-url');
-    urlInput.value = s.workspace_url || DEFAULT_WORKSPACE_URL;
-    document.getElementById('workspace-folder-id').textContent = folderIdFromUrl(urlInput.value) || '—';
+    await fetch('/api/settings');
     await testWorkspace(true);
   } catch (err) {
     setStatus('workspace-status', 'Could not load settings: ' + err.message, 'err');
@@ -148,16 +162,15 @@ async function loadWorkspace() {
 }
 
 async function testWorkspace(quiet) {
-  const url = document.getElementById('workspace-url').value.trim() || DEFAULT_WORKSPACE_URL;
-  document.getElementById('workspace-folder-id').textContent = folderIdFromUrl(url) || '(unparseable)';
   if (!quiet) setStatus('workspace-status', 'Testing workspace…');
   try {
-    const res = await fetch('/api/workspace/test?url=' + encodeURIComponent(url));
+    const res = await fetch('/api/workspace/test');
     const data = await res.json();
     document.getElementById('workspace-local-path').textContent =
       (data.local_path || '—') + (data.readable ? '  (readable ✓)' : '  (NOT readable)');
     document.getElementById('workspace-env').textContent =
       window.location.host + '  →  ' + (data.local_path || 'unresolved');
+    renderSyncNudge(data.local_path || '');
     if (data.ok) {
       setStatus('workspace-status', '✓ ' + data.message, 'ok');
     } else {
@@ -170,22 +183,89 @@ async function testWorkspace(quiet) {
   }
 }
 
-async function saveWorkspaceUrl() {
-  const url = document.getElementById('workspace-url').value.trim();
-  if (!folderIdFromUrl(url)) {
-    setStatus('workspace-status', '✗ Not a Google Drive folder URL — nothing saved.', 'err');
-    return;
+async function openFolderBrowser(startPath) {
+  const box = document.getElementById('folder-browser');
+  box.style.display = 'block';
+  await browseTo(startPath || '');
+}
+
+function closeFolderBrowser() {
+  document.getElementById('folder-browser').style.display = 'none';
+}
+
+async function browseTo(dirPath) {
+  try {
+    const q = dirPath ? ('?path=' + encodeURIComponent(dirPath)) : '';
+    const res = await fetch('/api/workspace/browse' + q);
+    const data = await res.json();
+    if (!data.success) {
+      setStatus('workspace-status', '✗ ' + (data.error || 'Browse failed'), 'err');
+      return;
+    }
+    _fbCurrentPath = data.path;
+    _fbParentPath = data.parent || null;
+    document.getElementById('fb-current-path').textContent = _fbCurrentPath;
+    document.getElementById('fb-up-btn').disabled = !_fbParentPath;
+
+    const rootsEl = document.getElementById('fb-roots');
+    rootsEl.innerHTML = '';
+    if (Array.isArray(data.roots) && data.roots.length > 1) {
+      for (const r of data.roots) {
+        const b = document.createElement('button');
+        b.className = 'secondary';
+        b.style.padding = '0.25rem 0.5rem';
+        b.style.fontSize = '0.75rem';
+        b.textContent = r;
+        b.onclick = () => browseTo(r);
+        rootsEl.appendChild(b);
+      }
+    }
+
+    const dirsEl = document.getElementById('fb-dirs');
+    dirsEl.innerHTML = '';
+    if (!data.dirs || data.dirs.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'fine';
+      empty.style.padding = '0.35rem 0.5rem';
+      empty.textContent = '(no subfolders)';
+      dirsEl.appendChild(empty);
+    } else {
+      for (const d of data.dirs) {
+        const item = document.createElement('div');
+        item.style.padding = '0.35rem 0.5rem';
+        item.style.cursor = 'pointer';
+        item.style.fontSize = '0.82rem';
+        item.style.borderRadius = '4px';
+        item.textContent = '📁 ' + d.name;
+        item.onmouseenter = () => { item.style.background = '#eef2ff'; };
+        item.onmouseleave = () => { item.style.background = ''; };
+        item.onclick = () => browseTo(d.path);
+        dirsEl.appendChild(item);
+      }
+    }
+  } catch (err) {
+    setStatus('workspace-status', '✗ Browse error: ' + err.message, 'err');
   }
+}
+
+function browseUp() {
+  if (_fbParentPath) browseTo(_fbParentPath);
+}
+
+async function pickCurrentFolder() {
+  if (!_fbCurrentPath) return;
   try {
     const cur = await (await fetch('/api/settings')).json();
-    cur.workspace_url = url;
+    cur.dd_hub_root = _fbCurrentPath;
     const res = await fetch('/api/settings', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur)
     });
     const data = await res.json();
     if (data.success) {
-      setStatus('workspace-status', 'Saved. Re-reading what is actually in force…', 'ok');
+      closeFolderBrowser();
+      setStatus('workspace-status', 'Saved workspace folder. Re-reading…', 'ok');
       await loadWorkspace();
+      await loadInputsLists();
     } else {
       setStatus('workspace-status', '✗ Save failed.', 'err');
     }

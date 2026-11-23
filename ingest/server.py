@@ -251,7 +251,30 @@ def kill_mdserve():
         except Exception:
             pass
 
+def _migrate_workspace_path_if_needed():
+    """On first run without a saved dd_hub_root, adopt the current effective hub path into SETTINGS_FILE."""
+    existing = _read_settings_file(SETTINGS_FILE)
+    if existing.get("dd_hub_root"):
+        return
+    eff = None
+    env_hub = os.environ.get("DD_HUB_ROOT")
+    if env_hub and Path(env_hub).exists():
+        eff = str(Path(env_hub))
+    elif Path("/workspace/dd_hub").exists():
+        eff = "/workspace/dd_hub"
+    elif (PROJECT_ROOT / "dd_hub").exists():
+        eff = str(PROJECT_ROOT / "dd_hub")
+    if eff:
+        existing["dd_hub_root"] = eff
+        try:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(existing, f, indent=2)
+        except Exception:
+            pass
+
+
 def load_settings():
+    _migrate_workspace_path_if_needed()
     settings = {}
     vault_file = get_dd_hub_root() / "vault" / "settings.json"
     if vault_file.exists():
@@ -290,7 +313,7 @@ def load_settings():
         merged["gemini_api_key"] = os.environ.get("GEMINI_API_KEY")
     if os.environ.get("MOSAIC_API_KEY"):
         merged["mosaic_api_key"] = os.environ.get("MOSAIC_API_KEY")
-    if os.environ.get("DD_HUB_ROOT"):
+    if os.environ.get("DD_HUB_ROOT") and not merged.get("dd_hub_root"):
         merged["dd_hub_root"] = os.environ.get("DD_HUB_ROOT")
     if os.environ.get("GDRIVE_PICKUP_PATH"):
         merged["gdrive_pickup_path"] = os.environ.get("GDRIVE_PICKUP_PATH")
@@ -847,14 +870,14 @@ def _read_settings_file(path):
 
 
 def get_dd_hub_root() -> Path:
-    """Resolves the canonical dd_hub root across Local Windows, Antigravity Cloud VM, and GCP Docker."""
-    env_hub = os.environ.get("DD_HUB_ROOT")
-    if env_hub and Path(env_hub).exists():
-        return Path(env_hub)
+    """Resolves the canonical dd_hub root: saved path first, DD_HUB_ROOT fallback if never saved."""
     settings = _read_settings_file(SETTINGS_FILE)
     cfg_hub = settings.get("dd_hub_root")
     if cfg_hub and Path(cfg_hub).exists():
         return Path(cfg_hub)
+    env_hub = os.environ.get("DD_HUB_ROOT")
+    if env_hub and Path(env_hub).exists():
+        return Path(env_hub)
     for cand in [
         Path("/workspace/dd_hub"),
     ]:
@@ -4187,47 +4210,73 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(list_dd_hub_inputs())
             return
 
+        if path == "/api/workspace/browse":
+            params = parse_qs(url.query)
+            raw_dir = params.get("path", [""])[0].strip()
+            if raw_dir:
+                target = Path(raw_dir).expanduser()
+            else:
+                hub = get_dd_hub_root()
+                target = hub if hub.exists() and hub.is_dir() else Path.home()
+            if not target.exists():
+                self.send_json({"success": False, "error": f"Path does not exist: {target}"}, status=400)
+                return
+            if not target.is_dir():
+                self.send_json({"success": False, "error": f"Path is not a directory: {target}"}, status=400)
+                return
+            dirs = []
+            try:
+                for entry in sorted(target.iterdir(), key=lambda p: p.name.lower()):
+                    if entry.is_dir() and not entry.name.startswith("."):
+                        dirs.append({"name": entry.name, "path": str(entry)})
+            except PermissionError:
+                pass
+            parent = str(target.parent) if target.parent != target else None
+            if os.name == "nt":
+                roots = [f"{c}:\\" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if Path(f"{c}:\\").exists()]
+            else:
+                roots = ["/"]
+            self.send_json({
+                "success": True,
+                "path": str(target),
+                "parent": parent,
+                "dirs": dirs,
+                "roots": roots,
+            })
+            return
+
         if path == "/api/workspace/test":
             params = parse_qs(url.query)
-            raw_url = params.get("url", [""])[0].strip()
-            m = re.search(r"/folders/([A-Za-z0-9_-]+)", raw_url)
-            if not m:
-                self.send_json({"success": False, "ok": False,
-                                "message": "Not a Google Drive folder URL (expected …/drive/folders/<folder-id>)."})
-                return
-            folder_id = m.group(1)
-            settings = load_settings()
-            cfg_id = ""
-            cfg_url = str(settings.get("workspace_url", "") or "")
-            cm = re.search(r"/folders/([A-Za-z0-9_-]+)", cfg_url)
-            if cm:
-                cfg_id = cm.group(1)
-            hub_root = get_dd_hub_root()
+            raw_path = params.get("path", [""])[0].strip()
+            hub_root = Path(raw_path).expanduser() if raw_path else get_dd_hub_root()
             local_path = str(hub_root)
             readable = False
             has_marker = False
             try:
                 readable = hub_root.exists() and hub_root.is_dir()
-                has_marker = readable and ((hub_root / "vault" / "settings.json").exists() or (hub_root / "episodes").exists())
+                has_marker = readable and (
+                    (hub_root / "vault" / "settings.json").exists()
+                    or (hub_root / "episodes").exists()
+                    or (hub_root / "inputs").exists()
+                )
             except Exception:
                 pass
-            ok = bool(folder_id) and readable
-            if ok and cfg_id and folder_id != cfg_id:
-                msg = (f"URL parses and the local workspace is readable at {local_path}, "
-                       f"but its folder ID does not match the configured workspace ({cfg_id}). "
-                       "Saving would switch workspaces.")
-            elif ok:
-                msg = (f"Workspace resolves and is readable at {local_path}. "
-                       + ("Folder ID matches the configured workspace." if cfg_id else ""))
-            elif not readable:
-                msg = f"URL parses (folder {folder_id}) but the local path {local_path} is not reachable. Mount dd_hub / set DD_HUB_ROOT."
+            sync_markers = ("My Drive", "Google Drive", "OneDrive", "Dropbox", "iCloud Drive")
+            parts = [p for p in re.split(r"[\\/]+", local_path) if p]
+            sync_service = next((m for m in sync_markers if m in parts), "")
+            if readable:
+                msg = f"Workspace folder is readable at {local_path}."
             else:
-                msg = "Workspace URL not usable."
-                ok = False
-            self.send_json({"success": True, "ok": ok, "folder_id": folder_id,
-                            "matches_configured": bool(cfg_id) and folder_id == cfg_id,
-                            "local_path": local_path, "readable": readable,
-                            "has_marker": has_marker, "message": msg})
+                msg = f"Local path {local_path} is not reachable."
+            self.send_json({
+                "success": True,
+                "ok": readable,
+                "local_path": local_path,
+                "readable": readable,
+                "has_marker": has_marker,
+                "sync_service": sync_service,
+                "message": msg,
+            })
             return
 
         # Media Streaming routes for video clips and cover images
