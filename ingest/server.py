@@ -3647,6 +3647,43 @@ def _ingest_research_payload_to_episode(slug_or_id: str, raw_text: str, is_pytho
     }
 
 
+def list_dd_hub_inputs() -> dict:
+    """
+    Read-only listing of the current hub's inputs/ folders split into slugs
+    (non-numeric) and episodes (numeric), merged with template episode numbers
+    from SUMMARY.md without duplicates. Writes nothing.
+    """
+    hub_inputs = get_dd_hub_root() / "inputs"
+    slugs = set()
+    episodes = set()
+    if hub_inputs.exists() and hub_inputs.is_dir():
+        for p in hub_inputs.iterdir():
+            if not p.is_dir() or p.name.startswith("."):
+                continue
+            name = p.name.strip()
+            if not name:
+                continue
+            if name.isdigit():
+                episodes.add(int(name))
+            else:
+                slugs.add(name)
+
+    try:
+        _, template_items, _, _ = parse_summary_structure()
+        for item in template_items:
+            num = item.get("number")
+            if num is not None:
+                episodes.add(int(num))
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "slugs": sorted(slugs, key=lambda s: s.lower()),
+        "episodes": [str(n) for n in sorted(episodes)],
+    }
+
+
 def sync_dd_hub_inputs() -> dict:
     """
     Scans dd_hub/inputs/<slug>/ for any automated drops (e.g. from the send-py skill or NotebookLM audio):
@@ -4165,6 +4202,10 @@ class IngestRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/settings":
             self.send_json(load_settings())
+            return
+
+        if path == "/api/dd_hub/inputs":
+            self.send_json(list_dd_hub_inputs())
             return
 
         if path == "/api/workspace/test":
