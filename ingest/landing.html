@@ -62,16 +62,11 @@
 
   <div class="card" id="launcher-card">
     <h2>Apps</h2>
-    <div id="suite-tiles" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.5rem; margin-bottom:0.7rem;">
+    <div id="suite-tiles" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:0.5rem;">
       <a class="btn secondary suite-tile" data-app="cockpit" href="/cockpit.html" style="display:flex;justify-content:space-between;align-items:center;"><span>Cockpit</span><span class="tile-state" data-state-for="cockpit">Running</span></a>
       <a class="btn secondary suite-tile" data-app="docs" href="http://localhost:3000/" onclick="return handleSuiteTileClick(event, 'docs')" style="display:flex;justify-content:space-between;align-items:center;"><span>Docs</span><span class="tile-state" data-state-for="docs">Starting</span></a>
       <a class="btn secondary suite-tile" data-app="cutroom" href="http://localhost:8000/curator.html" onclick="return handleSuiteTileClick(event, 'cutroom')" style="display:flex;justify-content:space-between;align-items:center;"><span>Cutroom</span><span class="tile-state" data-state-for="cutroom">Starting</span></a>
       <a class="btn secondary suite-tile" data-app="beats" href="http://127.0.0.1:8001/beats.html" onclick="return handleSuiteTileClick(event, 'beats')" style="display:flex;justify-content:space-between;align-items:center;"><span>Beats Studio</span><span class="tile-state" data-state-for="beats">Starting</span></a>
-    </div>
-    <div class="row">
-      <a class="btn secondary" href="/cockpit.html">Open mdIngest Cockpit</a>
-      <button onclick="launchDdMa()">Launch Cutroom</button>
-      <button onclick="launchBeats()">Launch Beats Studio</button>
     </div>
     <div class="status" id="launcher-status"></div>
   </div>
@@ -271,60 +266,6 @@ async function pickCurrentFolder() {
     }
   } catch (err) {
     setStatus('workspace-status', '✗ Save failed: ' + err.message, 'err');
-  }
-}
-
-async function launchDdMa() {
-  setStatus('launcher-status', 'Launching Cutroom…');
-  try {
-    const res = await fetch('/api/ddma/launch', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
-    });
-    const data = await res.json();
-    if (data.success && data.curator_url) {
-      const el = document.getElementById('launcher-status');
-      el.className = 'status ok';
-      el.innerHTML = '';
-      el.appendChild(document.createTextNode('✓ Cutroom ready: '));
-      const a = document.createElement('a');
-      a.href = data.curator_url;
-      a.textContent = data.curator_url;
-      a.className = 'inline';
-      a.target = '_blank';
-      a.rel = 'noopener';
-      el.appendChild(a);
-    } else {
-      setStatus('launcher-status', '✗ Launch failed: ' + (data.error || 'unknown error'), 'err');
-    }
-  } catch (err) {
-    setStatus('launcher-status', '✗ Launch failed: ' + err.message, 'err');
-  }
-}
-
-async function launchBeats() {
-  setStatus('launcher-status', 'Launching Beats Studio…');
-  try {
-    const res = await fetch('/api/beats/launch', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({})
-    });
-    const data = await res.json();
-    if (data.success && data.beats_url) {
-      const el = document.getElementById('launcher-status');
-      el.className = 'status ok';
-      el.innerHTML = '';
-      el.appendChild(document.createTextNode('✓ Beats Studio ready: '));
-      const a = document.createElement('a');
-      a.href = data.beats_url;
-      a.textContent = data.beats_url;
-      a.className = 'inline';
-      a.target = '_blank';
-      a.rel = 'noopener';
-      el.appendChild(a);
-    } else {
-      setStatus('launcher-status', '✗ Launch failed: ' + (data.error || 'unknown error'), 'err');
-    }
-  } catch (err) {
-    setStatus('launcher-status', '✗ Launch failed: ' + err.message, 'err');
   }
 }
 
@@ -580,6 +521,8 @@ async function pollSuiteStatus() {
     _suiteStateMap = apps;
     let anyStarting = false;
     for (const [k, info] of Object.entries(apps)) {
+      const tile = document.querySelector(`.suite-tile[data-app="${k}"]`);
+      if (tile && info.url) tile.href = info.url;
       const badge = document.querySelector(`[data-state-for="${k}"]`);
       if (badge) {
         const st = info.state || 'starting';
