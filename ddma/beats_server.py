@@ -193,6 +193,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
     # ---------- GET ----------
     STATIC_WHITELIST = {
         "/workspace-link.js": ("workspace-link.js", "application/javascript"),
+        "/shared-settings.js": ("shared-settings.js", "application/javascript"),
     }
 
     def do_GET(self):

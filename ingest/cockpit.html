@@ -20,6 +20,7 @@
 
     <!-- Self-hosted Lightning Widget (extracted from theme/book.js) -->
     <script src="lightning-widget.js"></script>
+    <script src="shared-settings.js"></script>
     <script src="workspace-link.js"></script>
 
     <style>
@@ -1567,7 +1568,7 @@
                 <!-- Dynamically populated with active Mempool drafts & Block Template episodes only -->
             </div>
             <div style="border-top: 1px solid var(--border-color); padding: 0.65rem 0.75rem; background: var(--panel-bg);">
-                <button type="button" id="settingsBtn" onclick="openModal('settings-modal')" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--panel-bg-darker); color: var(--text-main); font-size: 0.78rem; font-weight: 600; cursor: pointer;">
+                <button type="button" id="settingsBtn" onclick="openSharedSettingsModal()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.45rem; padding: 0.45rem 0.65rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--panel-bg-darker); color: var(--text-main); font-size: 0.78rem; font-weight: 600; cursor: pointer;">
                     <span>⚙️</span><span>System Settings</span>
                 </button>
             </div>
@@ -2153,61 +2154,6 @@ if __name__ == '__main__':
     </div>
 
     <!-- MODAL 3: SETTINGS (MATCHING DDMA PATTERN) -->
-    <div class="modal-overlay" id="settings-modal">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h2 style="font-size: 1.15rem; font-weight: 700;">⚙️ Publishing &amp; Platform Settings</h2>
-                <button onclick="closeModals()" style="background: none; border: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Spotify Show URL</label>
-                <input type="text" class="form-input" id="setting-spotify">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Apple Podcasts URL</label>
-                <input type="text" class="form-input" id="setting-apple">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">YouTube Music Playlist URL</label>
-                <input type="text" class="form-input" id="setting-yt-music">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Fountain.fm Show URL</label>
-                <input type="text" class="form-input" id="setting-fountain">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Lightning Tips Address</label>
-                <input type="text" class="form-input" id="setting-lightning">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Default Whisper STT Model (Cutroom Word Timestamps)</label>
-                <select class="form-input" id="setting-whisper-model" style="background: #ffffff;">
-                    <option value="large-v3-turbo" selected>large-v3-turbo (AVX-512 Turbo • Recommended)</option>
-                    <option value="small.en">small.en (Cutroom Standard • Fast)</option>
-                    <option value="small">small (Multilingual • High Accuracy)</option>
-                    <option value="base.en">base.en (Fast English)</option>
-                    <option value="base">base (Standard)</option>
-                    <option value="medium.en">medium.en (High Precision)</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">External Text Editor (e.g. gvim, vim, code, notepad)</label>
-                <input type="text" class="form-input" id="setting-external-editor" placeholder="gvim">
-            </div>
-
-            <button class="btn-cmd primary" style="width: 100%; justify-content: center; padding: 0.75rem;" onclick="saveSettings()">
-                💾 Save Configuration
-            </button>
-        </div>
-    </div>
-
     <!-- Toast Notification -->
     <div class="toast" id="toast">Action Executed</div>
 
@@ -4412,49 +4358,15 @@ if __name__ == '__main__':
         }
 
         function openModal(id) {
-            document.getElementById(id).classList.add('active');
             if (id === 'settings-modal') {
-                fetch('/api/settings').then(r => r.json()).then(s => {
-                    if (currentStatus) currentStatus.settings = s;
-                    document.getElementById('setting-spotify').value = s.spotify_url || '';
-                    document.getElementById('setting-apple').value = s.apple_podcasts_url || '';
-                    document.getElementById('setting-yt-music').value = s.youtube_music_url || '';
-                    document.getElementById('setting-fountain').value = s.fountain_url || '';
-                    document.getElementById('setting-lightning').value = s.lightning_address || '';
-                    if (document.getElementById('setting-whisper-model')) {
-                        document.getElementById('setting-whisper-model').value = s.whisper_model || 'large-v3-turbo';
-                    }
-                    if (document.getElementById('setting-external-editor')) {
-                        document.getElementById('setting-external-editor').value = s.external_editor || 'gvim';
-                    }
-                }).catch(() => {});
+                openSharedSettingsModal();
+                return;
             }
+            document.getElementById(id).classList.add('active');
         }
 
         function closeModals() {
             document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
-        }
-
-        async function saveSettings() {
-            const payload = {
-                ...currentStatus.settings,
-                spotify_url: document.getElementById('setting-spotify').value,
-                apple_podcasts_url: document.getElementById('setting-apple').value,
-                youtube_music_url: document.getElementById('setting-yt-music').value,
-                fountain_url: document.getElementById('setting-fountain').value,
-                lightning_address: document.getElementById('setting-lightning').value,
-                whisper_model: document.getElementById('setting-whisper-model') ? document.getElementById('setting-whisper-model').value : 'large-v3-turbo',
-                whisper_word_timestamps: true,
-                external_editor: document.getElementById('setting-external-editor') ? document.getElementById('setting-external-editor').value.trim() : 'gvim'
-            };
-            await fetch('/api/settings', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            closeModals();
-            showToast('💾 Settings saved!');
-            fetchStatus();
         }
 
         function showToast(msg) {

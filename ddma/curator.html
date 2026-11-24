@@ -1727,106 +1727,6 @@
         </div>
     </div>
 
-    <!-- System Settings Modal -->
-    <div class="export-modal-overlay" id="settingsModalOverlay">
-        <div class="export-modal" style="max-width: 1100px; width: 92vw; height: 85vh; max-height: 85vh; display: flex; flex-direction: column; padding: 1.8rem; box-sizing: border-box; gap: 1rem; border-radius: 12px; background: var(--panel-bg);">
-            <!-- Modal Header with Tab Navigation -->
-            <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.8rem;">
-                <div style="display: flex; align-items: center; gap: 1.5rem;">
-                    <h3 style="margin: 0; color: var(--primary); display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono); font-weight: 700; font-size: 1.2rem;">
-                        ⚙️ STUDIO SETTINGS
-                    </h3>
-                    <!-- Settings Tab Buttons -->
-                    <div style="display: flex; gap: 0.4rem; background: var(--panel-bg-darker); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <button type="button" class="settings-tab-btn active" data-tab="tab-general" style="padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; color: var(--text-main); background: var(--bg-color);">⚙️ General & Music</button>
-                        <button type="button" class="settings-tab-btn" data-tab="tab-gemini" style="padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; color: var(--text-muted); background: transparent;">🤖 Gemini Co-Pilot Prompts</button>
-                        <button type="button" class="settings-tab-btn" data-tab="tab-mosaic" style="padding: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; color: var(--text-muted); background: transparent;">🌌 Mosaic Motion Design</button>
-                    </div>
-                </div>
-                <button class="icon-btn" id="closeSettingsModalBtn" style="font-size: 1.2rem; cursor: pointer; background: transparent; border: none; color: var(--text-muted);">✖</button>
-            </div>
-            
-            <!-- Tab Body Container -->
-            <div style="flex-grow: 1; min-height: 0; overflow-y: auto; padding: 0.5rem 0.2rem;">
-                
-                <!-- TAB 1: General & Music -->
-                <div class="settings-tab-content active" id="tab-general" style="display: flex; flex-direction: column; gap: 1.5rem;">
-
-                    <!-- Global Music Library -->
-                    <div style="background: var(--panel-bg-darker); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-                            <label style="font-size: 0.82rem; font-weight: 700; margin: 0; color: var(--text-main);">GLOBAL MUSIC STING LIBRARY</label>
-                            <button class="btn btn-secondary btn-mini" id="importMusicBtn" style="font-weight: 600; padding: 0.4rem 0.8rem;">🎵 Import New Sting</button>
-                            <input type="file" id="musicUploadInput" accept=".mp3,.wav,.m4a" style="display: none;">
-                        </div>
-                        <div id="settingsMusicList" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; padding: 0.6rem; background-color: var(--bg-color); display: flex; flex-direction: column; gap: 0.4rem;">
-                            <!-- Dynamically populated global music files -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 2: Gemini Co-Pilot Prompts -->
-                <div class="settings-tab-content" id="tab-gemini" style="display: none; flex-direction: column; gap: 1.5rem;">
-                    <!-- API Key Header -->
-                    <div style="background: var(--panel-bg-darker); padding: 1rem 1.2rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); display: block;">GEMINI API CREDENTIALS</label>
-                            <span style="font-size: 0.72rem; color: var(--text-muted);">Required for Gemini AI Clip Remixing & Episode AI Auto-Plan.</span>
-                        </div>
-                        <input type="password" id="settingsGeminiApiKey" placeholder="Enter Gemini API Key" autocomplete="new-password" data-lpignore="true" style="width: 380px; padding: 0.55rem; font-size: 0.8rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-                    </div>
-
-                    </div>
-                </div>
-
-                <!-- TAB 3: Mosaic Motion Design Settings -->
-                <div class="settings-tab-content" id="tab-mosaic" style="display: none; flex-direction: column; gap: 1.5rem;">
-                    <!-- Mosaic Credentials -->
-                    <div style="background: var(--panel-bg-darker); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <label style="font-size: 0.82rem; font-weight: 700; margin-bottom: 0.8rem; display: block; color: var(--text-main);">MOSAIC INTEGRATION CREDENTIALS</label>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.8rem;">
-                            <div class="music-editor-field" style="width: 100%;">
-                                <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">API Key (mk_...):</label>
-                                <input type="password" id="settingsMosaicApiKey" placeholder="Enter Mosaic API Key" autocomplete="new-password" data-lpignore="true" style="width: 100%; padding: 0.55rem; font-size: 0.8rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-                            </div>
-                            <div class="music-editor-field" style="width: 100%;">
-                                <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Agent ID (UUID):</label>
-                                <input type="text" id="settingsMosaicAgentId" placeholder="Enter Agent ID" style="width: 100%; padding: 0.55rem; font-size: 0.8rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-                            </div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                            <div class="music-editor-field" style="width: 100%;">
-                                <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Motion Graphics Node ID:</label>
-                                <input type="text" id="settingsMosaicMogrNodeId" placeholder="Enter MOGR Node ID (Optional)" style="width: 100%; padding: 0.55rem; font-size: 0.8rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-                            </div>
-                            <div class="music-editor-field" style="width: 100%;">
-                                <label style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 0.3rem; display: block;">Cinematic Captions Node ID:</label>
-                                <input type="text" id="settingsMosaicCaptionsNodeId" placeholder="Enter Captions Node ID (Optional)" style="width: 100%; padding: 0.55rem; font-size: 0.8rem; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none;">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Default Prompt Textarea -->
-                    <div style="background: var(--panel-bg-darker); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.6rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); display: block;">DEFAULT MOTION DESIGN INSTRUCTIONS</label>
-                                <span style="font-size: 0.72rem; color: var(--text-muted);">Instructions sent to Mosaic visual animation engine for infographic overlay generation.</span>
-                            </div>
-                            <button type="button" class="btn btn-secondary btn-mini" id="resetMosaicPromptBtn" style="font-size: 0.7rem; font-weight: 600;">↺ Reset to Default</button>
-                        </div>
-                        <textarea id="settingsMosaicDefaultPrompt" placeholder="Enter default Motion Design instructions..." style="width: 100%; height: 260px; padding: 0.8rem; font-size: 0.8rem; font-family: var(--font-mono); line-height: 1.45; border-radius: 6px; background-color: var(--bg-color); border: 1px solid var(--border-color); color: var(--text-main); outline: none; resize: vertical; box-sizing: border-box;"></textarea>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="export-actions" style="margin-top: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.8rem; display: flex; justify-content: flex-end; gap: 0.8rem;">
-                <button class="btn btn-secondary" id="cancelSettingsBtn" style="font-weight: 600; padding: 0.6rem 1.2rem;">Cancel</button>
-                <button class="btn btn-primary" id="saveSettingsBtn" style="font-weight: 600; padding: 0.6rem 1.5rem; background-image: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);">Save Settings</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Mosaic Custom Prompt Modal -->
     <div class="export-modal-overlay" id="mosaicPromptModalOverlay">
         <div class="export-modal" style="max-width: 650px; width: 90%;">
@@ -1937,6 +1837,7 @@
 
     <audio id="audioElement"></audio>
 
+    <script src="shared-settings.js"></script>
     <script src="workspace-link.js"></script>
     <script>
         // =========================================================================
@@ -2780,102 +2681,14 @@
                 settingsModalOverlay.classList.remove('active');
             }
         }
-        async function openSettingsModal() {
-            const defaults = window.serverDefaultPrompts || {};
-            try {
-                const res = await fetch('/get-settings');
-                if (res.ok) {
-                    const d = await res.json();
-                    localStorage.setItem('ddma-mosaic-api-key', d.mosaic_api_key || '');
-                    localStorage.setItem('ddma-mosaic-agent-id', d.mosaic_agent_id || '');
-                    localStorage.setItem('ddma-mosaic-mogr-node-id', d.mosaic_mogr_node_id || '');
-                    localStorage.setItem('ddma-mosaic-captions-node-id', d.mosaic_captions_node_id || '');
-                    localStorage.setItem('ddma-gemini-api-key', d.gemini_api_key || '');
-                    localStorage.setItem('ddma-mosaic-default-prompt', d.mosaic_default_prompt || defaults.mosaic || '');
-                }
-            } catch (_) {}
-            document.getElementById('settingsMosaicApiKey').value = localStorage.getItem('ddma-mosaic-api-key') || '';
-            document.getElementById('settingsMosaicAgentId').value = localStorage.getItem('ddma-mosaic-agent-id') || '';
-            document.getElementById('settingsMosaicMogrNodeId').value = localStorage.getItem('ddma-mosaic-mogr-node-id') || '';
-            document.getElementById('settingsMosaicCaptionsNodeId').value = localStorage.getItem('ddma-mosaic-captions-node-id') || '';
-            document.getElementById('settingsGeminiApiKey').value = localStorage.getItem('ddma-gemini-api-key') || '';
-            document.getElementById('settingsMosaicDefaultPrompt').value = localStorage.getItem('ddma-mosaic-default-prompt') || defaults.mosaic || '';
-            window._settingsSnapshot = snapshotSettingsFields();
-
-            renderSettingsMusicList();
-            settingsModalOverlay.classList.add('active');
+        function openSettingsModal() {
+            if (window.openSharedSettingsModal) return window.openSharedSettingsModal();
         }
         window.openSettingsModal = openSettingsModal;
 
-        // Settings Modal Setup
+        // Settings Modal Setup (unified shared modal)
         function setupSettingsModal() {
-            settingsBtn.addEventListener('click', openSettingsModal);
-
-            closeSettingsModalBtn.addEventListener('click', () => {
-                closeSettingsModalWithCheck();
-            });
-            const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-            if (cancelSettingsBtn) {
-                cancelSettingsBtn.addEventListener('click', () => {
-                    closeSettingsModalWithCheck();
-                });
-            }
-
-
-
-            // Tab switching logic for Settings Modal
-            const tabBtns = document.querySelectorAll('.settings-tab-btn');
-            tabBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const targetTab = this.getAttribute('data-tab');
-                    tabBtns.forEach(b => {
-                        b.classList.remove('active');
-                        b.style.color = 'var(--text-muted)';
-                        b.style.background = 'transparent';
-                    });
-                    this.classList.add('active');
-                    this.style.color = 'var(--text-main)';
-                    this.style.background = 'var(--bg-color)';
-
-                    document.querySelectorAll('.settings-tab-content').forEach(c => c.style.display = 'none');
-                    const activeContent = document.getElementById(targetTab);
-                    if (activeContent) activeContent.style.display = 'flex';
-                });
-            });
-
-            // Reset prompt preset handlers
-            const resetMosaicPromptBtn = document.getElementById('resetMosaicPromptBtn');
-            if (resetMosaicPromptBtn) {
-                resetMosaicPromptBtn.addEventListener('click', () => {
-                    fetch('/get-settings')
-                        .then(r => r.json())
-                        .then(d => {
-                            const defVal = d.factory_mosaic_prompt || d.default_mosaic_prompt || (window.serverDefaultPrompts && window.serverDefaultPrompts.mosaic) || '';
-                            if (defVal) {
-                                document.getElementById('settingsMosaicDefaultPrompt').value = defVal;
-                                showDebug("Reset Mosaic Motion Design prompt to default", false);
-                            }
-                        });
-                });
-            }
-
-            saveSettingsBtn.addEventListener('click', () => {
-                localStorage.setItem('ddma-mosaic-api-key', document.getElementById('settingsMosaicApiKey').value.trim());
-                localStorage.setItem('ddma-mosaic-agent-id', document.getElementById('settingsMosaicAgentId').value.trim());
-                localStorage.setItem('ddma-mosaic-mogr-node-id', document.getElementById('settingsMosaicMogrNodeId').value.trim());
-                localStorage.setItem('ddma-mosaic-captions-node-id', document.getElementById('settingsMosaicCaptionsNodeId').value.trim());
-                localStorage.setItem('ddma-gemini-api-key', document.getElementById('settingsGeminiApiKey').value.trim());
-                localStorage.setItem('ddma-mosaic-default-prompt', document.getElementById('settingsMosaicDefaultPrompt').value);
-                
-                saveSettingsToServer().then(ok => {
-                    if (ok) {
-                        settingsModalOverlay.classList.remove('active');
-                        showDebug(`Settings saved successfully!`, false);
-                    } else {
-                        showDebug(`Saving settings failed: server did not confirm. Modal kept open -- retry Save or Cancel.`, true);
-                    }
-                });
-            });
+            if (settingsBtn) settingsBtn.addEventListener('click', openSettingsModal);
 
             // Topbar event listeners
             const topEpisodeSelect = document.getElementById('topEpisodeSelect');
