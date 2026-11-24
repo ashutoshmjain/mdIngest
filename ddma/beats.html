@@ -403,15 +403,64 @@ a { color: var(--accent-indigo); }
             }
         }
 
+        let _beatsSwitchSeq = 0;
+
+        function showBeatsEmptyState(epId, reason) {
+            const videoEl = document.getElementById('lf-studio-video-player');
+            if (videoEl) {
+                try { videoEl.pause(); } catch (e) {}
+                videoEl.removeAttribute('src');
+                try { videoEl.load(); } catch (e) {}
+            }
+            lfTimelineIndex = { total_chapters: 0, total_duration: 0, chapters: [], has_video: false };
+            lfActiveChapterData = null;
+            const cntEl = document.getElementById('lf-chapter-count-label');
+            if (cntEl) cntEl.innerText = '📚 Clips (0)';
+            const phEl = document.getElementById('lf-studio-playhead-badge');
+            if (phEl) phEl.innerText = '00:00 / 00:00';
+            const chStrip = document.getElementById('lf-chapter-strip');
+            if (chStrip) chStrip.innerHTML = '';
+            const spStrip = document.getElementById('lf-span-strip');
+            if (spStrip) spStrip.innerHTML = '';
+            const gridEl = document.getElementById('beats-workspace-grid');
+            const emptyEl = document.getElementById('beats-empty-state');
+            if (gridEl) gridEl.style.display = 'none';
+            if (emptyEl) {
+                const h2 = emptyEl.querySelector('h2');
+                if (h2) h2.textContent = `Episode ${epId} has no Beats data yet.`;
+                const p = emptyEl.querySelector('p');
+                if (p) p.textContent = reason || 'Render at least one clip in Cutroom before engineering beats here.';
+                emptyEl.style.display = 'block';
+            }
+        }
+
         async function initLongformBeatStudio() {
+            const mySeq = ++_beatsSwitchSeq;
             const cleanId = beatsEpisode();
             const videoEl = document.getElementById('lf-studio-video-player');
 
             try {
                 const res = await fetch(`/api/beats/index?ep=${encodeURIComponent(cleanId)}`);
-                if (!res.ok) return;
-                lfTimelineIndex = await res.json();
+                if (mySeq !== _beatsSwitchSeq) return;
+                if (!res.ok) {
+                    showBeatsEmptyState(cleanId);
+                    return;
+                }
+                const nextIndex = await res.json();
+                if (mySeq !== _beatsSwitchSeq) return;
+                if (!nextIndex || !Array.isArray(nextIndex.chapters)) {
+                    showBeatsEmptyState(cleanId);
+                    return;
+                }
+                const openables = nextIndex.chapters.filter(c => c.openable);
+                if (openables.length === 0) {
+                    showBeatsEmptyState(cleanId);
+                    loadPersonalBeats();
+                    return;
+                }
 
+                // Atomic commit of new episode state
+                lfTimelineIndex = nextIndex;
                 const cntEl = document.getElementById('lf-chapter-count-label');
                 if (cntEl) cntEl.innerText = `📚 Clips (${lfTimelineIndex.total_chapters || 0})`;
                 const phEl = document.getElementById('lf-studio-playhead-badge');
@@ -438,24 +487,21 @@ a { color: var(--accent-indigo); }
                     });
                 }
 
-                renderLfChapterStrip();
-                const openables = (lfTimelineIndex.chapters || []).filter(c => c.openable);
                 const gridEl = document.getElementById('beats-workspace-grid');
                 const emptyEl = document.getElementById('beats-empty-state');
-                if (openables.length === 0) {
-                    if (gridEl) gridEl.style.display = 'none';
-                    if (emptyEl) emptyEl.style.display = 'block';
-                    loadPersonalBeats();
-                    return;
-                }
                 if (gridEl) gridEl.style.display = 'grid';
                 if (emptyEl) emptyEl.style.display = 'none';
+                renderLfChapterStrip();
                 const targetCh = openables.find(c => c.clip_num === lfActiveClipNum) || openables[0];
                 lfPlaybackMode = 'clip';
                 await selectLfChapter(targetCh.clip_num, false);
+                if (mySeq !== _beatsSwitchSeq) return;
                 loadPersonalBeats();
             } catch (err) {
                 console.error("Failed to initialize Longform Beat Studio:", err);
+                if (mySeq === _beatsSwitchSeq) {
+                    showBeatsEmptyState(cleanId);
+                }
             }
         }
 
