@@ -173,6 +173,137 @@ PORT = 8000
 mosaic_runs = {}
 infographic_runs = {}
 
+
+def _file_sha256(path: str) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _probe_video_durations(path: str) -> tuple[float | None, float | None]:
+    """Returns (container_duration, video_stream_duration) in seconds via ffprobe."""
+    c_dur = None
+    v_dur = None
+    try:
+        p1 = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=15
+        )
+        if p1.returncode == 0 and p1.stdout.strip():
+            c_dur = float(p1.stdout.strip().splitlines()[0])
+    except Exception:
+        pass
+    try:
+        p2 = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=duration", "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, timeout=15
+        )
+        if p2.returncode == 0 and p2.stdout.strip():
+            val = p2.stdout.strip().splitlines()[0]
+            if val != "N/A":
+                v_dur = float(val)
+    except Exception:
+        pass
+    return c_dur, v_dur
+
+
+def _sample_gray_frames(path: str, w: int = 160, h: int = 284, fps: int = 2, max_frames: int = 20) -> list[bytes]:
+    """Samples raw 8-bit grayscale frames from video using ffmpeg (no brightness threshold)."""
+    cmd = [
+        "ffmpeg", "-v", "error", "-i", path,
+        "-vf", f"fps={fps},scale={w}:{h},format=gray",
+        "-frames:v", str(max_frames),
+        "-f", "rawvideo", "-pix_fmt", "gray", "-"
+    ]
+    res = subprocess.run(cmd, capture_output=True, timeout=20)
+    if res.returncode != 0 or not res.stdout:
+        return []
+    frame_size = w * h
+    raw = res.stdout
+    return [raw[i:i + frame_size] for i in range(0, len(raw) - frame_size + 1, frame_size)]
+
+
+def verify_publish_clip_gate(resolved_file: str, local_master: str | None = None, draft_baseline: str | None = None) -> tuple[bool, str, dict]:
+    """
+    Spec G Phase 2 publish gate:
+    1. Logs container vs video-stream duration diagnostic (warns on disagreement, never refuses on it).
+    2. Verifies resolved_file agrees with local_master (size, duration, sha256) if both exist.
+    3. Compares resolved_file structurally against draft_baseline (or spatial edge + temporal structure
+       if no baseline file exists) — never using an absolute brightness threshold.
+    """
+    info = {"resolved_file": resolved_file}
+    if not resolved_file or not os.path.exists(resolved_file):
+        return False, f"Resolved file does not exist: {resolved_file}", info
+
+    c_dur, v_dur = _probe_video_durations(resolved_file)
+    info["container_duration"] = c_dur
+    info["video_stream_duration"] = v_dur
+    print(f"[publish-gate] {resolved_file}: container_dur={c_dur}s, video_stream_dur={v_dur}s")
+    if c_dur is not None and v_dur is not None and abs(c_dur - v_dur) > 0.5:
+        print(f"[publish-gate] WARNING: duration disagreement for {resolved_file}: container={c_dur:.3f}s vs video_stream={v_dur:.3f}s")
+        info["duration_warning"] = f"container={c_dur:.3f}s vs video_stream={v_dur:.3f}s"
+
+    res_hash = _file_sha256(resolved_file)
+    res_size = os.path.getsize(resolved_file)
+    info["sha256"] = res_hash
+    info["size"] = res_size
+
+    if local_master and os.path.exists(local_master) and os.path.abspath(resolved_file) != os.path.abspath(local_master):
+        m_hash = _file_sha256(local_master)
+        m_size = os.path.getsize(local_master)
+        m_cdur, _ = _probe_video_durations(local_master)
+        dur_diff = (c_dur is not None and m_cdur is not None and abs(c_dur - m_cdur) > 0.5)
+        if res_hash != m_hash or res_size != m_size or dur_diff:
+            msg = (
+                f"Resolved file ({resolved_file}, size={res_size}, dur={c_dur}, sha256={res_hash[:12]}) "
+                f"disagrees with verified local master ({local_master}, size={m_size}, dur={m_cdur}, sha256={m_hash[:12]}) — refusing to publish."
+            )
+            print(f"[publish-gate] MISMATCH: {msg}")
+            return False, msg, info
+
+    if draft_baseline and os.path.exists(draft_baseline):
+        draft_hash = _file_sha256(draft_baseline)
+        if res_hash == draft_hash:
+            return False, "the file to publish matches the black-canvas draft — no infographic/render content detected", info
+        f_res = _sample_gray_frames(resolved_file)
+        f_drf = _sample_gray_frames(draft_baseline)
+        if f_res and f_drf:
+            diff_pixels = 0
+            for fr, fd in zip(f_res, f_drf):
+                for a, b in zip(fr, fd):
+                    if abs(a - b) > 15:
+                        diff_pixels += 1
+            info["draft_diff_pixels"] = diff_pixels
+            if diff_pixels == 0:
+                return False, "the file to publish matches the black-canvas draft — no infographic/render content detected", info
+    else:
+        f_res = _sample_gray_frames(resolved_file)
+        if f_res:
+            w, h = 160, 284
+            edge_pixels = 0
+            temporal_diff = 0
+            for idx, fr in enumerate(f_res):
+                for y in range(0, h - 1, 2):
+                    row = y * w
+                    for x in range(0, w - 1, 2):
+                        p = fr[row + x]
+                        if abs(p - fr[row + x + 1]) > 15 or abs(p - fr[row + w + x]) > 15:
+                            edge_pixels += 1
+                if idx > 0:
+                    prev = f_res[idx - 1]
+                    for k in range(0, len(fr), 4):
+                        if abs(fr[k] - prev[k]) > 15:
+                            temporal_diff += 1
+            info["edge_pixels"] = edge_pixels
+            info["temporal_diff"] = temporal_diff
+            if edge_pixels == 0 and temporal_diff == 0:
+                return False, "the file to publish matches the black-canvas draft — no infographic/render content detected", info
+
+    return True, "ok", info
+
 def safe_save_json(file_path, data):
     with plan_file_lock:
         temp_path = f"{file_path}.tmp.{os.getpid()}.{threading.get_ident()}"
@@ -4238,34 +4369,65 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 ep_num = str(project_id.replace('episode_', '')).replace('.md', '').lstrip('_')
                 master_name = f"{ep_num}-{clip_num}.mp4"
 
-                # (b) Ensure the finished canonical master exists: local cache, else hub primary, else compile.
+                # (b) Ensure the finished canonical master exists: prefer verified local master, else hub primary, else compile.
                 os.makedirs("clips", exist_ok=True)
                 local_master = os.path.join("clips", master_name)
-                if not (os.path.exists(local_master) and os.path.getsize(local_master) > 10000):
-                    hub_master = working_asset_hub_path(ep_num, master_name)
+                hub_master = working_asset_hub_path(ep_num, master_name)
+                resolved_file = None
+                if os.path.exists(local_master) and os.path.getsize(local_master) > 10000:
+                    resolved_file = local_master
                     if hub_master and os.path.exists(hub_master) and os.path.getsize(hub_master) > 10000:
-                        print(f"[{project_id}][Clip {clip_num}] Recovering finished master from hub primary store.")
-                        shutil.copy2(hub_master, local_master)
-                    else:
-                        print(f"[{project_id}][Clip {clip_num}] No finished master -- compiling via ddma.py cut + compile-clip.")
-                        local_plan_path = os.path.join("projects", project_id, "plan.json")
-                        info_path = os.path.join("projects", project_id, "project_info.json")
-                        p_info = {}
-                        if os.path.exists(info_path):
-                            with open(info_path, "r", encoding="utf-8") as f_info:
-                                p_info = json.load(f_info)
-                        audio_file = get_project_canonical_audio_path(os.path.join("projects", project_id), project_id, p_info)
-                        if audio_file and os.path.exists(audio_file):
-                            cut_cmd = [sys.executable, "ddma.py", "cut", "--audio", audio_file, "--plan-file", local_plan_path, "--out-dir", "clips", "--num", str(clip_num)]
-                            subprocess.run(cut_cmd, capture_output=True, text=True, cwd=".")
-                        cmd = [sys.executable, "ddma.py", "compile-clip", "--num", str(clip_num), "--plan-file", local_plan_path]
-                        src = (target_clip.get("visual_source") or "mosaic").lower()
-                        cmd.extend(["--source", "manim" if src in ("infographic", "manim") else "mosaic"])
-                        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
-                        if proc.returncode != 0:
-                            raise Exception(f"Compile-clip failed with return code {proc.returncode}: {proc.stderr[-500:] if proc.stderr else ''}")
-                if not (os.path.exists(local_master) and os.path.getsize(local_master) > 10000):
+                        if _file_sha256(local_master) != _file_sha256(hub_master):
+                            gate_ok, gate_err, gate_info = verify_publish_clip_gate(hub_master, local_master=local_master)
+                            if not gate_ok:
+                                self.send_response(400)
+                                self.send_header('Content-type', 'application/json')
+                                self.send_header('Access-Control-Allow-Origin', '*')
+                                self.end_headers()
+                                self.wfile.write(json.dumps({"success": False, "error": gate_err, "gate": gate_info}).encode("utf-8"))
+                                return
+                elif hub_master and os.path.exists(hub_master) and os.path.getsize(hub_master) > 10000:
+                    print(f"[{project_id}][Clip {clip_num}] Recovering finished master from hub primary store.")
+                    resolved_file = hub_master
+                else:
+                    print(f"[{project_id}][Clip {clip_num}] No finished master -- compiling via ddma.py cut + compile-clip.")
+                    local_plan_path = os.path.join("projects", project_id, "plan.json")
+                    info_path = os.path.join("projects", project_id, "project_info.json")
+                    p_info = {}
+                    if os.path.exists(info_path):
+                        with open(info_path, "r", encoding="utf-8") as f_info:
+                            p_info = json.load(f_info)
+                    audio_file = get_project_canonical_audio_path(os.path.join("projects", project_id), project_id, p_info)
+                    if audio_file and os.path.exists(audio_file):
+                        cut_cmd = [sys.executable, "ddma.py", "cut", "--audio", audio_file, "--plan-file", local_plan_path, "--out-dir", "clips", "--num", str(clip_num)]
+                        subprocess.run(cut_cmd, capture_output=True, text=True, cwd=".")
+                    cmd = [sys.executable, "ddma.py", "compile-clip", "--num", str(clip_num), "--plan-file", local_plan_path]
+                    src = (target_clip.get("visual_source") or "mosaic").lower()
+                    cmd.extend(["--source", "manim" if src in ("infographic", "manim") else "mosaic"])
+                    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+                    if proc.returncode != 0:
+                        raise Exception(f"Compile-clip failed with return code {proc.returncode}: {proc.stderr[-500:] if proc.stderr else ''}")
+                    resolved_file = local_master
+
+                if not (resolved_file and os.path.exists(resolved_file) and os.path.getsize(resolved_file) > 10000):
                     raise Exception(f"Finished master {master_name} is not available (local, hub, and compile all missed).")
+
+                draft_baseline = os.path.join("clips", f"{ep_num}-{clip_num}-draft.mp4")
+                gate_ok, gate_err, gate_info = verify_publish_clip_gate(
+                    resolved_file,
+                    local_master=local_master if os.path.exists(local_master) else None,
+                    draft_baseline=draft_baseline if os.path.exists(draft_baseline) else None,
+                )
+                if not gate_ok:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": gate_err, "gate": gate_info}).encode("utf-8"))
+                    return
+
+                if os.path.abspath(resolved_file) != os.path.abspath(local_master):
+                    shutil.copy2(resolved_file, local_master)
 
                 # (c) Resolve the deepDive repo root from git itself (not directory layout):
                 # the published master lives in deepDive's src/, and the git commands
