@@ -6298,10 +6298,18 @@
                 const isInfographicActive = hasInfographicRender && activeVisualSource === 'infographic';
                 const isMosaicActive = (hasMosaicRender || mosaicState === 'completed') && activeVisualSource === 'mosaic';
 
+                const infoStatusObj = (clipStatuses && clipStatuses[clip.num]) || {};
+                const infoState = infoStatusObj.infographic_state || (isCompilingInfographic ? 'processing' : '');
+                const infoPct = infoStatusObj.infographic_progress || 15;
+                const infoMsg = infoStatusObj.infographic_message || '';
+
                 let infographicBtnHtml = "";
                 if (isLocked) {
-                    if (isCompilingInfographic) {
-                        infographicBtnHtml = `<button class="btn btn-mini btn-card-infographic btn-status-success" id="infographicCardBtn_${index}" style="font-weight: 600; cursor: wait;" disabled title="Rendering Local 740×740 Manim Vector Reel &amp; 1080×1920 Captions...">⏳ Rendering...</button>`;
+                    if (infoState === 'processing') {
+                        infographicBtnHtml = `<button class="btn btn-mini btn-card-infographic btn-mosaic-progress" id="infographicCardBtn_${index}" style="font-weight: 600; --progress: ${infoPct}%;" disabled title="Infographic render in progress">${'⏳ ' + infoPct + '%'}</button>`;
+                    } else if (infoState === 'failed') {
+                        const errTip = (infoStatusObj.infographic_error || 'Infographic render failed').replace(/"/g, '&quot;');
+                        infographicBtnHtml = `<button class="btn btn-mini btn-card-infographic btn-status-danger" id="infographicCardBtn_${index}" style="font-weight: 600;" title="${errTip}">⚠️ Failed</button>`;
                     } else if (hasInfographicRender) {
                         const activeStyle = isInfographicActive
                             ? 'font-weight: 700; box-shadow: 0 0 0 2px #38bdf8;'
@@ -6390,6 +6398,7 @@
                                 ${publishBtnHtml}
                             </div>
                         </div>
+                        <div class="infographic-progress-line" id="infographicProgress_${index}" data-clip-num="${clip.num}" style="font-size:0.72rem;color:var(--text-muted);padding:0.2rem 0.6rem;display:${infoMsg ? 'block' : 'none'};">${escapeHtml(infoMsg)}</div>
                     </div>
                     
                     <div class="segments-container">
@@ -6504,7 +6513,7 @@
                             
                             openVideoModal(
                                 freshVideoUrl,
-                                `📹 DRAFT BASELINE (Black Canvas Preview) - Part ${clip.num}: ${clip.title}`,
+                                `📹 Draft — no infographic yet (Black Canvas Baseline) - Part ${clip.num}: ${clip.title}`,
                                 `ℹ️ Local Black Canvas Baseline (2s Title Intro + Black Canvas Audio Body + 5s Outro Curiosity Question).`
                             );
                             
@@ -6533,71 +6542,127 @@
                         const runLocalInfographic = (btn, forceRegen = false, customDirective = "") => {
                             window.activeCompilingInfographics = window.activeCompilingInfographics || {};
                             window.activeCompilingInfographics[clip.num] = true;
-                            btn.innerHTML = '⏳ Rendering...';
-                            btn.disabled = true;
-                            btn.style.cursor = 'wait';
-                            updateStateBar(`Rendering Local 740×740 Dan Koe Infographic & 1080×1920 Captions for Part ${clip.num}: "${clip.title}"...`);
-                            
                             const epNum = activeProjectId.replace('episode_', '');
-                            openVideoModalLoading(
-                                `✨ LOCAL DAN KOE INFOGRAPHIC - Part ${clip.num}: ${clip.title}`,
-                                `✨ 740×740 Neon Wireframe Engine → 1080×1920 Vertical + Burned ASS Captions ($0 Cost) • clips/${epNum}-${clip.num}.mp4`,
-                                `Rendering Local Dan Koe Infographic (Part ${clip.num})...`,
-                                forceRegen
-                                    ? `Generating fresh scene storyboard, rendering 740×740 neon vectors, and burning 1080×1920 captions...`
-                                    : `Verifying 740×740 infographic & assembling 1080×1920 captioned vertical Short...`
-                            );
-                            
+                            const liveStartBtn = document.getElementById(`infographicCardBtn_${index}`) || btn;
+                            if (liveStartBtn) {
+                                liveStartBtn.classList.remove('btn-status-purple', 'btn-status-success', 'btn-status-danger');
+                                liveStartBtn.classList.add('btn-mosaic-progress');
+                                liveStartBtn.style.setProperty('--progress', '15%');
+                                liveStartBtn.innerHTML = '⏳ 15%';
+                                liveStartBtn.disabled = true;
+                            }
+                            const progEl = document.getElementById(`infographicProgress_${index}`);
+                            if (progEl) {
+                                progEl.style.display = 'block';
+                                progEl.style.color = 'var(--text-muted)';
+                                progEl.textContent = 'Designing your infographic…';
+                            }
+                            updateStateBar(`Designing your infographic for Part ${clip.num}…`);
+
                             fetch(`/render-local-infographic?id=${activeProjectId}&num=${clip.num}&force=${forceRegen ? 'true' : 'false'}`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ directive: customDirective || "" })
                             })
                             .then(res => {
-                                if (!res.ok) return res.json().then(data => { throw new Error(data.error || "Local infographic render failed"); });
+                                if (!res.ok) return res.json().then(data => { throw new Error(data.error || "Infographic render failed"); });
                                 return res.json();
                             })
-                            .then(data => {
-                                clip.infographic_ready = true;
-                                clip.visual_source = "infographic";
-                                if (window.clipStatusesCache) {
-                                    window.clipStatusesCache[clip.num] = window.clipStatusesCache[clip.num] || {};
-                                    window.clipStatusesCache[clip.num].has_infographic_file = true;
-                                    window.clipStatusesCache[clip.num].video_state = 'compiled';
-                                }
-                                const freshVideoUrl = `/clips/${epNum}-${clip.num}.mp4?t=` + Date.now();
-                                openVideoModal(
-                                    freshVideoUrl,
-                                    `✨ LOCAL DAN KOE INFOGRAPHIC (1080×1920 + Captions) - Part ${clip.num}: ${clip.title}`,
-                                    `✨ 740×740 Neon Wireframe Engine (${data.scenes_count || 12} scenes) + Burned ASS Captions • clips/${epNum}-${clip.num}.mp4`
-                                );
-                                updateStateBar(`Playing Local Dan Koe Infographic video for Part ${clip.num}`);
+                            .then(startData => {
+                                const statusUrl = startData.status_url || `/get-infographic-status?id=${activeProjectId}&num=${clip.num}`;
+                                const pollInfoJob = () => {
+                                    fetch(statusUrl)
+                                    .then(r => r.json())
+                                    .then(st => {
+                                        const curBtn = document.getElementById(`infographicCardBtn_${index}`) || btn;
+                                        const curProg = document.getElementById(`infographicProgress_${index}`);
+                                        if (st.status === 'processing') {
+                                            const pct = st.progress || 15;
+                                            if (curBtn) {
+                                                curBtn.classList.add('btn-mosaic-progress');
+                                                curBtn.style.setProperty('--progress', `${pct}%`);
+                                                curBtn.innerHTML = `⏳ ${pct}%`;
+                                                curBtn.disabled = true;
+                                            }
+                                            if (curProg && st.message) {
+                                                curProg.style.display = 'block';
+                                                curProg.style.color = 'var(--text-muted)';
+                                                curProg.textContent = st.message;
+                                            }
+                                            setTimeout(pollInfoJob, 500);
+                                            return;
+                                        }
+                                        if (window.activeCompilingInfographics) delete window.activeCompilingInfographics[clip.num];
+                                        if (st.status === 'completed' && st.has_infographic_file) {
+                                            clip.infographic_ready = true;
+                                            clip.visual_source = "infographic";
+                                            if (window.clipStatusesCache) {
+                                                window.clipStatusesCache[clip.num] = window.clipStatusesCache[clip.num] || {};
+                                                window.clipStatusesCache[clip.num].has_infographic_file = true;
+                                                window.clipStatusesCache[clip.num].video_state = 'compiled';
+                                            }
+                                            if (curBtn) {
+                                                curBtn.classList.remove('btn-mosaic-progress', 'btn-status-purple', 'btn-status-gray', 'btn-status-danger');
+                                                curBtn.classList.add('btn-status-success');
+                                                curBtn.style.removeProperty('--progress');
+                                                curBtn.innerHTML = '🟢 Manim ✓';
+                                                curBtn.style.fontWeight = '700';
+                                                curBtn.style.boxShadow = '0 0 0 2px #38bdf8';
+                                                curBtn.style.opacity = '1';
+                                                curBtn.disabled = false;
+                                                curBtn.style.cursor = '';
+                                            }
+                                            const outcomeText = `Ready — your infographic is in the preview. (${st.stitched_count || 0} stitched, ${st.designed_count || 0} designed)`;
+                                            if (curProg) {
+                                                curProg.style.display = 'block';
+                                                curProg.style.color = 'var(--accent-emerald-dark)';
+                                                curProg.textContent = outcomeText;
+                                            }
+                                            const freshVideoUrl = (st.video_url || `/clips/${epNum}-${clip.num}-manim.mp4`) + '?t=' + Date.now();
+                                            openVideoModal(
+                                                freshVideoUrl,
+                                                `✨ Infographic (${st.stitched_count || 0} stitched, ${st.designed_count || 0} designed) - Part ${clip.num}: ${clip.title}`,
+                                                outcomeText
+                                            );
+                                            updateStateBar(outcomeText);
+                                        } else {
+                                            const errMsg = st.error || st.message || 'Infographic render failed';
+                                            if (curBtn) {
+                                                curBtn.classList.remove('btn-mosaic-progress', 'btn-status-purple', 'btn-status-success');
+                                                curBtn.classList.add('btn-status-danger');
+                                                curBtn.style.removeProperty('--progress');
+                                                curBtn.innerHTML = '⚠️ Failed';
+                                                curBtn.disabled = false;
+                                                curBtn.style.cursor = '';
+                                            }
+                                            if (curProg) {
+                                                curProg.style.display = 'block';
+                                                curProg.style.color = 'var(--danger)';
+                                                curProg.textContent = `FAILED: ${errMsg}`;
+                                            }
+                                            updateStateBar(`Infographic render failed for Part ${clip.num}`);
+                                        }
+                                    })
+                                    .catch(() => setTimeout(pollInfoJob, 800));
+                                };
+                                setTimeout(pollInfoJob, 250);
                             })
                             .catch(err => {
-                                closeVideoModal();
-                                alert("Error rendering Local Dan Koe Infographic: " + err.message);
-                                updateStateBar("Ready");
-                            })
-                            .finally(() => {
                                 if (window.activeCompilingInfographics) delete window.activeCompilingInfographics[clip.num];
-                                const liveBtn = document.getElementById(`infographicCardBtn_${index}`) || btn;
-                                const otherMosaicBtn = document.getElementById(`mosaicCardBtn_${index}`);
-                                if (liveBtn) {
-                                    liveBtn.classList.remove('btn-status-purple', 'btn-status-gray');
-                                    liveBtn.classList.add('btn-status-success');
-                                    liveBtn.innerHTML = (clip.visual_source === 'infographic') ? '🟢 Manim ✓' : '🟢 Manim';
-                                    liveBtn.style.fontWeight = (clip.visual_source === 'infographic') ? '700' : '600';
-                                    liveBtn.style.boxShadow = (clip.visual_source === 'infographic') ? '0 0 0 2px #38bdf8' : '';
-                                    liveBtn.style.opacity = (clip.visual_source === 'infographic') ? '1' : '0.78';
-                                    liveBtn.disabled = false;
-                                    liveBtn.style.cursor = '';
+                                const curBtn = document.getElementById(`infographicCardBtn_${index}`) || btn;
+                                const curProg = document.getElementById(`infographicProgress_${index}`);
+                                if (curBtn) {
+                                    curBtn.classList.remove('btn-mosaic-progress');
+                                    curBtn.classList.add('btn-status-danger');
+                                    curBtn.innerHTML = '⚠️ Failed';
+                                    curBtn.disabled = false;
                                 }
-                                if (otherMosaicBtn && clip.visual_source === 'infographic' && otherMosaicBtn.classList.contains('btn-status-success')) {
-                                    otherMosaicBtn.innerHTML = '🟢 Mosaic';
-                                    otherMosaicBtn.style.fontWeight = '600';
-                                    otherMosaicBtn.style.boxShadow = '';
-                                    otherMosaicBtn.style.opacity = '0.78';
+                                if (curProg) {
+                                    curProg.style.display = 'block';
+                                    curProg.style.color = 'var(--danger)';
+                                    curProg.textContent = `FAILED: ${err.message}`;
                                 }
+                                updateStateBar("Ready");
                             });
                         };
 

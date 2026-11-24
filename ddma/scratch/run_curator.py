@@ -171,6 +171,7 @@ PORT = 8000
 # Global tracker for background Mosaic runs
 # Keys: (project_id, clip_num), Values: {"status": ..., "progress": ..., "error": ..., "run_id": ...}
 mosaic_runs = {}
+infographic_runs = {}
 
 def safe_save_json(file_path, data):
     with plan_file_lock:
@@ -4558,175 +4559,245 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         req_body = json.loads(raw_body)
                     except Exception:
                         pass
-                custom_instructions = str(req_body.get("directive") or req_body.get("instructions") or "").strip()
 
-                if os.getcwd() not in sys.path:
-                    sys.path.insert(0, os.getcwd())
-                import glob
-                import importlib
-                import ddma as ddma_mod
-                import infographic_engine
-                import manim_infographic_engine
-                importlib.reload(infographic_engine)
+                job_key = (project_id, int(clip_num))
+                existing = infographic_runs.get(job_key, {})
+                if existing.get("status") == "processing":
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "success": True,
+                        "job_id": existing.get("job_id"),
+                        "status": "processing",
+                        "status_url": f"/get-infographic-status?id={project_id}&num={clip_num}",
+                    }).encode('utf-8'))
+                    return
 
-                plan_path = os.path.join("projects", project_id, "plan.json")
-                if not os.path.exists(plan_path):
-                    plan_path = "plan.json"
+                job_id = f"info-{project_id}-{clip_num}-{int(time.time())}"
+                infographic_runs[job_key] = {
+                    "job_id": job_id,
+                    "status": "processing",
+                    "stage": "designing",
+                    "progress": 15,
+                    "message": "Designing your infographic…",
+                    "stitched_count": 0,
+                    "designed_count": 0,
+                    "scenes_count": 0,
+                    "has_infographic_file": False,
+                    "video_url": "",
+                    "error": "",
+                }
 
-                with open(plan_path, "r", encoding="utf-8") as pf:
-                    plan_data = json.load(pf)
-
-                t_clip = next((c for c in plan_data if str(c.get("num")) == str(clip_num)), None)
-                if not t_clip:
-                    raise Exception(f"Clip {clip_num} not found in {plan_path}")
-
-                ep_num = project_id.replace('episode_', '')
-                info_path = os.path.join("projects", project_id, "project_info.json")
-                p_info = {}
-                if os.path.exists(info_path):
-                    with open(info_path, "r", encoding="utf-8") as f_info:
-                        p_info = json.load(f_info)
-                audio_file = get_project_canonical_audio_path(os.path.join("projects", project_id), project_id, p_info)
-
-                # 1. Ensure sliced clip MP3 exists & is up to date with segments
-                import hashlib
-                curr_audio_sig = hashlib.md5((json.dumps(t_clip.get("segments", []), sort_keys=True) + str(audio_file)).encode("utf-8")).hexdigest()
-                
-                # Compute expected duration from segments
-                segs = t_clip.get("segments", [])
-                expected_dur = sum(float(s.get("duration", 0.0)) for s in segs) - sum(float(s.get("crossfade", 0.0)) for s in segs[:-1]) if segs else 0.0
-
-                mp3_matches = glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}-*.mp3")) + glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}.mp3"))
-                need_audio_cut = force_regen or not mp3_matches or (t_clip.get("_audio_sig") != curr_audio_sig)
-                
-                # Check probed duration of existing MP3 against expected segments duration
-                if not need_audio_cut and mp3_matches:
-                    mp3_matches.sort(key=os.path.getmtime, reverse=True)
+                def _worker(pid=project_id, cnum=int(clip_num), force=force_regen, body=req_body, jkey=job_key):
                     try:
-                        p_probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", mp3_matches[0]], capture_output=True, text=True)
-                        if p_probe.returncode == 0 and p_probe.stdout.strip():
-                            probed_dur = float(p_probe.stdout.strip())
-                            if expected_dur > 0 and abs(probed_dur - expected_dur) > 1.5:
-                                print(f"[{project_id}][Clip {clip_num}] Existing MP3 duration ({probed_dur:.2f}s) mismatch with segments ({expected_dur:.2f}s). Re-cutting...")
-                                need_audio_cut = True
-                    except Exception:
-                        pass
+                        custom_instructions = str(body.get("directive") or body.get("instructions") or "").strip()
+                        if os.getcwd() not in sys.path:
+                            sys.path.insert(0, os.getcwd())
+                        import glob
+                        import hashlib
+                        import importlib
+                        import ddma as ddma_mod
+                        import infographic_engine
+                        import manim_infographic_engine
+                        import archetype_studio
+                        importlib.reload(infographic_engine)
+                        importlib.reload(archetype_studio)
 
-                if need_audio_cut and audio_file and os.path.exists(audio_file):
-                    print(f"[{project_id}][Clip {clip_num}] Re-slicing fresh audio from segments...")
-                    for old_m in mp3_matches:
+                        plan_path = os.path.join("projects", pid, "plan.json")
+                        if not os.path.exists(plan_path):
+                            plan_path = "plan.json"
+                        with open(plan_path, "r", encoding="utf-8") as pf:
+                            plan_data = json.load(pf)
+
+                        t_clip = next((c for c in plan_data if str(c.get("num")) == str(cnum)), None)
+                        if not t_clip:
+                            raise Exception(f"Clip {cnum} not found in {plan_path}")
+
+                        ep_num = pid.replace('episode_', '')
+                        info_path = os.path.join("projects", pid, "project_info.json")
+                        p_info = {}
+                        if os.path.exists(info_path):
+                            with open(info_path, "r", encoding="utf-8") as f_info:
+                                p_info = json.load(f_info)
+                        audio_file = get_project_canonical_audio_path(os.path.join("projects", pid), pid, p_info)
+
+                        curr_audio_sig = hashlib.md5((json.dumps(t_clip.get("segments", []), sort_keys=True) + str(audio_file)).encode("utf-8")).hexdigest()
+                        segs = t_clip.get("segments", [])
+                        expected_dur = sum(float(s.get("duration", 0.0)) for s in segs) - sum(float(s.get("crossfade", 0.0)) for s in segs[:-1]) if segs else 0.0
+
+                        mp3_matches = glob.glob(os.path.join("clips", f"{ep_num}-{cnum}-*.mp3")) + glob.glob(os.path.join("clips", f"{ep_num}-{cnum}.mp3"))
+                        need_audio_cut = force or not mp3_matches or (t_clip.get("_audio_sig") != curr_audio_sig)
+
+                        if not need_audio_cut and mp3_matches:
+                            mp3_matches.sort(key=os.path.getmtime, reverse=True)
+                            try:
+                                p_probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", mp3_matches[0]], capture_output=True, text=True)
+                                if p_probe.returncode == 0 and p_probe.stdout.strip():
+                                    probed_dur = float(p_probe.stdout.strip())
+                                    if expected_dur > 0 and abs(probed_dur - expected_dur) > 1.5:
+                                        need_audio_cut = True
+                            except Exception:
+                                pass
+
+                        if need_audio_cut and audio_file and os.path.exists(audio_file):
+                            for old_m in mp3_matches:
+                                try:
+                                    if os.path.exists(old_m):
+                                        os.remove(old_m)
+                                except Exception:
+                                    pass
+                            old_info_mp4 = os.path.join("clips", f"{ep_num}-{cnum}-infographic.mp4")
+                            if os.path.exists(old_info_mp4):
+                                try:
+                                    os.remove(old_info_mp4)
+                                except Exception:
+                                    pass
+                            subprocess.run([sys.executable, "ddma.py", "cut", "--audio", audio_file, "--plan-file", plan_path, "--out-dir", "clips", "--num", str(cnum)], capture_output=True, text=True, cwd=".")
+                            mp3_matches = glob.glob(os.path.join("clips", f"{ep_num}-{cnum}-*.mp3")) + glob.glob(os.path.join("clips", f"{ep_num}-{cnum}.mp3"))
+
+                        if not mp3_matches:
+                            raise Exception(f"Could not locate or slice clip MP3 for Clip {cnum}")
+                        mp3_matches.sort(key=os.path.getmtime, reverse=True)
+                        clip_mp3 = mp3_matches[0]
+
+                        body_dur = 0.0
                         try:
-                            if os.path.exists(old_m):
-                                os.remove(old_m)
+                            p_dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip_mp3], capture_output=True, text=True)
+                            if p_dur.returncode == 0 and p_dur.stdout.strip():
+                                body_dur = float(p_dur.stdout.strip())
                         except Exception:
                             pass
-                    old_info_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-infographic.mp4")
-                    if os.path.exists(old_info_mp4):
-                        try:
-                            os.remove(old_info_mp4)
-                        except Exception:
-                            pass
-                    cut_res = subprocess.run([sys.executable, "ddma.py", "cut", "--audio", audio_file, "--plan-file", plan_path, "--out-dir", "clips", "--num", str(clip_num)], capture_output=True, text=True, cwd=".")
-                    if cut_res.returncode != 0:
-                        print(f"[{project_id}][Clip {clip_num}] Cut warning/error: {cut_res.stderr}")
-                    mp3_matches = glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}-*.mp3")) + glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}.mp3"))
+                        if body_dur <= 0:
+                            body_dur = expected_dur if expected_dur > 0 else 60.0
 
-                if not mp3_matches:
-                    raise Exception(f"Could not locate or slice clip MP3 for Clip {clip_num}")
-                mp3_matches.sort(key=os.path.getmtime, reverse=True)
-                clip_mp3 = mp3_matches[0]
+                        sorted_clips = sorted(plan_data, key=lambda x: x.get("num", 0))
+                        is_last = (sorted_clips[-1].get("num") == t_clip.get("num")) if sorted_clips else False
+                        curr_caption_sig = hashlib.md5(json.dumps({
+                            "segments": t_clip.get("segments", []),
+                            "text": t_clip.get("text", ""),
+                            "intro_offset": 1.5,
+                            "has_outro": (not is_last)
+                        }, sort_keys=True).encode("utf-8")).hexdigest()
 
-                # 2. Compute body duration & ensure caption_chunks exist
-                body_dur = 0.0
-                try:
-                    p_dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip_mp3], capture_output=True, text=True)
-                    if p_dur.returncode == 0 and p_dur.stdout.strip():
-                        body_dur = float(p_dur.stdout.strip())
-                except Exception:
-                    pass
-                if body_dur <= 0:
-                    body_dur = expected_dur if expected_dur > 0 else 60.0
+                        if need_audio_cut or not t_clip.get("caption_chunks") or t_clip.get("_caption_sig") != curr_caption_sig:
+                            ddma_mod.generate_clip_captions(
+                                t_clip, plan_file=plan_path, audio_path=clip_mp3,
+                                intro_offset=1.5, body_duration=body_dur, has_outro=(not is_last),
+                                force_realign=True
+                            )
+                            t_clip["_caption_sig"] = curr_caption_sig
 
-                sorted_clips = sorted(plan_data, key=lambda x: x.get("num", 0))
-                is_last = (sorted_clips[-1].get("num") == t_clip.get("num")) if sorted_clips else False
+                        INFOGRAPHIC_ENGINE_VERSION = "v4_precompiled_archetypes"
+                        infographic_mp4 = os.path.join("clips", f"{ep_num}-{cnum}-infographic.mp4")
 
-                curr_caption_sig = hashlib.md5(json.dumps({
-                    "segments": t_clip.get("segments", []),
-                    "text": t_clip.get("text", ""),
-                    "intro_offset": 1.5,
-                    "has_outro": (not is_last)
-                }, sort_keys=True).encode("utf-8")).hexdigest()
+                        stitched_from_library = False
+                        stitched_count = 0
+                        designed_count = 0
+                        scenes = []
 
-                if need_audio_cut or not t_clip.get("caption_chunks") or t_clip.get("_caption_sig") != curr_caption_sig:
-                    print(f"[{project_id}][Clip {clip_num}] Re-aligning captions for fresh audio/segments...")
-                    ddma_mod.generate_clip_captions(
-                        t_clip, plan_file=plan_path, audio_path=clip_mp3,
-                        intro_offset=1.5, body_duration=body_dur, has_outro=(not is_last),
-                        force_realign=True
-                    )
-                    t_clip["_caption_sig"] = curr_caption_sig
+                        if not custom_instructions:
+                            stitched_from_library = archetype_studio.stitch_precompiled_archetypes_for_clip(
+                                int(cnum), clip_mp3, infographic_mp4, body_dur, plan_clip=t_clip
+                            )
 
-                INFOGRAPHIC_ENGINE_VERSION = "v4_precompiled_archetypes"
-                infographic_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-infographic.mp4")
+                        if stitched_from_library:
+                            meta_obj = archetype_studio.ensure_clip_meta(int(cnum), plan_clip=t_clip, body_duration=body_dur)
+                            scenes = meta_obj.get("beats", []) or []
+                            stitched_count = len(scenes)
+                            t_clip["infographic_scenes"] = scenes
+                            print(f"[{pid}][Clip {cnum}] Stitched {stitched_count} pre-compiled archetypes into {infographic_mp4}.")
+                        else:
+                            sb_disk_path = get_storyboard_filepath(pid, cnum)
+                            scenes = body.get("scenes") or []
+                            if not scenes and os.path.exists(sb_disk_path):
+                                try:
+                                    with open(sb_disk_path, "r", encoding="utf-8") as sbf:
+                                        sb_disk_data = json.load(sbf)
+                                        if sb_disk_data.get("scenes"):
+                                            scenes = sb_disk_data["scenes"]
+                                            t_clip["infographic_scenes"] = scenes
+                                except Exception:
+                                    pass
+                            if not scenes:
+                                scenes = t_clip.get("infographic_scenes") or []
+                            if not scenes or (force and not os.path.exists(sb_disk_path) and not body.get("scenes")):
+                                settings = load_settings()
+                                api_key = settings.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
+                                g_mod = genai if (HAS_GENAI and configure_gemini(api_key)) else None
+                                scenes = manim_infographic_engine.generate_pedagogical_storyboard(
+                                    t_clip, body_duration=body_dur, intro_offset=1.5,
+                                    custom_instructions=custom_instructions, genai_mod=g_mod,
+                                    force_regenerate=True
+                                ) or []
+                                t_clip["infographic_scenes"] = scenes
+                            designed_count = len(scenes)
 
-                import archetype_studio
-                importlib.reload(archetype_studio)
-                stitched_from_library = False
-                if not custom_instructions:
-                    stitched_from_library = archetype_studio.stitch_precompiled_archetypes_for_clip(
-                        int(clip_num), clip_mp3, infographic_mp4, body_dur, plan_clip=t_clip
-                    )
+                        if not scenes or len(scenes) == 0:
+                            raise Exception("Zero scenes produced (pre-compiled archetypes did not stitch and storyboard/Gemini returned 0 scenes)")
 
-                if stitched_from_library:
-                    meta_obj = archetype_studio.ensure_clip_meta(int(clip_num), plan_clip=t_clip, body_duration=body_dur)
-                    t_clip["infographic_scenes"] = meta_obj.get("beats", [])
-                    print(f"[{project_id}][Clip {clip_num}] Super-fast stitched {len(t_clip['infographic_scenes'])} pre-compiled archetypes into {infographic_mp4}!")
-                else:
-                    sb_disk_path = get_storyboard_filepath(project_id, clip_num)
-                    scenes = req_body.get("scenes")
-                    if not scenes and os.path.exists(sb_disk_path):
-                        try:
-                            with open(sb_disk_path, "r", encoding="utf-8") as sbf:
-                                sb_disk_data = json.load(sbf)
-                                if sb_disk_data.get("scenes"):
-                                    scenes = sb_disk_data["scenes"]
-                                    t_clip["infographic_scenes"] = scenes
-                        except Exception:
-                            pass
-                    if not scenes:
-                        scenes = t_clip.get("infographic_scenes")
-                    if not scenes or (force_regen and not os.path.exists(sb_disk_path) and not req_body.get("scenes")):
-                        settings = load_settings()
-                        api_key = settings.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
-                        g_mod = genai if (HAS_GENAI and configure_gemini(api_key)) else None
-                        scenes = manim_infographic_engine.generate_pedagogical_storyboard(
-                            t_clip, body_duration=body_dur, intro_offset=1.5,
-                            custom_instructions=custom_instructions, genai_mod=g_mod,
-                            force_regenerate=True
-                        )
-                        t_clip["infographic_scenes"] = scenes
-                    manim_infographic_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur)
+                        infographic_runs[jkey].update({
+                            "stage": "building",
+                            "progress": 65,
+                            "message": "Building the video…",
+                            "stitched_count": stitched_count,
+                            "designed_count": designed_count,
+                            "scenes_count": len(scenes),
+                        })
 
-                t_clip["_audio_sig"] = curr_audio_sig
-                t_clip["audio_duration"] = round(body_dur, 2)
-                t_clip["infographic_ready"] = True
-                t_clip["_infographic_version"] = INFOGRAPHIC_ENGINE_VERSION
-                with open(plan_path, "w", encoding="utf-8") as pf_w:
-                    json.dump(plan_data, pf_w, indent=4)
+                        if not stitched_from_library:
+                            manim_infographic_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur)
 
-                docs_plan_path = os.path.join("docs", "episodes", ep_num, "plan.json")
-                if os.path.exists(docs_plan_path):
-                    try:
-                        with open(docs_plan_path, "w", encoding="utf-8") as dpf_w:
-                            json.dump(plan_data, dpf_w, indent=4)
-                    except Exception:
-                        pass
+                        if not os.path.exists(infographic_mp4) or os.path.getsize(infographic_mp4) <= 0:
+                            raise Exception(f"Infographic video file was not produced at {infographic_mp4}")
 
-                # 3. Compile 1080x1920 vertical captioned video with the 740x740 infographic
-                cmd_comp = [sys.executable, "ddma.py", "compile-clip", "--num", str(clip_num), "--plan-file", plan_path, "--source", "manim"]
-                proc = subprocess.run(cmd_comp, capture_output=True, text=True, cwd=".")
-                if proc.returncode != 0:
-                    raise Exception(f"compile-clip failed: {proc.stderr}")
+                        t_clip["_audio_sig"] = curr_audio_sig
+                        t_clip["audio_duration"] = round(body_dur, 2)
+                        t_clip["infographic_ready"] = True
+                        t_clip["_infographic_version"] = INFOGRAPHIC_ENGINE_VERSION
+                        with open(plan_path, "w", encoding="utf-8") as pf_w:
+                            json.dump(plan_data, pf_w, indent=4)
+
+                        docs_plan_path = os.path.join("docs", "episodes", ep_num, "plan.json")
+                        if os.path.exists(docs_plan_path):
+                            try:
+                                with open(docs_plan_path, "w", encoding="utf-8") as dpf_w:
+                                    json.dump(plan_data, dpf_w, indent=4)
+                            except Exception:
+                                pass
+
+                        cmd_comp = [sys.executable, "ddma.py", "compile-clip", "--num", str(cnum), "--plan-file", plan_path, "--source", "manim"]
+                        proc = subprocess.run(cmd_comp, capture_output=True, text=True, cwd=".")
+                        if proc.returncode != 0:
+                            raise Exception(f"compile-clip failed: {proc.stderr}")
+
+                        print(f"[{pid}][Clip {cnum}] INFOGRAPHIC COMPLETE: stitched={stitched_count}, designed={designed_count}, total={len(scenes)}")
+                        infographic_runs[jkey].update({
+                            "status": "completed",
+                            "stage": "completed",
+                            "progress": 100,
+                            "message": "Ready — your infographic is in the preview.",
+                            "stitched_count": stitched_count,
+                            "designed_count": designed_count,
+                            "scenes_count": len(scenes),
+                            "has_infographic_file": True,
+                            "video_url": f"/clips/{ep_num}-{cnum}-manim.mp4",
+                            "active_master": t_clip.get("visual_source", "mosaic"),
+                            "error": "",
+                        })
+                    except Exception as je:
+                        print(f"[{pid}][Clip {cnum}] INFOGRAPHIC FAILED: {je}")
+                        infographic_runs[jkey].update({
+                            "status": "failed",
+                            "stage": "failed",
+                            "progress": 0,
+                            "error": str(je),
+                            "message": f"Render failed: {je}",
+                            "has_infographic_file": False,
+                        })
+
+                threading.Thread(target=_worker, daemon=True).start()
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -4734,16 +4805,12 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({
                     "success": True,
-                    "infographic_file": infographic_mp4,
-                    "video_url": f"/clips/{ep_num}-{clip_num}-manim.mp4",
-                    "active_master": t_clip.get("visual_source", "mosaic"),
-                    "scenes_count": len(t_clip.get("infographic_scenes", [])),
-                    "message": "740x740 Manim Pedagogical Video rendered and compiled into 1080x1920 captioned video!"
+                    "job_id": job_id,
+                    "status": "processing",
+                    "status_url": f"/get-infographic-status?id={project_id}&num={clip_num}",
                 }).encode('utf-8'))
                 return
             except Exception as e:
-                import traceback
-                traceback.print_exc()
                 self.send_response(500)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
@@ -5369,6 +5436,18 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                             clip_statuses[c_num_int]["mosaic_progress"] = j_prog
                             clip_statuses[c_num_int]["mosaic_status"] = j_status
                             clip_statuses[c_num_int]["has_mosaic_file"] = False
+
+                    for job_key, job in list(infographic_runs.items()):
+                        if job_key[0] == project_id:
+                            c_num_int = int(job_key[1])
+                            if c_num_int not in clip_statuses:
+                                clip_statuses[c_num_int] = {"has_audio": False, "video_state": "none", "has_mosaic_file": False}
+                            clip_statuses[c_num_int]["infographic_state"] = job.get("status", "idle")
+                            clip_statuses[c_num_int]["infographic_progress"] = job.get("progress", 0)
+                            clip_statuses[c_num_int]["infographic_message"] = job.get("message", "")
+                            clip_statuses[c_num_int]["infographic_error"] = job.get("error", "")
+                            clip_statuses[c_num_int]["infographic_stitched"] = job.get("stitched_count", 0)
+                            clip_statuses[c_num_int]["infographic_designed"] = job.get("designed_count", 0)
                                 
                 ingestion_progress = None
                 progress_file = os.path.join(project_dir, "ingestion_progress.json")
@@ -5545,6 +5624,23 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
                 return
                 
+        elif parsed_url.path == '/get-infographic-status':
+            project_id = params.get('id', [None])[0]
+            clip_num = params.get('num', [None])[0]
+            try:
+                if not project_id or clip_num is None or str(clip_num).strip() == "":
+                    raise Exception("Missing project id or clip number.")
+                job = infographic_runs.get((project_id, int(clip_num)), {"status": "idle", "progress": 0, "message": ""})
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps(job).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_error(500, str(e))
+                return
+
         elif parsed_url.path == '/get-mosaic-status':
             project_id = params.get('id', [None])[0]
             clip_num = params.get('num', [None])[0]
