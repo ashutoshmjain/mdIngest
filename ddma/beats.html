@@ -118,7 +118,7 @@ a { color: var(--accent-indigo); }
                                         </div>
                                         <span id="lf-engine-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:var(--accent-amber);"></span>
                                         <span id="beats-mosaic-status" style="font-size:0.7rem;color:var(--primary);"></span>
-                                        <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button>
+                                        <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button><button type="button" class="btn-cmd" id="btn-design-artifacts" onclick="designArtifacts('episode')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="One deliberate start: design the Manim artifact for every clip, queued in the background (Spec H2 s3, ep 249 only)">🎨 Design artifacts</button><button type="button" class="btn-cmd" id="btn-design-clip" onclick="designArtifacts('clip')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Design the Manim artifact for the active clip only (Spec H2 s3)">🎨 Design this clip</button><button type="button" class="btn-cmd" id="btn-retrigger-manim" onclick="compositeRetrigger('manim')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Manim left pane only for this clip, re-stitch its segment (Spec H2 s4)">↻ Retrigger Manim-only</button><button type="button" class="btn-cmd" id="btn-retrigger-mosaic" onclick="compositeRetrigger('mosaic')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Mosaic right pane only for this clip (double-confirmed; Spec H2 s4)">↻ Retrigger Mosaic-only</button>
                                     </div>
                                 </div>
 
@@ -140,6 +140,7 @@ a { color: var(--accent-indigo); }
 
                             <!-- Dynamic Below-Player Surface (Spec C §3.2: Scene Editor if has_beats, else 2 Mosaic actions) -->
                             <div id="beats-below-player"></div>
+                            <div id="h2-design-panel" style="display:none;padding:8px 16px;font-family:var(--font-mono);font-size:0.72rem;background:var(--panel-bg-darker);border-top:1px solid var(--border-color);color:var(--text-main);"></div>
                         </main>
 
                         <template id="tpl-mosaic-only-actions">
@@ -494,6 +495,7 @@ a { color: var(--accent-indigo); }
                 renderLfChapterStrip();
                 const targetCh = openables.find(c => c.clip_num === lfActiveClipNum) || openables[0];
                 lfPlaybackMode = 'clip';
+                await loadCompositeTimeline();
                 await selectLfChapter(targetCh.clip_num, false);
                 if (mySeq !== _beatsSwitchSeq) return;
                 loadPersonalBeats();
@@ -837,9 +839,9 @@ a { color: var(--accent-indigo); }
 
         async function onLfVideoTimeUpdate(currentTime) {
             const playheadBadge = document.getElementById('lf-studio-playhead-badge');
-            const totalDur = lfTimelineIndex?.total_duration || 3254.08;
+            const totalDur = (lfComposite?.total_duration ?? lfTimelineIndex?.total_duration ?? null);
             if (playheadBadge) {
-                playheadBadge.innerText = `${formatDuration(currentTime)} / ${formatDuration(totalDur)}`;
+                playheadBadge.innerText = (totalDur == null) ? `${formatDuration(currentTime)} / --:--` : `${formatDuration(currentTime)} / ${formatDuration(totalDur)}`;
             }
 
             if (!lfTimelineIndex || !lfTimelineIndex.chapters) return;
@@ -878,6 +880,112 @@ a { color: var(--accent-indigo); }
                     selectLfBeat(bIdx, false);
                 }
             }
+        }
+
+        // ===== Spec H2 sections 3+4: Design artifacts + retrigger + composite timeline =====
+        // Ep 249 only. The push endpoint and gate below are UNCHANGED.
+        let lfComposite = null;
+        let lfDesignPoll = null;
+
+        async function loadCompositeTimeline() {
+            // Spec H2 s4: the preview timeline comes from the composite master
+            // itself (probed) — never the old hardcoded 54:14 index.
+            const cleanId = beatsEpisode();
+            try {
+                const res = await fetch(`/api/beats/composite_timeline?ep=${encodeURIComponent(cleanId)}`);
+                const data = await res.json();
+                lfComposite = (res.ok && data && data.success) ? data : null;
+            } catch (e) { lfComposite = null; }
+            const badge = document.getElementById('lf-studio-playhead-badge');
+            if (badge) {
+                const total = lfComposite?.total_duration ?? lfTimelineIndex?.total_duration ?? null;
+                badge.innerText = (total != null) ? `00:00 / ${formatDuration(total)}` : '00:00 / --:--';
+            }
+        }
+
+        async function designArtifacts(scope) {
+            // Spec H2 s3: ONE deliberate start; the server fans out one design
+            // call per clip as queued background jobs with per-clip progress.
+            const cleanId = beatsEpisode();
+            if (cleanId !== '249') { showToast('Design artifacts serves episode 249 only.'); return; }
+            const body = { ep: cleanId };
+            if (scope === 'clip') body.clip_num = lfActiveClipNum || 1;
+            const what = (scope === 'clip') ? `Part ${body.clip_num}` : 'all 21 clips of ep 249';
+            if (!confirm(`Design the Manim artifact for ${what}? One deliberate start, background queue.`)) return;
+            try {
+                const res = await fetch('/api/beats/design_artifacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Design started: ${data.planned} clip(s) queued in the background.`);
+                pollDesignStatus(data.group);
+            } catch (e) { showToast('Design start failed: ' + e.message); }
+        }
+
+        async function renderDesignStatus(group) {
+            // Returns true when the group is finished (stop polling).
+            const panel = document.getElementById('h2-design-panel');
+            try {
+                const res = await fetch(`/api/beats/design_status?group=${encodeURIComponent(group)}`);
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+                const done = data.jobs.filter(j => j.status === 'done').length;
+                const failed = data.exceptions || [];
+                if (panel) {
+                    panel.style.display = 'block';
+                    let html = `<b>Design ${escapeHtml(group)} (ep 249):</b> ${done}/${data.jobs.length} clips rendered`;
+                    if (failed.length) {
+                        html += `<br>Exceptions only: ${failed.map(j => `Part ${j.clip}: ${escapeHtml(j.error || 'failed')}`).join('; ')}`;
+                    } else if (data.finished) {
+                        html += `<br>All clips designed — no exceptions.`;
+                    }
+                    panel.innerHTML = html;
+                }
+                if (data.finished) {
+                    showToast(failed.length ? `Design finished with ${failed.length} exception(s) — see panel.` : 'Design finished — no exceptions.');
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                if (panel) { panel.style.display = 'block'; panel.innerText = 'Design status: ' + e.message; }
+                return true;
+            }
+        }
+
+        async function pollDesignStatus(group) {
+            if (lfDesignPoll) { clearInterval(lfDesignPoll); lfDesignPoll = null; }
+            if (await renderDesignStatus(group)) return;
+            lfDesignPoll = setInterval(async () => {
+                if (await renderDesignStatus(group)) { clearInterval(lfDesignPoll); lfDesignPoll = null; }
+            }, 3000);
+        }
+
+        async function compositeRetrigger(side) {
+            // Spec H2 s4: pause the longform preview, retrigger ONE side for
+            // the active clip. Manim re-renders via the existing Manim path
+            // (left pane only); Mosaic via the existing double-confirmed
+            // path (right pane only). Duration + frame stay locked.
+            const cleanId = beatsEpisode();
+            if (cleanId !== '249') { showToast('Composite retrigger serves episode 249 only.'); return; }
+            const videoEl = document.getElementById('lf-studio-video-player');
+            if (videoEl && !videoEl.paused) videoEl.pause();
+            const cNum = lfActiveClipNum || 1;
+            try {
+                const res = await fetch('/api/beats/composite_retrigger', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ep: cleanId, clip_num: cNum, side })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Retrigger ${side} scoped to Part ${cNum}: re-stitch only its segment, duration + frame locked.`);
+                if (side === 'manim') {
+                    await switchClipToManim();
+                } else {
+                    await beatsMosaicRetrigger();
+                }
+            } catch (e) { showToast('Retrigger refused: ' + e.message); }
         }
 
         async function pushLongformToDdHub() {

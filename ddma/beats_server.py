@@ -21,7 +21,9 @@ path as the curator's Mosaic button). No auto-resume, no restore branch.
 import http.server
 import json
 import os
+import shutil
 import socket
+import threading
 import subprocess
 import sys
 import time
@@ -67,6 +69,116 @@ def resolve_dd_hub_root():
 
 
 DD_HUB_ROOT = resolve_dd_hub_root()
+
+
+# ---------- Spec H2 sections 3+4: composite wiring (episode 249 ONLY) ----------
+# Design-artifacts fan-out, composite timeline, and retrigger scope live
+# here. The push endpoint and gate (Spec H sections 8/9) are UNCHANGED.
+# Guardrails: serves episode 249 only (never 250); never starts a Mosaic
+# run — no mosaic_retry call exists anywhere in this block; never writes
+# plan.json (read-only) or docs/plan.json.
+H2_EPISODE = "249"
+H2_DESIGN_GROUPS = {}
+H2_DESIGN_LOCK = threading.Lock()
+H2_DESIGN_SEQ = [0]
+
+
+def _h2_refused(ep):
+    if str(ep) != H2_EPISODE:
+        return {"success": False,
+                "error": f"H2 wiring serves episode {H2_EPISODE} only "
+                         f"(refused ep {ep}; never 250)"}
+    return None
+
+
+def _h2_load_plan_clips():
+    """Read-only load of the episode plan (never written by H2 wiring)."""
+    return json.loads((DDMA_DIR / "plan.json").read_text(encoding="utf-8"))
+
+
+def _h2_clip_transcript(clip):
+    """The Cutroom clip's transcript: audio as cut (segment texts)."""
+    parts = []
+    for s in clip.get("segments") or []:
+        t = str(s.get("text") or "").strip()
+        if t:
+            parts.append(t)
+    return " ".join(parts)
+
+
+def _h2_probe_duration(path):
+    try:
+        if shutil.which("ffprobe") is None:
+            return None
+        p = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, timeout=15)
+        if p.returncode == 0 and p.stdout.strip():
+            return float(p.stdout.strip())
+    except Exception:
+        pass
+    return None
+
+
+def _h2_composite_master(ep):
+    """The assembled master that feeds the push endpoint and gate (H ss8/9).
+
+    Same resolution as the push path: hub-first master, then the episode
+    longform slot. Returns a Path or None — never a fabricated duration."""
+    m = find_master_video(ep)
+    if m:
+        return m
+    try:
+        import spec_h_composite_longform as spec_h
+        dest = spec_h.longform_destination(DD_HUB_ROOT, ep)
+        if dest.exists():
+            return dest
+    except Exception:
+        pass
+    return None
+
+
+def _h2_run_design_group(group_id):
+    """Background worker: one design call per clip, sequential queue.
+
+    Forwards each clip to the curator's manual Manim path (the same path as
+    the existing manim_retrigger button). Never touches Mosaic."""
+    import spec_h_composite_longform as spec_h
+    grp = H2_DESIGN_GROUPS.get(group_id)
+    if not grp:
+        return
+    for job in grp["jobs"]:
+        with H2_DESIGN_LOCK:
+            if grp.get("cancelled"):
+                break
+            job["status"] = "running"
+        try:
+            cap = spec_h.validate_clip_captions(
+                job["clip"], job.get("body_words") or [], False)
+            if not cap["ok"]:
+                raise RuntimeError(cap["exception"])
+            body = json.dumps(
+                {"ep": grp["ep"], "clip_num": job["clip"]}).encode("utf-8")
+            req = urllib.request.Request(
+                f"{CURATOR_BASE}/generate-manim-infographic"
+                f"?id=episode_{grp['ep']}&num={job['clip']}",
+                data=body, headers={"Content-Type": "application/json"},
+                method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:
+                detail = json.loads(r.read().decode("utf-8"))
+            if isinstance(detail, dict) and detail.get("success") is False:
+                raise RuntimeError(
+                    str(detail.get("error", "curator refused"))[:500])
+            with H2_DESIGN_LOCK:
+                job["status"] = "done"
+                job["detail"] = detail
+        except Exception as e:
+            with H2_DESIGN_LOCK:
+                job["status"] = "failed"
+                job["error"] = str(e)[:500]
+    with H2_DESIGN_LOCK:
+        grp["finished"] = True
 
 
 def rewrite_beat_urls(ch_data):
@@ -332,6 +444,67 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, status=500)
             return
 
+        if path == "/api/beats/composite_timeline":
+            # Spec H2 s4: the longform preview timeline comes from the
+            # composite master itself — probed, never the hardcoded 54:14.
+            ep = clean_ep(params.get("ep", ["248"])[0])
+            if _h2_refused(ep):
+                self.send_json({"success": False, "ep": ep,
+                                "error": _h2_refused(ep)["error"]}, status=400)
+                return
+            master = _h2_composite_master(ep)
+            if not master:
+                self.send_json({"success": True, "ep": ep, "has_video": False,
+                                "video_url": "", "total_duration": None,
+                                "fallback_used": False,
+                                "note": "No composite master yet — assemble first "
+                                        "(never the old hardcoded 54:14 index).",
+                                "chapters": []})
+                return
+            total = _h2_probe_duration(master)
+            try:
+                clips = _h2_load_plan_clips()
+            except Exception as e:
+                self.send_json({"success": False,
+                                "error": f"plan unreadable: {e}"}, status=500)
+                return
+            import spec_h2_composite_assembler as spec_h2
+            chapters, cursor = [], 0.0
+            for c in clips:
+                dur = spec_h2.clip_ground_zero_duration(c)
+                chapters.append({"clip_num": c.get("num"),
+                                 "title": c.get("title", f"Part {c.get('num')}"),
+                                 "start": round(cursor, 3),
+                                 "end": round(cursor + dur, 3),
+                                 "duration": round(dur, 3),
+                                 "source": "plan-segments-ground-zero"})
+                cursor += dur
+            self.send_json({"success": True, "ep": ep, "has_video": True,
+                            "video_url": f"/api/beats/video?ep={ep}",
+                            "total_duration": total,
+                            "master": str(master),
+                            "fallback_used": False,
+                            "chapters": chapters})
+            return
+
+        if path == "/api/beats/design_status":
+            # Spec H2 s3: per-clip progress; only exceptions are reported.
+            group_id = params.get("group", [""])[0]
+            with H2_DESIGN_LOCK:
+                grp = H2_DESIGN_GROUPS.get(group_id)
+                snap = ({"ep": grp["ep"], "finished": grp["finished"],
+                         "jobs": [{k: j[k] for k in ("clip", "status", "error")
+                                   if k in j} for j in grp["jobs"]]}
+                        if grp else None)
+            if not snap:
+                self.send_json({"success": False,
+                                "error": "unknown design group"}, status=404)
+                return
+            self.send_json({"success": True, "group": group_id, **snap,
+                            "exceptions": [j for j in snap["jobs"]
+                                           if j["status"] == "failed"]})
+            return
+
         if path == "/api/beats/mosaic_status":
             # PURE READ — never starts a pipeline. Reports curator-side state only.
             ep = clean_ep(params.get("ep", ["248"])[0])
@@ -522,6 +695,105 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(
                     {"success": False, "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
                     status=502)
+            return
+
+        if path == "/api/beats/design_artifacts":
+            # Spec H2 s3: ONE deliberate start; fans out one design call per
+            # clip; queued background renders with per-clip progress;
+            # exceptions-only reporting. Serves 249 only; never starts Mosaic.
+            ep = clean_ep(data.get("ep", "248"))
+            refused = _h2_refused(ep)
+            if refused:
+                self.send_json(refused, status=400)
+                return
+            try:
+                import spec_h2_composite_assembler as spec_h2
+                clips = _h2_load_plan_clips()
+            except Exception as e:
+                self.send_json({"success": False,
+                                "error": f"plan unreadable: {e}"}, status=500)
+                return
+            try:
+                only = data.get("clip_num", None)
+                targets = ([c for c in clips if c.get("num") == int(only)]
+                           if only is not None and str(only) != ""
+                           else list(clips))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"},
+                               status=400)
+                return
+            if not targets:
+                self.send_json({"success": False,
+                                "error": "no such clip in plan"}, status=404)
+                return
+            plan = spec_h2.plan_design_artifacts(
+                [{"clip": c.get("num")} for c in targets])
+            with H2_DESIGN_LOCK:
+                H2_DESIGN_SEQ[0] += 1
+                group_id = f"h2-{ep}-{H2_DESIGN_SEQ[0]}"
+                jobs = []
+                for c, desc in zip(targets, plan["jobs"]):
+                    words = [(float(w.get("start", 0)), float(w.get("end", 0)),
+                              str(w.get("word", "")))
+                             for w in (c.get("_caption_words") or [])]
+                    jobs.append({"clip": c.get("num"), "status": "queued",
+                                 "transcript_chars": len(_h2_clip_transcript(c)),
+                                 "body_words": words, "shape": desc["shape"]})
+                H2_DESIGN_GROUPS[group_id] = {"ep": ep, "finished": False,
+                                              "jobs": jobs}
+            threading.Thread(target=_h2_run_design_group,
+                             args=(group_id,), daemon=True).start()
+            self.send_json({"success": True, "group": group_id, "ep": ep,
+                            "planned": len(jobs),
+                            "kill_status": plan["kill_status"],
+                            "note": "One design call per clip, queued in the "
+                                    "background; poll design_status. Only "
+                                    "exceptions are reported."})
+            return
+
+        if path == "/api/beats/composite_retrigger":
+            # Spec H2 s4: pause the preview (client-side), retrigger ONE side
+            # for ONE clip. Planner only: validates the duration lock and
+            # returns the restitch scope. Never starts a Mosaic run; never
+            # touches duration or the hard-coded frame.
+            ep = clean_ep(data.get("ep", "248"))
+            refused = _h2_refused(ep)
+            if refused:
+                self.send_json(refused, status=400)
+                return
+            try:
+                clip_num = int(data.get("clip_num", 1))
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"},
+                               status=400)
+                return
+            side = str(data.get("side", "")).strip().lower()
+            try:
+                import spec_h2_composite_assembler as spec_h2
+                clips = _h2_load_plan_clips()
+                clip = next((c for c in clips if c.get("num") == clip_num),
+                            None)
+                if clip is None:
+                    self.send_json({"success": False,
+                                    "error": f"clip {clip_num} not in plan"},
+                                   status=404)
+                    return
+                dur = spec_h2.clip_ground_zero_duration(clip)
+                scope = spec_h2.plan_retrigger(ep, clip_num, side, dur, dur)
+            except ValueError as ve:
+                self.send_json({"success": False, "error": str(ve)}, status=400)
+                return
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+                return
+            note = ("Manim re-render runs via the existing manim_retrigger "
+                    "path; this scope re-stitches only this clip's segment."
+                    if side == "manim" else
+                    "Mosaic re-render runs ONLY via the double-confirmed "
+                    "Mosaic retrigger button or your explicit instruction — "
+                    "this endpoint never starts a run.")
+            self.send_json({"success": True, "ep": ep, "clip": clip_num,
+                            "scope": scope, "note": note})
             return
 
         if path == "/api/beats/longform_push":
