@@ -318,6 +318,20 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_error(404, f"Beat preview not found: {cls_name}")
             return
 
+        if path == "/api/beats/spec_h":
+            # Spec H status snapshot: fixed frame, workflow, platform quirks.
+            try:
+                import spec_h_composite_longform as spec_h
+                self.send_json({"spec": spec_h.SPEC_ID,
+                                "frame": spec_h.composite_frame_spec(),
+                                "workflow": spec_h.WORKFLOW,
+                                "platform_quirks": spec_h.PLATFORM_QUIRKS,
+                                "oracle": {"size": spec_h.ORACLE_SIZE,
+                                           "duration_s": spec_h.ORACLE_DURATION_S}})
+            except Exception as e:
+                self.send_json({"error": str(e)}, status=500)
+            return
+
         if path == "/api/beats/mosaic_status":
             # PURE READ — never starts a pipeline. Reports curator-side state only.
             ep = clean_ep(params.get("ep", ["248"])[0])
@@ -508,6 +522,54 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(
                     {"success": False, "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
                     status=502)
+            return
+
+        if path == "/api/beats/longform_push":
+            # Spec H section 6/8/9: "Push the movie to dd_hub" button backend.
+            # Gate first, then copy to the episode longform slot + meta.
+            ep = clean_ep(data.get("ep", "248"))
+            try:
+                import spec_h_composite_longform as spec_h
+                master = find_master_video(ep)
+                if not master:
+                    self.send_json({"success": False,
+                                    "error": f"no longform master for ep {ep}"},
+                                   status=404)
+                    return
+                local_master = DDMA_DIR / "clips" / f"{ep}-longform-master.mp4"
+                gate = spec_h.longform_publish_gate(
+                    master, local_master if local_master.exists() else None)
+                if not gate["ok"]:
+                    self.send_json({"success": False, "gate": gate}, status=409)
+                    return
+                dest = spec_h.longform_destination(DD_HUB_ROOT, ep)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                import shutil
+                shutil.copy2(master, dest)
+                container_d, stream_d = None, None
+                if shutil.which("ffprobe") is not None:
+                    try:
+                        _fp = subprocess.run(
+                            ["ffprobe", "-v", "error", "-show_entries",
+                             "format=duration:stream=codec_type,duration",
+                             "-of", "json", str(dest)],
+                            capture_output=True, text=True, timeout=60)
+                        _info = json.loads(_fp.stdout or "{}")
+                        container_d = float(_info.get("format", {}).get("duration"))
+                        stream_d = container_d
+                        for _s in _info.get("streams", []):
+                            if _s.get("codec_type") == "video" and _s.get("duration"):
+                                stream_d = float(_s["duration"])
+                                break
+                    except Exception:
+                        container_d, stream_d = None, None
+                meta = spec_h.write_longform_meta(
+                    dest, spec_h.sha256_of(dest), container_d, stream_d,
+                    gate_ok=True)
+                self.send_json({"success": True, "dest": str(dest),
+                                "meta": meta, "gate": gate})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
             return
 
         if path == "/api/beats/personal/save":

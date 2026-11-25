@@ -118,7 +118,7 @@ a { color: var(--accent-indigo); }
                                         </div>
                                         <span id="lf-engine-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:var(--accent-amber);"></span>
                                         <span id="beats-mosaic-status" style="font-size:0.7rem;color:var(--primary);"></span>
-                                        <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button>
+                                        <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button>
                                     </div>
                                 </div>
 
@@ -880,6 +880,23 @@ a { color: var(--accent-indigo); }
             }
         }
 
+        async function pushLongformToDdHub() {
+            const cleanId = beatsEpisode();
+            const btn = document.getElementById('btn-push-longform-ddhub');
+            if (btn) { btn.disabled = true; btn.style.cursor = 'wait'; }
+            showToast('Gating master and pushing movie to dd_hub...');
+            try {
+                const res = await fetch('/api/beats/longform_push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ep: cleanId })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) { throw new Error((data.gate && data.gate.reason) || data.error || 'push refused'); }
+                showToast('Movie pushed to dd_hub: ' + data.dest);
+            } catch (e) { showToast('Push refused: ' + e.message); }
+            finally { if (btn) { btn.disabled = false; btn.style.cursor = 'pointer'; } }
+        }
         async function patchActiveLongformChapter() {
             const cleanId = beatsEpisode();
             const cNum = lfActiveClipNum || 1;
