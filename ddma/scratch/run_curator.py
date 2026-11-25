@@ -5170,6 +5170,142 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
                 return
 
+        elif parsed_url.path == '/generate-manim-infographic':
+            # Beats target for H2 design groups and /api/beats/manim_retrigger.
+            # Manual Manim path only: storyboard via
+            # generate_or_load_storyboard_data, then the existing Manim render
+            # step (manim_infographic_engine.render_manim_infographic_mp4),
+            # then the existing compile path (`ddma.py compile-clip --source
+            # manim`). Episode 249 only. Never touches Mosaic, never
+            # substitutes another file when the render produces nothing.
+            try:
+                query = parse_qs(parsed_url.query)
+                project_id = query.get('id', [None])[0]
+                clip_num = query.get('num', [None])[0]
+                force_regen = query.get('force', ['false'])[0].lower() in ('true', '1')
+
+                content_len = int(self.headers.get('Content-Length', 0))
+                req_body = {}
+                if content_len > 0:
+                    try:
+                        req_body = json.loads(self.rfile.read(content_len).decode('utf-8'))
+                    except Exception:
+                        req_body = {}
+                if not isinstance(req_body, dict):
+                    req_body = {}
+
+                # Beats design-group body shape: {"ep": 249, "clip_num": N}.
+                if (not project_id) and req_body.get("ep") is not None:
+                    project_id = f"episode_{req_body.get('ep')}"
+                if (clip_num is None or str(clip_num).strip() == "") and req_body.get("clip_num") is not None:
+                    clip_num = req_body.get("clip_num")
+                if req_body.get("force_regen") is True:
+                    force_regen = True
+
+                if not project_id or clip_num is None or str(clip_num).strip() == "":
+                    raise Exception("Missing id or num parameter")
+                if str(project_id) != "episode_249":
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"success": False, "error": f"Refusing: this endpoint serves episode_249 only (got {project_id})"}).encode('utf-8'))
+                    return
+
+                if os.getcwd() not in sys.path:
+                    sys.path.insert(0, os.getcwd())
+                import glob as _glob
+                import manim_infographic_engine as _manim_engine
+
+                custom_directive = str(req_body.get("directive") or req_body.get("instructions") or req_body.get("custom_directive") or "").strip()
+
+                storyboard = generate_or_load_storyboard_data(
+                    project_id, clip_num,
+                    force_regen=force_regen,
+                    custom_directive=custom_directive,
+                )
+                scenes = (req_body.get("scenes") or storyboard.get("scenes") or [])
+                if not scenes:
+                    raise Exception("Zero scenes produced (storyboard returned 0 scenes)")
+
+                plan_path = os.path.join("projects", project_id, "plan.json")
+                if not os.path.exists(plan_path):
+                    raise Exception(f"Project plan missing at {plan_path} (root plan.json is never used here)")
+                with open(plan_path, "r", encoding="utf-8") as pf:
+                    plan_data = json.load(pf)
+                t_clip = next((c for c in plan_data if str(c.get("num")) == str(clip_num)), None)
+                if not t_clip:
+                    raise Exception(f"Clip {clip_num} not found in {plan_path}")
+
+                ep_num = project_id.replace('episode_', '')
+                mp3_matches = _glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}-*.mp3")) + _glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}.mp3"))
+                if not mp3_matches:
+                    info_path = os.path.join("projects", project_id, "project_info.json")
+                    p_info = {}
+                    if os.path.exists(info_path):
+                        with open(info_path, "r", encoding="utf-8") as f_info:
+                            p_info = json.load(f_info)
+                    audio_file = get_project_canonical_audio_path(os.path.join("projects", project_id), project_id, p_info)
+                    if not audio_file or not os.path.exists(audio_file):
+                        raise Exception(f"Could not locate or slice clip MP3 for Clip {clip_num}")
+                    subprocess.run([sys.executable, "ddma.py", "cut", "--audio", audio_file, "--plan-file", plan_path, "--out-dir", "clips", "--num", str(clip_num)], capture_output=True, text=True, cwd=".")
+                    mp3_matches = _glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}-*.mp3")) + _glob.glob(os.path.join("clips", f"{ep_num}-{clip_num}.mp3"))
+                    if not mp3_matches:
+                        raise Exception(f"Could not locate or slice clip MP3 for Clip {clip_num}")
+                mp3_matches.sort(key=os.path.getmtime, reverse=True)
+                clip_mp3 = mp3_matches[0]
+
+                body_dur = 0.0
+                try:
+                    p_dur = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", clip_mp3], capture_output=True, text=True)
+                    if p_dur.returncode == 0 and p_dur.stdout.strip():
+                        body_dur = float(p_dur.stdout.strip())
+                except Exception:
+                    pass
+                if body_dur <= 0:
+                    body_dur = float(t_clip.get("audio_duration") or t_clip.get("duration") or 120.0)
+
+                infographic_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-infographic.mp4")
+                _manim_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur)
+
+                if not os.path.exists(infographic_mp4) or os.path.getsize(infographic_mp4) <= 0:
+                    raise Exception(f"Manim render produced no video at {infographic_mp4}")
+
+                t_clip["audio_duration"] = round(body_dur, 2)
+                t_clip["infographic_ready"] = True
+                with open(plan_path, "w", encoding="utf-8") as pf_w:
+                    json.dump(plan_data, pf_w, indent=4)
+
+                cmd_comp = [sys.executable, "ddma.py", "compile-clip", "--num", str(clip_num), "--plan-file", plan_path, "--source", "manim"]
+                proc = subprocess.run(cmd_comp, capture_output=True, text=True, cwd=".")
+                if proc.returncode != 0:
+                    raise Exception(f"compile-clip --source manim failed: {proc.stderr}")
+
+                final_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-manim.mp4")
+                if not os.path.exists(final_mp4) or os.path.getsize(final_mp4) <= 0:
+                    raise Exception(f"Compiled manim master missing at {final_mp4}")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "video_url": f"/clips/{ep_num}-{clip_num}-manim.mp4",
+                    "artifact": final_mp4,
+                    "clip_num": int(clip_num),
+                    "project_id": project_id,
+                    "scenes_count": len(scenes),
+                }).encode('utf-8'))
+                return
+            except Exception as e:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+                return
+
         self.send_error(404, "Not Found")
 
     def do_GET(self):

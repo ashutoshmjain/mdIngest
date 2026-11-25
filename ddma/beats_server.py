@@ -684,7 +684,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 data=json.dumps({}).encode("utf-8"),
                 headers={"Content-Type": "application/json"}, method="POST")
             try:
-                with urllib.request.urlopen(req, timeout=30) as r:
+                with urllib.request.urlopen(req, timeout=120) as r:
                     self.send_json(json.loads(r.read().decode("utf-8")))
             except urllib.error.HTTPError as he:
                 try:
