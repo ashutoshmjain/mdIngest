@@ -121,5 +121,77 @@ class TestSegmentBuild(unittest.TestCase):
         self.assertFalse(r["jobs"][0]["per_beat"])
 
 
+class TestEpisode249DurationPin(unittest.TestCase):
+    """Pin the episode-249 fresh-assembly total to the run-file oracle.
+
+    The 21 per-clip run durations below are the ffprobe format=duration
+    values of the REAL hub run artifacts (episode 249, read-only probe).
+    The assembler's fresh-assembly total (run-file probe per clip) must
+    match the oracle total 1883.689 s within 0.05 s. Skips when the hub
+    root or any run file is absent (environmental, not a code failure).
+    """
+    EP = "249"
+    # Per-clip oracle durations, clip order 0..20 (ffprobe, 3 dp).
+    ORACLE_CLIP_DURATIONS = [
+        144.300, 120.733, 112.666, 87.166, 89.467, 94.966, 81.067,
+        74.267, 91.533, 75.700, 76.866, 77.533, 78.200, 78.200,
+        98.633, 74.167, 88.200, 77.066, 68.000, 63.066, 131.867,
+    ]
+    ORACLE_TOTAL = 1883.689
+    TOLERANCE_S = 0.05
+
+    def test_oracle_clip_durations_sum(self):
+        # Rounded (3 dp) per-clip oracles: their sum carries rounding
+        # error, so pin it to the oracle total within tolerance, and pin
+        # the 21 caller-given run durations to 1883.69 within 1 cent.
+        total = sum(self.ORACLE_CLIP_DURATIONS)
+        self.assertEqual(len(self.ORACLE_CLIP_DURATIONS), 21)
+        self.assertLessEqual(abs(total - self.ORACLE_TOTAL),
+                             self.TOLERANCE_S)
+        caller_given = [144.30, 120.73, 112.67, 87.17, 89.47, 94.97,
+                        81.07, 74.27, 91.53, 75.70, 76.87, 77.53, 78.20,
+                        78.20, 98.63, 74.17, 88.20, 77.07, 68.00, 63.07,
+                        131.87]
+        self.assertEqual(len(caller_given), 21)
+        self.assertAlmostEqual(sum(caller_given), 1883.69, places=2)
+
+    def test_fresh_assembly_total_matches_oracle(self):
+        import json
+        import beats_server
+        hub = beats_server.DD_HUB_ROOT
+        # Clip list: local clone plan first; the code-only mirror clone
+        # has no plan files by design, so fall back to the canonical hub
+        # plan (same 21 clip dicts with mosaic_run_id).
+        clips = None
+        local_plan = DDMA_DIR / "plan.json"
+        if local_plan.exists():
+            clips = json.loads(local_plan.read_text(encoding="utf-8"))
+        elif hub is not None:
+            hub_plan = Path(str(hub)) / "episodes" / self.EP / "plan.json"
+            if hub_plan.exists():
+                clips = json.loads(hub_plan.read_text(encoding="utf-8"))
+        if clips is None:
+            self.skipTest("no clip plan available "
+                          "(local plan.json and hub plan both absent)")
+        self.assertEqual(len(clips), 21)
+        run_paths = [H2.resolve_clip_run_path(self.EP, c, hub)
+                     for c in clips]
+        if hub is None or not Path(str(hub)).exists() or any(
+                p is None or not p.exists() for p in run_paths):
+            self.skipTest(f"hub run files unavailable (hub={hub})")
+        total, sources = 0.0, []
+        for c in clips:
+            dur, src = H2.clip_composite_duration_explained(
+                c, self.EP, hub)
+            total += dur
+            sources.append(src)
+        self.assertTrue(all(s == "run-file-probe" for s in sources),
+                        f"fresh assembly must probe run files: {sources}")
+        self.assertLessEqual(abs(total - self.ORACLE_TOTAL),
+                             self.TOLERANCE_S,
+                             f"assembler total {total:.3f}s vs oracle "
+                             f"{self.ORACLE_TOTAL:.3f}s")
+
+
 if __name__ == "__main__":
     unittest.main()

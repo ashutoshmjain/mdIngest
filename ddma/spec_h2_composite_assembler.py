@@ -45,6 +45,8 @@ What this module does NOT do (guardrails):
 
 import hashlib
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 SPEC_ID = "deepdive-spec-h2-composite-assembler"
@@ -112,9 +114,11 @@ def composite_frame_spec():
 
 
 # --------------------------------------------------------------------------
-# Segments ground zero (spec H2 s2: the clip's `segments` list is the timing
-# source; start/end/duration/audio_duration/rendered_duration are derived
-# bookkeeping and may be stale — never read them for timing).
+# Segments ground zero for CONTENT (spec H2 s2: the clip's `segments` list
+# decides which audio/stings/order — start/end/duration/audio_duration/
+# rendered_duration are derived bookkeeping and may be stale, never read them
+# for timing). DURATION comes from the clip's Mosaic run file via ffprobe
+# (clip_composite_duration); segments-minus-crossfades is fallback only.
 # --------------------------------------------------------------------------
 def segments_hash(segments):
     """Audio signature of a clip's segments list (md5 of canonical JSON).
@@ -128,17 +132,101 @@ def segments_hash(segments):
 
 
 def clip_ground_zero_duration(clip):
-    """Clip duration from the segments list as it stands (never span fields).
+    """Segments-minus-crossfades fallback (content ground zero, NOT timing).
 
     Sums audio/music segment durations minus crossfades, mirroring the
-    Cutroom display (sum of segments minus crossfades). The trial DURS equal
-    the run-artifact durations, which carry the Cutroom clip's duration.
+    Cutroom display (sum of segments minus crossfades). Segments still decide
+    CONTENT (which audio/stings/order — golden rule stands); they no longer
+    decide DURATION. Used only when no run file exists for the clip.
     """
     total = sum(float(s.get("duration", 0) or 0)
                 for s in (clip.get("segments") or []))
     xfades = sum(float(s.get("crossfade", 0) or 0)
                  for s in (clip.get("segments") or []))
     return total - xfades
+
+
+def probe_run_duration(run_path, probe=None):
+    """ffprobe the run artifact's duration (Spec H heal-pattern probe).
+
+    probe: optional callable(path_str) -> float (test seam, same role as the
+    probe param of spec_h.verify_run_artifact / health_check_run_artifacts).
+    Without it, runs ffprobe format=duration. Returns a float or None —
+    never raises, never substitutes another file: the caller passes the real
+    run-ID artifact path only.
+    """
+    try:
+        if probe is not None:
+            return float(probe(str(run_path)))
+        if shutil.which("ffprobe") is None:
+            return None
+        p = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(run_path)],
+            capture_output=True, text=True, timeout=15)
+        if p.returncode == 0 and p.stdout.strip():
+            return float(p.stdout.strip())
+    except Exception:
+        pass
+    return None
+
+
+def resolve_clip_run_path(ep, clip, dd_hub_root=None, run_path=None):
+    """Resolve the clip's real run-ID artifact path (never a substitute).
+
+    Returns a Path or None. Only the canonical
+    {ep}-{clip}-mosaic-{run_id}.mp4 (via spec_h.canonical_run_artifact_path)
+    or an explicitly passed run_path is ever returned — never the compiled
+    clip, never a generically-named body file.
+    """
+    if run_path is not None:
+        return Path(run_path)
+    run_id = (clip.get("mosaic_run_id") or clip.get("run_id") or "").strip() \
+        if isinstance(clip, dict) else ""
+    if not run_id or dd_hub_root is None:
+        return None
+    import spec_h_composite_longform as spec_h
+    return spec_h.canonical_run_artifact_path(
+        dd_hub_root, ep, clip.get("num"), run_id)
+
+
+def clip_composite_duration(clip, ep=None, dd_hub_root=None, run_path=None,
+                            probe=None):
+    """Clip composite duration: the RUN FILE decides duration.
+
+    Probes the clip's Mosaic run file via ffprobe (heal-pattern probe) and
+    returns that duration. Falls back to segments-minus-crossfades ONLY when
+    no run file exists (missing run_id or file absent) or the probe yields
+    nothing. Segments still decide CONTENT (golden rule); this decides
+    DURATION so both panes render to the same length. Read-only: never
+    triggers Mosaic, never substitutes another file.
+    """
+    candidate = resolve_clip_run_path(ep, clip, dd_hub_root, run_path) \
+        if (run_path is not None or (ep is not None
+                                     and dd_hub_root is not None)) else None
+    if candidate is not None and Path(candidate).exists():
+        probed = probe_run_duration(candidate, probe=probe)
+        if probed is not None:
+            return probed
+    return clip_ground_zero_duration(clip)
+
+
+def clip_composite_duration_explained(clip, ep=None, dd_hub_root=None,
+                                      run_path=None, probe=None):
+    """Same as clip_composite_duration plus the source of the number.
+
+    Returns (duration, source) where source is "run-file-probe" or
+    "segments-fallback (no run file)". The Manim side renders to the same
+    duration so both panes stay in sync.
+    """
+    candidate = resolve_clip_run_path(ep, clip, dd_hub_root, run_path) \
+        if (run_path is not None or (ep is not None
+                                     and dd_hub_root is not None)) else None
+    if candidate is not None and Path(candidate).exists():
+        probed = probe_run_duration(candidate, probe=probe)
+        if probed is not None:
+            return probed, "run-file-probe"
+    return clip_ground_zero_duration(clip), "segments-fallback (no run file)"
 
 
 class StaleRun(Exception):

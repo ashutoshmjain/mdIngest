@@ -471,13 +471,14 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             import spec_h2_composite_assembler as spec_h2
             chapters, cursor = [], 0.0
             for c in clips:
-                dur = spec_h2.clip_ground_zero_duration(c)
+                dur, src = spec_h2.clip_composite_duration_explained(
+                    c, ep, DD_HUB_ROOT)
                 chapters.append({"clip_num": c.get("num"),
                                  "title": c.get("title", f"Part {c.get('num')}"),
                                  "start": round(cursor, 3),
                                  "end": round(cursor + dur, 3),
                                  "duration": round(dur, 3),
-                                 "source": "plan-segments-ground-zero"})
+                                 "source": src})
                 cursor += dur
             self.send_json({"success": True, "ep": ep, "has_video": True,
                             "video_url": f"/api/beats/video?ep={ep}",
@@ -778,7 +779,8 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                                     "error": f"clip {clip_num} not in plan"},
                                    status=404)
                     return
-                dur = spec_h2.clip_ground_zero_duration(clip)
+                dur = spec_h2.clip_composite_duration(
+                    clip, ep, DD_HUB_ROOT)
                 scope = spec_h2.plan_retrigger(ep, clip_num, side, dur, dur)
             except ValueError as ve:
                 self.send_json({"success": False, "error": str(ve)}, status=400)
