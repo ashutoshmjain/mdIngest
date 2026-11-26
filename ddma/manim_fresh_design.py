@@ -165,7 +165,7 @@ Return ONLY a JSON object, no other text:
 
 
 def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
-                         genai_mod, hook):
+                         genai_mod, hook, instruction=None):
     if genai_mod is None:
         return None
     cat_lines = [f"[{i}] ({c['section'][:60]}) {c['norm'][:200]}"
@@ -178,6 +178,10 @@ def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
         catalog="\n".join(cat_lines) if cat_lines else "(none)",
         prior=json.dumps(prior, ensure_ascii=False)[:800] or "(none)",
         hook=hook[:300])
+    if instruction:
+        prompt += ("\nUser design instruction for this clip (honor it; the "
+                   "catalog-membership rule still applies): "
+                   + str(instruction)[:300])
     for m_name in ["gemini-3.5-flash-lite", "gemini-flash-lite-latest",
                    "gemini-3.5-flash", "gemini-3.8-flash"]:
         try:
@@ -251,27 +255,68 @@ def _build_stages(title, kind, visual, transcript, body_duration):
 
 
 def design_clip_artifact(transcript, title, body_duration, catalog,
-                         genai_mod=None, prior_equations=None, clip_num=None):
+                         genai_mod=None, prior_equations=None, clip_num=None,
+                         directive=None):
     """Fresh-cast ONE artifact. Returns (storyboard_design_dict, reports).
 
     Never reads caches or plan scenes. The returned equation (if any) is
     always a catalog member; anything else degrades to anchor/title-only
-    and is reported.
+    and is reported. A non-empty directive (per-clip design instruction)
+    is honored deterministically: unnegated "anchor" forces kind anchor;
+    an equation name picks the best-matching catalog member (never
+    invented); anything else acts as a topic hint. Empty directive means
+    exactly the historical behavior (no directive keys are stored).
     """
     reports = []
     transcript = str(transcript or "").strip()
     title = str(title or "Deep Dive").strip()
     hook = hook_sentence(transcript)
     prior = prior_equations or {}
-    choice = _gemini_fresh_choice(transcript, title, body_duration, catalog,
-                                  prior, genai_mod, hook)
+    directive = str(directive or "").strip()
+    directive_outcome = ""
+    forced = None
+    if directive:
+        if _directive_forces_anchor(directive):
+            forced = ("anchor", None, "directive-honored: forced anchor")
+        else:
+            _idx = _directive_equation_match(directive, catalog)
+            if _idx is not None:
+                forced = ("equation", _idx,
+                          "directive-honored: equation " + str(_idx))
+            elif _directive_names_equation(directive):
+                forced = ("anchor", None,
+                          "directive-unmatched: no catalog equation matched '"
+                          + directive[:120] + "'; degraded to anchor")
+    if forced is not None:
+        kind_name, ref = forced[0], forced[1]
+        directive_outcome = forced[2]
+        if kind_name == "anchor":
+            choice = {"kind": "anchor", "anchor_label": None,
+                      "equation_ref": None, "equation_display": "",
+                      "diagram": None,
+                      "reason": "directive forced anchor"}
+        else:
+            entry = catalog[ref]
+            choice = {"kind": "equation", "equation_ref": ref,
+                      "equation_display": entry.get("norm", ""),
+                      "anchor_label": None, "diagram": None,
+                      "reason": "directive picked catalog member"}
+        reports.append("directive: " + directive[:200])
+        reports.append(directive_outcome)
+    else:
+        choice = _gemini_fresh_choice(transcript, title, body_duration,
+                                     catalog, prior, genai_mod, hook,
+                                     instruction=directive or None)
+        if directive:
+            reports.append("directive: " + directive[:200])
     kind, visual = "anchor", {"type": "anchor",
                               "label": title.upper()[:24],
                               "hook": hook[:220]}
     equation_norm, equation_section = None, ""
     reuse_of = None
     if choice is None:
-        choice = _deterministic_choice(transcript, title, hook, catalog, prior)
+        choice = _deterministic_choice(transcript, title, hook, catalog,
+                                       prior, directive=directive or None)
         reports.append("deterministic-design-call: " + str(choice.get("reason", "")))
     want = choice.get("kind")
     if want == "equation":
@@ -340,6 +385,9 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
               "diagram": visual.get("diagram") if kind == "diagram" else None,
               "reports": reports,
               "reason": str((choice or {}).get("reason") or "")[:300]}
+    if directive:
+        design["directive"] = directive
+        design["directive_report"] = directive_outcome
     return {"design": design, "stages": stages}, reports
 
 
@@ -428,21 +476,69 @@ def _entry_topics(catalog):
     return topics
 
 
-def _deterministic_choice(transcript, title, hook, catalog, prior):
+def _directive_forces_anchor(directive):
+    """Unnegated 'anchor' word forces kind anchor (e.g. 'make this an
+    anchor', 'anchor only'). Never invents; the anchor path is unchanged."""
+    toks = set(_tokens(directive or ""))
+    if "anchor" not in toks:
+        return False
+    low = str(directive or "").lower()
+    for neg in ("no anchor", "not anchor", "without anchor", "never anchor",
+                "don't anchor", "dont anchor", "isn't anchor", "isnt anchor"):
+        if neg in low:
+            return False
+    return True
+
+
+def _directive_equation_match(directive, catalog):
+    """Best catalog member for a directive naming an equation, or None.
+
+    Scores directive words against entry topics + normalized text. The
+    pick is always a catalog member (returned as index); None means
+    no member matched (caller degrades to anchor and reports it)."""
+    dtoks = set(_tokens(directive or ""))
+    if not dtoks:
+        return None
+    topics = _entry_topics(catalog)
+    best, best_score = None, 0
+    for idx, entry in enumerate(catalog):
+        tset = set(_tokens(topics[idx]))
+        nset = set(_tokens(entry.get("norm", "")))
+        score = 3 * len(dtoks & tset) + len(dtoks & nset)
+        if score > best_score:
+            best, best_score = idx, score
+    if best is not None and best_score >= 4:
+        return best
+    return None
+
+
+def _directive_names_equation(directive):
+    low = str(directive or "").lower()
+    return ("equation" in low or "formula" in low or "theorem" in low
+            or "identity" in low or "=" in low)
+
+
+def _deterministic_choice(transcript, title, hook, catalog, prior,
+                         directive=None):
     '''One deterministic design call per clip (no AI key needed).
 
     Matches the clip title+transcript against the episode-page catalog.
     Returns a choice dict in the Gemini shape. Cannot invent: the equation
-    is always a catalog member by construction.'''
+    is always a catalog member by construction. A non-empty directive acts
+    as a topic hint (score boost); forced outcomes are resolved by the
+    caller before this runs.'''
     title_toks = _expand(set(_tokens(title)))
     title_raw = set(_tokens(title))
     text_toks = _expand(set(_tokens(transcript)))
     topics = _entry_topics(catalog)
+    hint_toks = _expand(set(_tokens(directive))) if directive else set()
     scored = []
     for idx, entry in enumerate(catalog):
         tset = set(_tokens(topics[idx]))
         overlap_title = title_toks & tset
         score = 4 * len(overlap_title) + len(text_toks & tset)
+        if hint_toks:
+            score += 2 * len(hint_toks & tset)
         used = any(e == entry.get('norm') for e in (prior or {}).values())
         scored.append((score, bool(overlap_title), used, idx))
     scored.sort(reverse=True)

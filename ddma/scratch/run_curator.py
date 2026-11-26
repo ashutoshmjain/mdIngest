@@ -5258,7 +5258,9 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     _design_dur = float(_pre_clip.get("audio_duration") or _pre_clip.get("duration") or 120.0)
                     _art, fresh_reports = _fresh.design_clip_artifact(
                         _transcript, _title, _design_dur, _catalog,
-                        genai_mod=_g_mod, prior_equations=_prior, clip_num=clip_num)
+                        genai_mod=_g_mod, prior_equations=_prior,
+                        clip_num=clip_num,
+                        directive=custom_directive or None)
                     fresh_design = _art['design']
                     _stages = _art['stages']
                     for _st in _stages:

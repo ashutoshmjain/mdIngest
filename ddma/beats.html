@@ -109,16 +109,8 @@ a { color: var(--accent-indigo); }
                                             <button type="button" id="btn-playback-mode-master" onclick="setLfPlaybackMode('master')" style="background:transparent;color:var(--text-dark-secondary);border:none;padding:4px 9px;font-size:0.68rem;font-weight:700;cursor:pointer;">Play Full</button>
                                         </div>
                                         <span id="lf-player-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:var(--accent-amber);"></span>
-                                        <button type="button" id="lf-span-replay-btn" onclick="replayActiveSpan()" style="display:none;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:3px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">↺ Replay Span</button>
                                         <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dark-secondary); background: var(--panel-bg-darker); padding: 3px 9px; border-radius: 5px;">00:00 / 00:00</span>
-                                        <span style="font-size:0.66rem;color:var(--text-muted);font-weight:700;">Use in longform:</span>
-                                        <div style="display: inline-flex; background: var(--panel-bg-darker); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;">
-                                            <button type="button" id="btn-engine-mosaic" onclick="setClipEngine('mosaic')" style="background:transparent;color:var(--text-dark-secondary);border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Mosaic</button>
-                                            <button type="button" id="btn-engine-manim" onclick="setClipEngine('manim')" style="background:transparent;color:var(--text-dark-secondary);border:none;padding:4px 8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Manim</button>
-                                        </div>
-                                        <span id="lf-engine-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:var(--accent-amber);"></span>
-                                        <span id="beats-mosaic-status" style="font-size:0.7rem;color:var(--primary);"></span>
-                                        <button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button><button type="button" class="btn-cmd" id="btn-design-artifacts" onclick="designArtifacts('episode')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="One deliberate start: design the Manim artifact for every clip, queued in the background (Spec H2 s3, ep 249 only)">🎨 Design artifacts</button><button type="button" class="btn-cmd" id="btn-design-clip" onclick="designArtifacts('clip')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Design the Manim artifact for the active clip only (Spec H2 s3)">🎨 Design this clip</button><button type="button" class="btn-cmd" id="btn-retrigger-manim" onclick="compositeRetrigger('manim')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Manim left pane only for this clip, re-stitch its segment (Spec H2 s4)">↻ Retrigger Manim-only</button><button type="button" class="btn-cmd" id="btn-retrigger-mosaic" onclick="compositeRetrigger('mosaic')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Mosaic right pane only for this clip (double-confirmed; Spec H2 s4)">↻ Retrigger Mosaic-only</button>
+                                        <span id="beats-mosaic-status" style="font-size:0.7rem;color:var(--primary);"></span><button type="button" class="btn-cmd" id="btn-patch-lf-chapter" onclick="patchActiveLongformChapter()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Hot-patch ONLY the active chapter into the Master (~8s)">⚡ Patch (~8s)</button><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button><button type="button" class="btn-cmd" id="btn-design-artifacts" onclick="designArtifacts('episode')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="One deliberate start: design the Manim artifact for every clip, queued in the background (Spec H2 s3, ep 249 only)">🎨 Design artifacts</button><button type="button" class="btn-cmd" id="btn-retrigger-manim" onclick="compositeRetrigger('manim')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Manim left pane only for this clip, re-stitch its segment (Spec H2 s4)">↻ Retrigger Manim-only</button><button type="button" class="btn-cmd" id="btn-retrigger-mosaic" onclick="compositeRetrigger('mosaic')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Mosaic right pane only for this clip (double-confirmed; Spec H2 s4)">↻ Retrigger Mosaic-only</button>
                                     </div>
                                 </div>
 
@@ -131,23 +123,11 @@ a { color: var(--accent-indigo); }
                                 <div id="lf-span-strip" style="display:flex; gap:2px; align-items:stretch; height:22px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:2px; overflow:hidden;"></div>
                             </div>
 
-                            <!-- Dynamic Below-Player Surface (Spec C §3.2: clip Manim panel if has_beats, else 2 Mosaic actions) -->
+                            <!-- Below-Player Surface: always the clip Manim panel (Spec H2 X, ep 249) -->
                             <div id="beats-below-player"></div>
                             <div id="h2-design-panel" style="display:none;padding:8px 16px;font-family:var(--font-mono);font-size:0.72rem;background:var(--panel-bg-darker);border-top:1px solid var(--border-color);color:var(--text-main);"></div>
                         </main>
 
-                        <template id="tpl-mosaic-only-actions">
-                            <div id="beats-mosaic-only-surface" style="padding: 20px; background: var(--bg-color); display: flex; flex-direction: column; gap: 12px;">
-                                <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px;">
-                                    <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">🎞️ Mosaic Render Only (No Manim Yet)</div>
-                                    <div style="font-size: 0.78rem; color: var(--text-dark-secondary); margin-bottom: 14px;">This clip has a Mosaic render and no Manim artifact yet. Choose an action:</div>
-                                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                        <button type="button" id="btn-mosaic-surface-retrigger" onclick="beatsMosaicRetrigger()" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Mosaic</button>
-                                        <button type="button" id="btn-mosaic-surface-switch-manim" onclick="switchClipToManim()" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Switch this clip to Manim</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
 
                         
 
@@ -195,17 +175,6 @@ a { color: var(--accent-indigo); }
             }
         }
 
-        function replayActiveSpan() {
-            const videoEl = document.getElementById('lf-studio-video-player');
-            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === lfActiveClipNum);
-            const replayBtn = document.getElementById('lf-span-replay-btn');
-            if (replayBtn) replayBtn.style.display = 'none';
-            if (videoEl && chInfo) {
-                seekVideoSafely(videoEl, lfTimelineIndex?.has_video ? chInfo.start : 0);
-                videoEl.play().catch(() => {});
-            }
-        }
-
         function applyPlaybackSource() {
             const cleanId = beatsEpisode();
             const videoEl = document.getElementById('lf-studio-video-player');
@@ -213,8 +182,6 @@ a { color: var(--accent-indigo); }
             const hintEl = document.getElementById('lf-player-hint');
             const btnMaster = document.getElementById('btn-playback-mode-master');
             const btnClip = document.getElementById('btn-playback-mode-clip');
-            const replayBtn = document.getElementById('lf-span-replay-btn');
-            if (replayBtn) replayBtn.style.display = 'none';
 
             const hasMaster = Boolean(lfTimelineIndex && lfTimelineIndex.has_video);
             if (btnMaster) {
@@ -468,15 +435,7 @@ a { color: var(--accent-indigo); }
 
 
         async function renderClipSurface(cNum, chInfo, seekVideo = false) {
-            const container = document.getElementById('beats-below-player');
-            if (!container) return;
-            if (chInfo && chInfo.has_beats) {
-                await renderClipManimPanel(cNum, chInfo);
-            } else {
-                const tpl = document.getElementById('tpl-mosaic-only-actions');
-                container.innerHTML = '';
-                if (tpl) container.appendChild(tpl.content.cloneNode(true));
-            }
+            await renderClipManimPanel(cNum, chInfo || {});
             if (seekVideo) {
                 const videoEl = document.getElementById('lf-studio-video-player');
                 if (videoEl && chInfo && typeof chInfo.start === 'number') {
@@ -490,8 +449,11 @@ a { color: var(--accent-indigo); }
             if (!container) return;
             const ep = beatsEpisode();
             const title = (chInfo && chInfo.title) ? chInfo.title : ('Part ' + cNum);
-            let focusHtml = 'Storyboard unavailable - reported exception, never a silent fallback.';
+            let focusHtml = '';
             let stageNote = '';
+            let directiveVal = '';
+            let outcomeHtml = '';
+            let hasManim = Boolean(chInfo && chInfo.has_beats);
             try {
                 const res = await fetch('/api/beats/storyboard?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
                 const data = await res.json();
@@ -522,36 +484,49 @@ a { color: var(--accent-indigo); }
                     stageNote = stages.length + ' scenes (legacy board) ' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
                 }
                 if (!stageNote) stageNote = stages.length + ' stages' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
+                if (design.directive) directiveVal = design.directive;
+                if (design.directive_report) outcomeHtml = 'Last outcome: ' + escapeHtml(design.directive_report);
             } catch (e) {
-                focusHtml = 'Storyboard unavailable - ' + escapeHtml(e.message);
+                hasManim = false;
             }
-            const hasManim = Boolean(chInfo && chInfo.has_beats);
-            const statusLine = (hasManim ? 'Manim ready' : 'No Manim artifact yet - reported exception')
-                + (stageNote ? ' - ' + stageNote : '')
-                + (hasManim ? ' - ' + escapeHtml(ep + '-' + cNum + '-manim.mp4') : '');
+            const statusLine = hasManim
+                ? ('Manim ready' + (stageNote ? ' - ' + stageNote : '') + ' - ' + escapeHtml(ep + '-' + cNum + '-manim.mp4'))
+                : 'No Manim yet';
+            const headHtml = hasManim
+                ? ('<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
+                   (focusHtml ? '<div style="font-size:0.84rem;color:var(--text-main);">' + focusHtml + '</div>' : ''))
+                : ('<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
+                   (focusHtml ? '<div style="font-size:0.84rem;color:var(--text-main);margin-bottom:8px;">' + focusHtml + '</div>' : '') +
+                   '<div style="font-size:0.84rem;color:var(--text-main);">No Manim yet</div>');
             container.innerHTML =
                 '<div id="lf-manim-panel" style="padding:16px 20px;background:var(--bg-color);display:flex;flex-direction:column;gap:12px;">' +
                 '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
                 '<div style="font-size:0.68rem;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dark-secondary);margin-bottom:6px;">Manim - Part ' + cNum + '</div>' +
-                '<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
-                '<div style="font-size:0.84rem;color:var(--text-main);">' + focusHtml + '</div>' +
+                headHtml +
                 '</div>' +
                 '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
                 '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-bottom:10px;">' + statusLine + '</div>' +
-                '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+                '<label for="lf-manim-directive" style="display:block;font-size:0.78rem;font-weight:700;color:var(--text-main);margin-bottom:6px;">Design instruction for this clip&#39;s Manim</label>' +
+                '<textarea id="lf-manim-directive" rows="2" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;font-size:0.84rem;" placeholder="Instruction for this clip&#39;s Manim — e.g. make this an anchor, or use the thermal-time equation">' + escapeHtml(directiveVal) + '</textarea>' +
+                (outcomeHtml ? '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-top:6px;">' + outcomeHtml + '</div>' : '') +
+                '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
                 '<button type="button" onclick="designArtifacts(' + "'clip'" + ')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
-                '<button type="button" onclick="compositeRetrigger(' + "'manim'" + ')" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Manim-only</button>' +
                 '</div></div></div>';
         }
 
+
         async function switchClipToManim() {
             const cNum = normClipNum(lfActiveClipNum);
+            const dirBox = document.getElementById('lf-manim-directive');
+            const dirVal = dirBox ? dirBox.value.trim() : '';
+            const switchBody = { ep: beatsEpisode(), clip_num: cNum };
+            if (dirVal) switchBody.directive = dirVal;
             try {
                 showToast(`🔄 Switching Part ${cNum} to Manim...`);
                 const res = await fetch('/api/beats/manim_retrigger', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ep: beatsEpisode(), clip_num: cNum })
+                    body: JSON.stringify(switchBody)
                 });
                 const data = await res.json();
                 if (!res.ok || data.success === false) throw new Error(data.error || 'Manim generation failed');
@@ -573,42 +548,6 @@ a { color: var(--accent-indigo); }
 
             const metaEl = document.getElementById('lf-active-chapter-meta');
             const isMosaicCh = chInfo?.visual_source === 'mosaic';
-            const hasMosaic = Boolean(chInfo?.has_mosaic);
-            const hasBeats = Boolean(chInfo?.has_beats);
-            const btnEMos = document.getElementById('btn-engine-mosaic');
-            const btnEMan = document.getElementById('btn-engine-manim');
-            const engHint = document.getElementById('lf-engine-hint');
-            if (btnEMos) {
-                btnEMos.disabled = !hasMosaic;
-                btnEMos.style.background = isMosaicCh ? 'var(--accent-indigo)' : 'transparent';
-                btnEMos.style.color = isMosaicCh ? '#ffffff' : 'var(--text-dark-secondary)';
-                btnEMos.style.opacity = hasMosaic ? '1' : '0.4';
-                btnEMos.style.cursor = hasMosaic ? 'pointer' : 'not-allowed';
-                btnEMos.title = hasMosaic ? 'Use Mosaic in longform' : 'No Mosaic render yet — render it in Cutroom';
-            }
-            if (btnEMan) {
-                btnEMan.disabled = !hasBeats;
-                btnEMan.style.background = !isMosaicCh ? 'var(--primary)' : 'transparent';
-                btnEMan.style.color = !isMosaicCh ? '#ffffff' : 'var(--text-dark-secondary)';
-                btnEMan.style.opacity = hasBeats ? '1' : '0.4';
-                btnEMan.style.cursor = hasBeats ? 'pointer' : 'not-allowed';
-                btnEMan.title = hasBeats ? 'Use Manim in longform' : 'No Manim yet — switch this clip to Manim first';
-            }
-            if (engHint) {
-                if (!hasBeats && hasMosaic) {
-                    engHint.style.display = 'inline';
-                    engHint.innerText = 'No Manim yet — switch this clip to Manim first';
-                } else if (!hasMosaic && hasBeats) {
-                    engHint.style.display = 'inline';
-                    engHint.innerText = 'No Mosaic render yet — render it in Cutroom';
-                } else if (!hasMosaic && !hasBeats) {
-                    engHint.style.display = 'inline';
-                    engHint.innerText = 'No Mosaic or Manim render yet';
-                } else {
-                    engHint.style.display = 'none';
-                    engHint.innerText = '';
-                }
-            }
             if (metaEl && chInfo) {
                 const badge = isMosaicCh ? '<span style="background:var(--accent-indigo);color:#fff;font-size:0.64rem;padding:2px 7px;border-radius:4px;margin-left:8px;font-weight:800;letter-spacing:0.5px;">🎞 MOSAIC MASTER</span>' : '';
                 metaEl.innerHTML = `Part ${cNum}: ${escapeHtml(chInfo.title)} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})${badge}`;
@@ -621,30 +560,6 @@ a { color: var(--accent-indigo); }
                 console.error("Failed loading clip panel:", err);
             }
         }
-
-
-
-        async function setClipEngine(vs) {
-            const cNum = normClipNum(lfActiveClipNum);
-            const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
-            if (vs === 'manim' && !chInfo?.has_beats) return;
-            if (vs === 'mosaic' && !chInfo?.has_mosaic) return;
-            try {
-                const res = await fetch('/api/beats/set_engine', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ep: beatsEpisode(), clip_num: cNum, visual_source: vs })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) throw new Error(data.error || 'Switch failed');
-                lfChapterLRU.delete(cNum);
-                await initLongformBeatStudio();
-                showToast(`✅ Part ${cNum} engine set to ${vs}`);
-            } catch (e) {
-                showToast('❌ Engine switch failed: ' + e.message);
-            }
-        }
-
 
 
 
@@ -662,8 +577,6 @@ a { color: var(--accent-indigo); }
                 const videoEl = document.getElementById('lf-studio-video-player');
                 if (chSpan && videoEl && !videoEl.paused && currentTime >= chSpan.end - 0.05) {
                     videoEl.pause();
-                    const replayBtn = document.getElementById('lf-span-replay-btn');
-                    if (replayBtn) replayBtn.style.display = 'inline-block';
                 }
             } else if (lfPlaybackMode === 'master') {
                 const activeCh = lfTimelineIndex.chapters.find(c => currentTime >= c.start && currentTime < c.end);
@@ -713,6 +626,11 @@ a { color: var(--accent-indigo); }
             if (cleanId !== '249') { showToast('Design artifacts serves episode 249 only.'); return; }
             const body = { ep: cleanId };
             if (scope === 'clip') body.clip_num = normClipNum(lfActiveClipNum);
+            if (scope === 'clip') {
+                const dirBox = document.getElementById('lf-manim-directive');
+                const dirVal = dirBox ? dirBox.value.trim() : '';
+                if (dirVal) body.directive = dirVal;
+            }
             const what = (scope === 'clip') ? `Part ${body.clip_num}` : 'all 21 clips of ep 249';
             if (!confirm(`Design the Manim artifact for ${what}? One deliberate start, background queue.`)) return;
             try {

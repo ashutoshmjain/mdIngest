@@ -173,7 +173,8 @@ def _h2_run_design_group(group_id):
                 {"ep": grp["ep"], "clip_num": job["clip"],
                  "force_regen": True,
                  "transcript": _h2_clip_transcript(_pc) or "",
-                 "title": str(_pc.get("title") or "")}).encode("utf-8")
+                 "title": str(_pc.get("title") or ""),
+                 "directive": str(job.get("directive") or "")}).encode("utf-8")
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic"
                 f"?id=episode_{grp['ep']}&num={job['clip']}",
@@ -244,6 +245,87 @@ def _h2_design_stale_report(grp):
     except Exception:
         pass
     return out
+
+
+def _h2_patch_clip_249(clip_num):
+    """Manual-trigger H2 segment re-stitch for one ep-249 clip.
+
+    Rebuilds ONLY that clip composite segment (fresh Manim
+    infographic + Mosaic run + strip + karaoke, per the H2
+    assembler) and splices it into the 249 master behind a
+    duration gate. No auto-assemble: runs only on the manual
+    Patch trigger. Returns (ok, message_or_error). Missing
+    inputs are a reported refusal, never a substitution.
+    """
+    try:
+        n = int(clip_num)
+    except (TypeError, ValueError):
+        return False, "bad clip_num"
+    try:
+        import spec_h2_composite_assembler as _h2a
+        plan = json.loads((DDMA_DIR / "projects" / "episode_249" / "plan.json").read_text(encoding="utf-8"))
+        clips = plan if isinstance(plan, list) else plan.get("clips", [])
+        t_clip = next((c for c in clips if str(c.get("num")) == str(n)), None)
+        if t_clip is None:
+            return False, "clip " + str(n) + " not in episode_249 plan (refused, never substituted)"
+        chrome = DDMA_DIR / "assets" / "chrome_249.png"
+        strip = DDMA_DIR / "assets" / "strip_249.mp4"
+        if not chrome.exists() or not strip.exists():
+            return False, "249 frame assets missing (refused, never substituted)"
+        art = DDMA_DIR / "clips" / ("249-" + str(n) + "-infographic.mp4")
+        if not art.exists() or art.stat().st_size <= 0:
+            return False, "clip " + str(n) + " has no Manim infographic yet (design it first; refused, never substituted)"
+        rid = t_clip.get("mosaic_run_id")
+        inputs = _h2a.resolve_segment_inputs("249", n, rid, str(art), str(DD_HUB_ROOT), str(chrome), str(strip))
+        dur = _h2a.clip_composite_duration(t_clip, "249", str(DD_HUB_ROOT))
+        words = [(float(w.get("start", 0)), float(w.get("end", 0)), str(w.get("word", ""))) for w in (t_clip.get("_caption_words") or [])]
+        if not words:
+            return False, "clip " + str(n) + " has no caption words (refused, never a silent fallback)"
+        work = DDMA_DIR / "scratch" / "249-patch"
+        work.mkdir(parents=True, exist_ok=True)
+        _h2a.write_caption_ass(str(work), n, words, dur)
+        seg = work / ("seg_" + str(n) + ".mp4")
+        cmd = _h2a.build_segment_cmd("249", n, inputs, dur, str(seg), str(work / ("vf_" + str(n) + ".txt")))
+        r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(work))
+        if r.returncode != 0 or not seg.exists():
+            return False, "segment render failed: " + (r.stderr or r.stdout)[-500:]
+        master = _h2_composite_master("249")
+        if master is None or not master.exists():
+            return False, "249 master missing (refused)"
+        m_dur = _h2_probe_duration(master)
+        t0 = 0.0
+        for c in clips:
+            if int(c.get("num")) < n:
+                t0 += _h2a.clip_composite_duration(c, "249", str(DD_HUB_ROOT))
+        seg_dur = _h2_probe_duration(seg) or dur
+        t1 = t0 + seg_dur
+        parts = []
+        if t0 > 0.05:
+            head = work / ("head_" + str(n) + ".mp4")
+            rh = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(master), "-t", ("%.3f" % t0), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", str(head)], capture_output=True, text=True)
+            if rh.returncode != 0:
+                return False, "head cut failed"
+            parts.append(str(head))
+        parts.append(str(seg))
+        if m_dur is not None and t1 < m_dur - 0.05:
+            tail = work / ("tail_" + str(n) + ".mp4")
+            rt = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", ("%.3f" % t1), "-i", str(master), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", str(tail)], capture_output=True, text=True)
+            if rt.returncode != 0:
+                return False, "tail cut failed"
+            parts.append(str(tail))
+        lst = work / ("splice_" + str(n) + ".txt")
+        _h2a.write_concat_list(parts, str(lst))
+        new_master = work / "249-longform-master-new.mp4"
+        rc = subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(new_master)], capture_output=True, text=True, cwd=str(work))
+        if rc.returncode != 0:
+            return False, "concat failed: " + (rc.stderr or rc.stdout)[-500:]
+        new_dur = _h2_probe_duration(new_master)
+        if new_dur is None or m_dur is None or abs(new_dur - m_dur) > 0.10:
+            return False, "duration gate failed (master %.3f, rebuilt %.3f; refused)" % (m_dur or -1, new_dur or -1)
+        new_master.replace(master)
+        return True, "Part " + str(n) + " patched into ep 249 master."
+    except Exception as e:
+        return False, "patch failed: " + str(e)[:300]
 def rewrite_beat_urls(ch_data):
     """Point per-beat preview URLs at this server (engine emits cockpit paths)."""
     try:
@@ -589,9 +671,20 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             group_id = params.get("group", [""])[0]
             with H2_DESIGN_LOCK:
                 grp = H2_DESIGN_GROUPS.get(group_id)
+                def _job_snap(j):
+                    out = {k: j[k] for k in ("clip", "status", "error")
+                           if k in j}
+                    out["directive"] = str(j.get("directive") or "")
+                    try:
+                        _det = j.get("detail") or {}
+                        _des = _det.get("design") or {}
+                        out["directive_report"] = str(
+                            _des.get("directive_report") or "")
+                    except Exception:
+                        out["directive_report"] = ""
+                    return out
                 snap = ({"ep": grp["ep"], "finished": grp["finished"],
-                         "jobs": [{k: j[k] for k in ("clip", "status", "error")
-                                   if k in j} for j in grp["jobs"]]}
+                         "jobs": [_job_snap(j) for j in grp["jobs"]]}
                         if grp else None)
             if not snap:
                 self.send_json({"success": False,
@@ -703,6 +796,13 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             except ValueError:
                 self.send_json({"success": False, "error": "bad clip_num"}, status=400)
                 return
+            if str(ep) == "249":
+                _ok, _msg = _h2_patch_clip_249(clip_num)
+                if _ok:
+                    self.send_json({"success": True, "message": _msg})
+                else:
+                    self.send_json({"success": False, "error": _msg}, status=500)
+                return
             try:
                 cmd = [sys.executable, "render_longform_parallel.py", "--patch", str(clip_num)]
                 res = subprocess.run(cmd, cwd=str(DDMA_DIR), capture_output=True,
@@ -788,7 +888,8 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                     _rc = {}
                 _re_body = {"force_regen": True,
                               "transcript": _h2_clip_transcript(_rc) or "",
-                              "title": str(_rc.get("title") or "")}
+                              "title": str(_rc.get("title") or ""),
+                              "directive": str(data.get("directive") or "")}
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
                 data=json.dumps(_re_body).encode("utf-8"),
@@ -833,6 +934,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": "bad clip_num"},
                                status=400)
                 return
+            _clip_directive = (str(data.get("directive") or "") if (only is not None and str(only) != "") else "")
             if not targets:
                 self.send_json({"success": False,
                                 "error": "no such clip in plan"}, status=404)
@@ -849,7 +951,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                              for w in (c.get("_caption_words") or [])]
                     jobs.append({"clip": c.get("num"), "status": "queued",
                                  "transcript_chars": len(_h2_clip_transcript(c)),
-                                 "body_words": words, "shape": desc["shape"]})
+                                 "body_words": words, "shape": desc["shape"], "directive": _clip_directive})
                 H2_DESIGN_GROUPS[group_id] = {"ep": ep, "finished": False,
                                               "jobs": jobs}
             threading.Thread(target=_h2_run_design_group,
