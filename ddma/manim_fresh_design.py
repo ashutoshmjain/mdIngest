@@ -568,12 +568,81 @@ def _lit(s):
     return json.dumps(str(s or ""), ensure_ascii=False)
 
 
-def _chrome_bottom(title):
-    return (f'    bottom = Text({_lit(title.upper()[:40])}, font="DejaVu Sans", '
-            f'font_size=22, color="#FFFFFF").move_to([0, -2.95, 0])\n'
-            f'    foot = Line([-3.4, -3.35, 0], [3.4, -3.35, 0], '
-            f'color="#FFFFFF", stroke_width=2, stroke_opacity=0.35)\n'
-            f'    self.add(bottom, foot)\n')
+FOCUS_MAX_CHARS = 36
+SUB_ROW_FONT_SIZE = 14
+
+
+def _format_focus(text, limit=FOCUS_MAX_CHARS):
+    """Uppercase footer focus label, numeric section prefix stripped,
+    truncated at a word boundary (with ellipsis) so the sub-row never
+    collides. The single-line budget (~36 caps at sub-row size) was
+    measured from rendered frames; longer section names cannot fit."""
+    t = re.sub(r'^\d+\.\s*', '', str(text or '')).strip().upper()
+    if len(t) <= limit:
+        return t
+    cut = t[:limit]
+    if ' ' in cut:
+        cut = cut.rsplit(' ', 1)[0]
+    return cut + "\u2026"
+
+
+def _stage_focus(stage):
+    """Clip-level focus for the footer sub-row, derived from the stage
+    visual. The render driver overrides this per clip via the transient
+    in-memory ``_render_focus`` hint (storyboard files are never edited);
+    title-kind stages carry no focus of their own, so without the hint
+    they render a blank below-left."""
+    hint = (stage or {}).get("_render_focus")
+    if hint is not None:
+        return _format_focus(hint)
+    visual = (stage or {}).get("visual") or {}
+    vtype = str(visual.get("type") or (stage or {}).get("kind")
+                or "").lower()
+    if vtype == "formula":
+        return _format_focus(visual.get("section") or "")
+    if vtype == "anchor":
+        return _format_focus(visual.get("label") or "")
+    if vtype == "diagram":
+        return _format_focus(visual.get("diagram") or "")
+    return ""
+
+
+def _chrome_bottom(title, focus_left="", ep=None):
+    """Two-row footer: clip title above the divider line; below the line
+    the design focus (left) and ``deepDive podcast`` credit (right).
+
+    The untouched render engine's base scene draws its own duplicate
+    rule + sub-row at y ~-3.35/-3.6; this module may not touch the
+    engine file, so the chrome first paints a black cover strip over
+    that region, then draws the single canonical footer on top.
+    """
+    right = ("deepDive podcast \u00b7 Ep " + str(ep) if ep
+             else "deepDive podcast")
+    parts = [
+        f'    _cover = Rectangle(width=8.0, height=0.8, '
+        f'fill_color="#000000", fill_opacity=1, '
+        f'stroke_width=0).move_to([0, -3.66, 0])\n',
+        f'    bottom = Text({_lit(title.upper()[:40])}, font="DejaVu Sans", '
+        f'font_size=22, color="#FFFFFF").move_to([0, -2.70, 0])\n',
+        f'    foot = Line([-3.4, -3.45, 0], [3.4, -3.45, 0], '
+        f'color="#FFFFFF", stroke_width=2, stroke_opacity=0.35)\n',
+    ]
+    adds = ['_cover', 'bottom', 'foot']
+    if focus_left:
+        parts.append(
+            f'    _focus_l = Text({_lit(focus_left)}, font="DejaVu Sans", '
+            f'font_size={SUB_ROW_FONT_SIZE}, color="#FFFFFF")\n'
+            f'    _focus_l.move_to('
+            f'[-3.4 + _focus_l.width / 2, -3.72, 0])\n')
+        adds.append('_focus_l')
+    parts.append(
+        f'    _focus_r = Text({_lit(right)}, font="DejaVu Sans", '
+        f'font_size={SUB_ROW_FONT_SIZE}, color="#FFFFFF")\n'
+        f'    _focus_r.move_to('
+        f'[3.4 - _focus_r.width / 2, -3.72, 0])\n')
+    adds.append('_focus_r')
+    parts.append(f'    self.add({", ".join(adds)})\n')
+    return "".join(parts)
 
 
 def _timings(duration):
@@ -595,8 +664,15 @@ def _render_stage_body(stage, cls_name, duration):
     title = str(stage.get("title") or "DEEP DIVE")
     visual = stage.get("visual") or {}
     t_enter, t_build, t_hold = _timings(duration)
+    focus = _stage_focus(stage)
+    ep = (stage or {}).get("_render_ep")
+    # Above-line chrome title is the clip's PLAN title (transient
+    # in-memory ``_render_title`` hint from the render driver; the
+    # design label stays below-left as the focus). Falls back to the
+    # stage title when no hint is present.
+    chrome_title = str((stage or {}).get("_render_title") or title)
     head = (f"class {cls_name}(Scene):\n    def construct(self):\n"
-            + _chrome_bottom(title))
+            + _chrome_bottom(chrome_title, focus_left=focus, ep=ep))
     if kind == "formula":
         full = str(visual.get("full") or title)
         toks = full.split()
@@ -605,7 +681,7 @@ def _render_stage_body(stage, cls_name, duration):
         shown = _wrap_lines(" ".join(toks[:cut]))
         return (head +
                 f'    eq = Text({_lit(shown)}, font="DejaVu Sans", '
-                f'font_size=30, color="#FFFFFF")\n'
+                f'font_size=20, color="#FFFFFF")\n'
                 f'    eq.scale_to_fit_width(6.4).move_to([0, 0.5, 0])\n'
                 f'    self.play(FadeIn(eq), run_time={t_enter})\n'
                 f'    self.play(eq.animate.shift(UP * 0.25).scale(1.02), '
@@ -663,11 +739,11 @@ def _render_stage_body(stage, cls_name, duration):
         hook_txt = _wrap_lines(visual.get("hook") or "", 44)
         return (head +
                 f'    lab = Text({_lit(label)}, font="DejaVu Sans", '
-                f'weight=BOLD, font_size=44, color="#FFFFFF").move_to([0, 0.9, 0])\n'
+                f'weight=BOLD, font_size=34, color="#FFFFFF").move_to([0, 0.9, 0])\n'
                 f'    arr = Arrow([0, 0.25, 0], [0, -0.55, 0], '
                 f'color="#FFFFFF", stroke_width=6)\n'
                 f'    hook = Text({_lit(hook_txt)}, font="DejaVu Sans", '
-                f'font_size=24, color="#FFFFFF").move_to([0, -1.5, 0])\n'
+                f'font_size=14, color="#FFFFFF").move_to([0, -1.5, 0])\n'
                 f'    hook.scale_to_fit_width(6.2)\n'
                 f'    self.play(FadeIn(lab), run_time={t_enter})\n'
                 f'    self.play(GrowArrow(arr), FadeIn(hook), '
@@ -677,7 +753,7 @@ def _render_stage_body(stage, cls_name, duration):
     big = _wrap_lines(title.upper(), 20)
     return (head +
             f'    big = Text({_lit(big)}, font="DejaVu Sans", weight=BOLD, '
-            f'font_size=52, color="#FFFFFF").move_to([0, 0.5, 0])\n'
+            f'font_size=42, color="#FFFFFF").move_to([0, 0.5, 0])\n'
             f'    big.scale_to_fit_width(6.4)\n'
             f'    self.play(FadeIn(big), run_time={t_enter})\n'
             f'    self.play(big.animate.shift(UP * 0.2), run_time={t_build})\n'

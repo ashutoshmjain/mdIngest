@@ -285,7 +285,7 @@ def _h2_patch_clip_249(clip_num):
         work.mkdir(parents=True, exist_ok=True)
         _h2a.write_caption_ass(str(work), n, words, dur)
         seg = work / ("seg_" + str(n) + ".mp4")
-        cmd = _h2a.build_segment_cmd("249", n, inputs, dur, str(seg), str(work / ("vf_" + str(n) + ".txt")))
+        cmd = _h2a.build_segment_cmd("249", n, inputs, dur, str(seg), str(work / ("vf_" + str(n) + ".txt")), total_clips=len(clips))
         r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(work))
         if r.returncode != 0 or not seg.exists():
             return False, "segment render failed: " + (r.stderr or r.stdout)[-500:]
@@ -426,6 +426,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
                 self.send_header("Content-Length", str(length))
                 self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 with open(file_path, "rb") as f:
                     f.seek(start)
@@ -435,6 +436,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Content-Type", mime_type)
                 self.send_header("Content-Length", str(file_size))
                 self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Cache-Control", "no-cache")
                 self.end_headers()
                 with open(file_path, "rb") as f:
                     while True:
@@ -586,8 +588,23 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, status=500)
                 return
+            # Patch-gate inputs (read-only file times for the stored-state
+            # gate: designed-but-unpatched <=> artifact newer than master).
+            art_mtime = None
+            master_mtime = None
+            try:
+                _art = (DDMA_DIR / "clips" / f"{ep}-{clip_num}-infographic.mp4")
+                if _art.exists():
+                    art_mtime = _art.stat().st_mtime
+                _master = _h2_composite_master(ep)
+                if _master is not None and _master.exists():
+                    master_mtime = _master.stat().st_mtime
+            except Exception:
+                pass
             self.send_json({"success": True, "ep": ep, "clip_num": clip_num,
-                            "storyboard": storyboard})
+                            "storyboard": storyboard,
+                            "manim_artifact_mtime": art_mtime,
+                            "master_mtime": master_mtime})
             return
 
         if path == "/api/beats/beat_video":

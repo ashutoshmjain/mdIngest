@@ -107,8 +107,9 @@ def composite_frame_spec():
         "middle_band": {"left": f"Manim {PANEL_SIZE}x{PANEL_SIZE}",
                         "right": f"Mosaic {PANEL_SIZE}x{PANEL_SIZE}",
                         "origins": {"art": ART_POS, "mosaic": MOS_POS}},
-        "footer": {"style": "Mosaic", "left": "Mosaic",
-                   "right": "deepDive podcast", "rule": "delimiter line above",
+        "footer": {"style": "Mosaic", "left": "Manim",
+                   "center": "Part N of total (per-clip drawtext)",
+                   "right": "Mosaic", "rule": "delimiter line above",
                    "copy": "no invented copy"},
     }
 
@@ -375,13 +376,41 @@ def write_caption_ass(out_dir, clip_num, body_words, duration_s):
 # exactly; this module emits the correct -filter_complex_script form and
 # writes the same vf_{n}.txt sidecar the trial used for inspection.
 # --------------------------------------------------------------------------
-def segment_filter(clip_num):
-    """Exact trial filter graph for clip n (caps_{n}.ass burned in)."""
+CHROME_LABEL_FONTFILE = "C\\:/Windows/Fonts/verdana.ttf"
+CHROME_LABEL_FONTSIZE = 14
+CHROME_LABEL_COLOR = "0x888888"
+# Baseline-matched top for the footer labels (PIL Verdana-14 baseline
+# y=1028, ascent 15 -> top 1013; verified against the chrome rule/labels).
+CHROME_LABEL_Y = 1013
+
+
+def segment_filter(clip_num, total_clips):
+    """Exact trial filter graph for clip n (caps_{n}.ass burned in).
+
+    The chrome image carries the static footer (Manim left, Mosaic
+    right, delimiter rule); the center "Part N of total" is drawn per
+    clip here since it varies. total_clips comes from the episode plan
+    via the caller -- never hardcoded.
+    """
+    total = int(total_clips)
+    if total <= 0:
+        raise ValueError("segment_filter: total_clips must be positive "
+                         "(derived from the episode plan, never hardcoded)")
+    # NOTE (deviation from the spec's `clip_num + 1` line, per V1 + UI):
+    # Beats Studio numbers 249's parts 0-based (P0 -> "Part 0"), so the
+    # footer must read Part {clip_num}, matching the on-screen part name
+    # and V1's literal "Part 1 of 21" for clip 1. (A +1 would print
+    # "Part 2 of 21" on clip 1's segment and fail V1.)
+    center = f"Part {int(clip_num)} of {total}"
     return ("[1:v]setsar=1[art];"
             "[2:v]scale=740:740,setsar=1[mos];"
             "[0:v][3:v]overlay=0:0[base];"
             "[base][art]overlay=220:230[tl];"
             f"[tl][mos]overlay=960:230,subtitles=caps_{clip_num}.ass,"
+            f"drawtext=fontfile='{CHROME_LABEL_FONTFILE}':"
+            f"fontsize={CHROME_LABEL_FONTSIZE}:"
+            f"fontcolor={CHROME_LABEL_COLOR}:"
+            f"text='{center}':x=(w-text_w)/2:y={CHROME_LABEL_Y},"
             "format=yuv420p[v]")
 
 
@@ -416,15 +445,21 @@ def resolve_segment_inputs(ep, clip_num, run_id, manim_artifact_path,
 
 
 def build_segment_cmd(ep, clip_num, inputs, duration_s, out_path,
-                      filter_sidecar_path=None):
+                      filter_sidecar_path=None, total_clips=None):
     """Describe the per-clip ffmpeg build (no execution — manual trigger only).
 
     Writes the vf_{n}.txt sidecar holding the filter graph (trial naming) and
     returns the argv list. Audio: run artifact's, unchanged (-map 2:a?).
+    total_clips is the episode's clip count from the plan (threaded through
+    from the caller, never hardcoded) for the per-clip center footer text.
     """
+    if total_clips is None:
+        raise ValueError("build_segment_cmd: total_clips is required "
+                         "(episode clip count from the plan, never hardcoded)")
     sidecar = (Path(filter_sidecar_path) if filter_sidecar_path
                else Path(out_path).parent / f"vf_{clip_num}.txt")
-    sidecar.write_text(segment_filter(clip_num), encoding="utf-8")
+    sidecar.write_text(segment_filter(clip_num, total_clips),
+                       encoding="utf-8")
     codec, preset, crf = SEGMENT_CODEC
     return ["ffmpeg", "-y",
             "-loop", "1", "-framerate", str(CHROME_FRAMERATE),

@@ -82,13 +82,28 @@ class TestCaptions(unittest.TestCase):
 
 class TestSegmentBuild(unittest.TestCase):
     def test_filter_graph_exact(self):
-        f = H2.segment_filter(0)
+        f = H2.segment_filter(0, 21)
         self.assertIn("[1:v]setsar=1[art]", f)
         self.assertIn("[2:v]scale=740:740,setsar=1[mos]", f)
         self.assertIn("[base][art]overlay=220:230[tl]", f)
-        self.assertIn("[tl][mos]overlay=960:230,subtitles=caps_0.ass,"
-                      "format=yuv420p[v]", f)
+        self.assertIn("subtitles=caps_0.ass", f)
+        self.assertIn("format=yuv420p[v]", f)
         self.assertNotIn("crop", f)
+
+    def test_filter_graph_center_footer_text(self):
+        # Per-clip center footer: "Part N of total" with N = the clip's
+        # on-screen part number (249 parts are 0-based: P1 -> "Part 1").
+        self.assertIn("text='Part 0 of 21'", H2.segment_filter(0, 21))
+        self.assertIn("text='Part 1 of 21'", H2.segment_filter(1, 21))
+        self.assertIn("text='Part 9 of 21'", H2.segment_filter(9, 21))
+        self.assertIn("text='Part 20 of 21'", H2.segment_filter(20, 21))
+        self.assertIn("x=(w-text_w)/2", H2.segment_filter(0, 21))
+        self.assertIn("fontsize=14", H2.segment_filter(0, 21))
+        self.assertIn("fontcolor=0x888888", H2.segment_filter(0, 21))
+        with self.assertRaises(ValueError):
+            H2.segment_filter(0, 0)
+        with self.assertRaises(ValueError):
+            H2.build_segment_cmd("249", 0, {}, 10.0, "o.mp4")
 
     def test_missing_run_id_refuses_substitution(self):
         with self.assertRaises(ValueError):
@@ -159,20 +174,23 @@ class TestEpisode249DurationPin(unittest.TestCase):
         import json
         import beats_server
         hub = beats_server.DD_HUB_ROOT
-        # Clip list: local clone plan first; the code-only mirror clone
-        # has no plan files by design, so fall back to the canonical hub
-        # plan (same 21 clip dicts with mosaic_run_id).
+        # Clip list: the episode plan, NEVER the shared root copy. The
+        # root plan.json is the currently-loaded Cutroom project's working
+        # copy and flips to 250's 14-clip plan whenever the user works on
+        # 250 -- reading it here caused false 14 != 21 failures. The
+        # code-only mirror clone has no plan files by design, so fall back
+        # to the canonical hub plan (same 21 clip dicts with mosaic_run_id).
         clips = None
-        local_plan = DDMA_DIR / "plan.json"
-        if local_plan.exists():
-            clips = json.loads(local_plan.read_text(encoding="utf-8"))
+        local_ep_plan = DDMA_DIR / "projects" / ("episode_" + self.EP) / "plan.json"
+        if local_ep_plan.exists():
+            clips = json.loads(local_ep_plan.read_text(encoding="utf-8"))
         elif hub is not None:
             hub_plan = Path(str(hub)) / "episodes" / self.EP / "plan.json"
             if hub_plan.exists():
                 clips = json.loads(hub_plan.read_text(encoding="utf-8"))
         if clips is None:
             self.skipTest("no clip plan available "
-                          "(local plan.json and hub plan both absent)")
+                          "(local episode plan and hub plan both absent)")
         self.assertEqual(len(clips), 21)
         run_paths = [H2.resolve_clip_run_path(self.EP, c, hub)
                      for c in clips]
