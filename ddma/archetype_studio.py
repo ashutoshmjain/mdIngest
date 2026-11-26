@@ -1234,6 +1234,122 @@ def _has_master_video(clean_ep: str) -> bool:
     return any(os.path.exists(p) for p in cands)
 
 
+# ---------- Spec H2 chapter-list wiring (Beats chapter list reads H2 data) ----------
+# The chapter list (/api/beats/index via get_longform_timeline_index) used to
+# read only the retired beat-file mapping: openable missed H2 artifacts,
+# has_beats read retired beat files, and windows were beat-mapped on a
+# 3254.21-based header. When an episode is H2-covered (every plan clip
+# resolves a run-file-probed composite duration), the list reads H2 data:
+# openable gains H2 terms (composite membership, Manim artifact, hub run
+# file by run ID) on top of the existing terms; has_beats is the H2 Manim
+# artifact only (old beat-file term dropped, no fallback); windows are
+# cursor-based from 0 over run-file durations. Episodes without full H2
+# coverage keep the legacy path untouched. Read-only: never substitutes,
+# never triggers a run, never writes any plan.
+
+def _h2_manim_artifact_exists(clean_ep: str, clip_num: int) -> bool:
+    """H2 Manim artifact existence: {ep}-{clip}-manim.mp4, hub or local."""
+    try:
+        c = int(clip_num)
+    except Exception:
+        return False
+    cands = [os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-manim.mp4")]
+    hub = _resolve_dd_hub_root()
+    if hub:
+        cands.append(os.path.join(hub, "episodes", clean_ep,
+                                  f"{clean_ep}-{c}-manim.mp4"))
+    for p in cands:
+        try:
+            if os.path.exists(p) and os.path.getsize(p) > 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _h2_hub_run_file_exists(clean_ep: str,
+                            plan_clip: Optional[Dict[str, Any]]) -> bool:
+    """Hub run file existence by the plan's mosaic_run_id (hub-first).
+
+    Only the exact run-ID artifact counts — never the compiled clip, never a
+    generically-named body file."""
+    clip = plan_clip or {}
+    run_id = str(clip.get("mosaic_run_id") or "").strip()
+    if not run_id:
+        return False
+    try:
+        c_num = int(clip.get("num"))
+    except Exception:
+        return False
+    cands = []
+    hub = _resolve_dd_hub_root()
+    if hub:
+        try:
+            import spec_h_composite_longform as spec_h
+            cands.append(str(spec_h.canonical_run_artifact_path(
+                hub, clean_ep, c_num, run_id)))
+        except Exception:
+            cands.append(os.path.join(hub, "episodes", clean_ep,
+                                      f"{clean_ep}-{c_num}-mosaic-{run_id}.mp4"))
+    cands.append(os.path.join(SCRIPT_DIR, "clips",
+                              f"{clean_ep}-{c_num}-mosaic-{run_id}.mp4"))
+    for p in cands:
+        try:
+            if os.path.exists(p) and os.path.getsize(p) > 0:
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def _h2_composite_durations(clean_ep: str,
+                           plan_data: List[Dict[str, Any]]) -> Dict[int, float]:
+    """Per-clip H2 composite durations keyed by clip num.
+
+    Returns {} unless EVERY plan clip resolves a run-file-probed duration
+    (all-or-nothing: cursor windows need full coverage). Read-only."""
+    try:
+        import spec_h2_composite_assembler as spec_h2
+    except Exception:
+        return {}
+    try:
+        clips = list(plan_data or [])
+    except Exception:
+        return {}
+    if not clips:
+        return {}
+    hub = _resolve_dd_hub_root()
+    # Cheap gate first: full coverage needs a mosaic_run_id per clip.
+    for _pre in clips:
+        try:
+            _rid = str(_pre.get("mosaic_run_id") or "").strip()
+        except Exception:
+            return {}
+        if not _rid:
+            return {}
+    out: Dict[int, float] = {}
+    for clip in clips:
+        try:
+            c_num = int(clip.get("num"))
+        except Exception:
+            return {}
+        try:
+            dur, src = spec_h2.clip_composite_duration_explained(
+                clip, clean_ep, hub)
+        except Exception:
+            return {}
+        if src != "run-file-probe":
+            return {}
+        try:
+            dur_f = float(dur)
+        except Exception:
+            return {}
+        if dur_f <= 0:
+            return {}
+        out[c_num] = dur_f
+    return out
+
+
 def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optional[float] = None) -> Dict[str, Any]:
     """
     Single source of truth for Longform visual alignment (used by Beat Studio, full render and hot-patch).
@@ -1253,6 +1369,17 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
     mapped_words = _load_mapped_longform_words(clean_ep)
 
     has_master = _has_master_video(clean_ep)
+    # Spec H2 chapter-list wiring: full run-file-probe coverage means the
+    # episode reads H2 data (windows, has_beats); openable gains H2 terms
+    # regardless (additive only, never a substitution, never a run).
+    _h2_plan_nums = []
+    for _h2_c in (plan_data or []):
+        try:
+            _h2_plan_nums.append(int(_h2_c.get("num")))
+        except Exception:
+            pass
+    _h2_durs = _h2_composite_durations(clean_ep, plan_data)
+    h2_covered = bool(_h2_plan_nums) and all(n in _h2_durs for n in _h2_plan_nums)
     chapters: Dict[int, Dict[str, Any]] = {}
     order: List[int] = []
     for idx, clip in enumerate(plan_data):
@@ -1270,17 +1397,21 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
             c_start = map_t(float(clip.get("start", 0.0)))
         chapters[c_num] = {"start": round(c_start, 2), "beats": beats, "title": str(clip.get("title", f"Part {c_num}")).strip()}
         actual_mosaic_body = resolve_mosaic_body(clean_ep, c_num, clip)
-        has_beats = len(beats) > 0
+        legacy_has_beats = len(beats) > 0
         has_rendered_beat = any(b.get("beat", {}).get("mp4_exists") for b in beats)
-        openable = bool(actual_mosaic_body) or _has_clip_media(clean_ep, c_num) or (has_beats and has_rendered_beat) or has_master
+        h2_manim = _h2_manim_artifact_exists(clean_ep, c_num)
+        h2_run = _h2_hub_run_file_exists(clean_ep, clip)
+        openable = (bool(actual_mosaic_body) or _has_clip_media(clean_ep, c_num)
+                    or (legacy_has_beats and has_rendered_beat) or has_master
+                    or (c_num in _h2_durs) or h2_manim or h2_run)
         published = bool(clip.get("published", False))
 
         raw_vs = str(clip.get("visual_source") or "").strip().lower()
         if raw_vs in ("mosaic", "manim"):
             configured_vs = raw_vs
-        elif actual_mosaic_body and not has_beats:
+        elif actual_mosaic_body and not legacy_has_beats:
             configured_vs = "mosaic"
-        elif has_beats and not actual_mosaic_body:
+        elif legacy_has_beats and not actual_mosaic_body:
             configured_vs = "manim"
         else:
             configured_vs = "mosaic"
@@ -1289,7 +1420,7 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         chapters[c_num]["visual_source"] = configured_vs
         chapters[c_num]["mosaic_body"] = mosaic_body
         chapters[c_num]["locked"] = bool(configured_vs == "mosaic" and mosaic_body)
-        chapters[c_num]["has_beats"] = has_beats
+        chapters[c_num]["has_beats"] = (h2_manim if h2_covered else legacy_has_beats)
         chapters[c_num]["has_mosaic"] = bool(actual_mosaic_body)
         chapters[c_num]["openable"] = openable
         chapters[c_num]["published"] = published
@@ -1316,6 +1447,16 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
             if kept:
                 kept[-1]["longform_end"] = ch["end"]
 
+    if h2_covered:
+        # Spec H2: run-file durations, cursor-based from 0 -- never the
+        # beat-mapped windows above, never the 3254.21-based header total.
+        _h2_cursor = 0.0
+        for _h2_n in order:
+            _h2_d = float(_h2_durs[_h2_n])
+            chapters[_h2_n]["start"] = round(_h2_cursor, 2)
+            chapters[_h2_n]["end"] = round(_h2_cursor + _h2_d, 2)
+            _h2_cursor += _h2_d
+        total_duration = round(_h2_cursor, 2)
     value = {"ep_num": clean_ep, "total_duration": total_duration, "order": order, "chapters": chapters}
     _LF_INTERVALS_CACHE["key"] = key
     _LF_INTERVALS_CACHE["value"] = value
@@ -1423,7 +1564,9 @@ def get_longform_timeline_index(ep_num: str = "248") -> Dict[str, Any]:
 
     return {
         "ep_num": clean_ep,
-        "total_duration": round(total_duration, 2),
+        # Spec H2: on H2-covered episodes the mappings total is the composite
+        # cursor total (run-file durations from 0), never the probed master.
+        "total_duration": round(data["total_duration"], 2),
         "total_chapters": len(chapters),
         "total_scenes": total_scenes,
         "welcome_sting": {"start": WELCOME_STING_START, "end": WELCOME_STING_END},
