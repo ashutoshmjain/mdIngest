@@ -72,10 +72,10 @@ a { color: var(--accent-indigo); }
                 <div id="submode-view-longform" style="display: block; width: 100%; max-width: 1520px; margin: 0 auto;">
                     <div id="beats-empty-state" style="display: none; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 48px 24px; text-align: center; color: var(--text-main);">
                         <h2 style="margin: 0 0 8px 0; font-size: 1.15rem;">No clips rendered. Go to Cutroom!</h2>
-                        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 16px 0;">Render at least one clip in Cutroom before engineering beats here.</p>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 16px 0;">Render at least one clip in Cutroom first.</p>
                         <a class="btn-mini" data-cutroom-home data-cutroom-page="curator.html">Go to Cutroom</a>
                     </div>
-                    <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 12px; align-items: start;">
+                    <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start;">
 
                         <!-- LEFT PANE: Clips / Chapters -->
                         <button type="button" id="tab-expand-left" onclick="toggleSidePane('left', false)" title="Expand Clips pane" style="display:none;background:var(--panel-bg);color:var(--text-muted);border:1px solid var(--border-color);border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">▶</button>
@@ -126,19 +126,12 @@ a { color: var(--accent-indigo); }
                                 <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 8px;">
                                     <video id="lf-studio-video-player" style="width: 100%; max-height: 360px; aspect-ratio: 16/9; display: block; background: #000;" controls preload="metadata"></video>
                                     <div id="lf-no-media-hint" style="display:none; padding:24px; text-align:center; color:var(--text-muted); font-size:0.82rem; font-family:var(--font-mono);">No clip render or longform master available for this clip yet.</div>
-                                    <div id="lf-beat-preview-overlay" style="display: none; position: absolute; right: 12px; bottom: 48px; width: 190px; background: #090d16; border: 2px solid var(--primary); border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.75); overflow: hidden; z-index: 15;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; background: var(--primary-hover); color: #fff; font-size: 0.65rem; font-weight: 800; font-family: var(--font-mono);">
-                                            <span id="lf-beat-preview-label">✨ UPDATED BEAT</span>
-                                            <button type="button" onclick="closeLfBeatPreview()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:0.75rem;line-height:1;">✕</button>
-                                        </div>
-                                        <video id="lf-beat-preview-video" style="width: 100%; aspect-ratio: 1/1; display: block; background: #000;" controls loop muted playsinline></video>
-                                    </div>
-                                </div>
+                                                                    </div>
                                 <!-- Chapter Span Strip + Beat Boundary Ticks (Spec C §3.1) -->
                                 <div id="lf-span-strip" style="display:flex; gap:2px; align-items:stretch; height:22px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:2px; overflow:hidden;"></div>
                             </div>
 
-                            <!-- Dynamic Below-Player Surface (Spec C §3.2: Scene Editor if has_beats, else 2 Mosaic actions) -->
+                            <!-- Dynamic Below-Player Surface (Spec C §3.2: clip Manim panel if has_beats, else 2 Mosaic actions) -->
                             <div id="beats-below-player"></div>
                             <div id="h2-design-panel" style="display:none;padding:8px 16px;font-family:var(--font-mono);font-size:0.72rem;background:var(--panel-bg-darker);border-top:1px solid var(--border-color);color:var(--text-main);"></div>
                         </main>
@@ -146,8 +139,8 @@ a { color: var(--accent-indigo); }
                         <template id="tpl-mosaic-only-actions">
                             <div id="beats-mosaic-only-surface" style="padding: 20px; background: var(--bg-color); display: flex; flex-direction: column; gap: 12px;">
                                 <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 16px;">
-                                    <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">🎞️ Mosaic Render Only (No Beats Storyboard Yet)</div>
-                                    <div style="font-size: 0.78rem; color: var(--text-dark-secondary); margin-bottom: 14px;">This clip has a Mosaic render and no Manim beats working set. Choose an action:</div>
+                                    <div style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">🎞️ Mosaic Render Only (No Manim Yet)</div>
+                                    <div style="font-size: 0.78rem; color: var(--text-dark-secondary); margin-bottom: 14px;">This clip has a Mosaic render and no Manim artifact yet. Choose an action:</div>
                                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                         <button type="button" id="btn-mosaic-surface-retrigger" onclick="beatsMosaicRetrigger()" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Mosaic</button>
                                         <button type="button" id="btn-mosaic-surface-switch-manim" onclick="switchClipToManim()" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Switch this clip to Manim</button>
@@ -156,88 +149,8 @@ a { color: var(--accent-indigo); }
                             </div>
                         </template>
 
-                        <template id="tpl-beats-editor">
-                            <div id="beats-editor-surface">
-                                <div style="background: var(--panel-bg-darker); border-top: 1px solid var(--border-color); padding: 10px 16px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                        <span style="font-size: 0.68rem; font-weight: 800; color: var(--accent-indigo); text-transform: uppercase; letter-spacing: 0.5px;">⏱️ Micro-Beats in Active Clip</span>
-                                        <button type="button" onclick="previewIsolatedLfBeat()" style="background: var(--tag-bg); border: 1px solid var(--primary); color: var(--primary-hover); border-radius: 4px; padding: 2px 7px; font-size: 0.65rem; font-weight: 700; cursor: pointer;" title="Preview the isolated 740x740 Manim vector MP4 for this beat">👁️ Preview 740×740 MP4</button>
-                                    </div>
-                                    <div id="lf-beat-pill-strip" style="display: flex; gap: 5px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin;">
-                                        <span style="color: var(--text-muted); font-size: 0.75rem;">Select a clip to inspect beats...</span>
-                                    </div>
-                                </div>
-                                <div style="padding: 16px 20px; background: var(--bg-color); display: flex; flex-direction: column; gap: 14px;">
-                                    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                                <span id="lf-beat-badge" style="background: var(--accent-indigo); color: #fff; font-weight: 800; font-size: 0.72rem; padding: 3px 9px; border-radius: 5px; font-family: var(--font-mono);">PART 1 • BEAT 1/1</span>
-                                                <span id="lf-beat-split-badge" style="display:none; background:var(--accent-amber-dark); color:#fef3c7; font-weight:800; font-size:0.68rem; padding:2px 8px; border-radius:5px; font-family:var(--font-mono);">sentence split</span>
-                                                <span id="lf-beat-classname" style="font-family: var(--font-mono); font-weight: 800; font-size: 0.85rem; color: var(--text-main);">Scene01_01</span>
-                                                <span style="color: var(--text-muted);">•</span>
-                                                <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-dark-secondary);">Visual Geometry:</span>
-                                                <span id="lf-beat-visual-summary" style="font-size: 0.78rem; color: var(--accent-indigo-hover); font-weight: 700; background: var(--tag-bg); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border-color-hover);">Bespoke monochrome vector animation</span>
-                                            </div>
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <span id="lf-beat-pyfile-badge" style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-indigo-hover); background: var(--tag-bg); padding: 2px 8px; border-radius: 4px; font-weight: 700;">archetypes/clip_01_gemini_scenes.py</span>
-                                                <span id="lf-beat-time-range" style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); font-weight: 700;">0.0s – 7.5s</span>
-                                            </div>
-                                        </div>
-                                        <div style="font-size: 0.68rem; font-weight: 800; color: var(--text-dark-secondary); text-transform: uppercase; margin-bottom: 4px;">
-                                            🗣️ Spoken Dialogue in This Beat (Synchronized with Burned-In Captions):
-                                        </div>
-                                        <div id="lf-beat-spoken-text" style="font-size: 0.86rem; color: var(--text-main); background: var(--bg-color); padding: 9px 12px; border-radius: 6px; border-left: 3px solid var(--accent-indigo); font-style: italic; line-height: 1.45;">
-                                            "Select a beat to inspect dialogue."
-                                        </div>
-                                    </div>
-                                    <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                                            <label for="lf-beat-directive-input" style="font-size: 0.78rem; font-weight: 800; color: var(--primary-hover); display: flex; align-items: center; gap: 6px;">
-                                                <span>✍️ Producer Feedback / Request Archetype Change:</span>
-                                            </label>
-                                            <span id="lf-beat-compile-status" style="font-family: var(--font-mono); font-size: 0.74rem; font-weight: 700; color: var(--accent);"></span>
-                                        </div>
-                                        <textarea id="lf-beat-directive-input" rows="2" placeholder="Describe what you want changed in this beat's animation..." style="width: 100%; box-sizing: border-box; border: 1px solid var(--border-color-hover); border-radius: 6px; padding: 9px 11px; font-size: 0.84rem; font-family: inherit; resize: vertical; background: var(--bg-color); color: var(--text-main); margin-bottom: 10px;"></textarea>
-                                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                            <button type="button" id="lf-btn-toggle-code" onclick="toggleLfCodeEditor()" style="background: var(--tag-bg); border: 1px solid var(--border-color-hover); color: var(--text-dark-secondary); border-radius: 6px; padding: 7px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;">
-                                                💻 Show / Edit Manim Python Code
-                                            </button>
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <button type="button" id="lf-btn-save-personal" onclick="saveCurrentBeatToPersonal()" style="background: var(--accent); border: none; color: #fff; border-radius: 6px; padding: 8px 12px; font-size: 0.78rem; font-weight: 800; cursor: pointer;">
-                                                    ⭐ Save to Personal Beats
-                                                </button>
-                                                <button type="button" id="lf-btn-regen-beat" onclick="regenerateLfBeatWithAI(false)" style="background: linear-gradient(135deg, var(--primary), var(--accent-indigo)); border: none; color: #fff; border-radius: 6px; padding: 8px 16px; font-size: 0.8rem; font-weight: 800; cursor: pointer; box-shadow: 0 2px 6px rgba(124, 58, 237, 0.3);">
-                                                    ✨ Regenerate This Beat with AI &amp; Recompile (~3s)
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div id="lf-code-editor-drawer" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-color-hover);">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                                <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-dark-secondary); font-family: var(--font-mono);">🐍 Direct Manim Scene Class Definition (740×740 Square Vector Canvas):</span>
-                                                <button type="button" onclick="regenerateLfBeatWithAI(true)" style="background: var(--accent-indigo); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 0.74rem; font-weight: 800; cursor: pointer;">
-                                                    💾 Save Custom Code &amp; Recompile Beat (~3s)
-                                                </button>
-                                            </div>
-                                            <textarea id="lf-beat-code-textarea" rows="12" spellcheck="false" style="width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 0.76rem; line-height: 1.45; background: var(--panel-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; resize: vertical;"></textarea>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
+                        
 
-                        <!-- RIGHT PANE: Personal Beats Selection -->
-                        <aside id="beats-right-pane" style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; gap: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 4px;">
-                                <button type="button" id="btn-collapse-right" onclick="toggleSidePane('right', true)" title="Collapse Personal Beats pane" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:0.72rem;padding:2px 4px;">▶</button>
-                                <span style="font-size: 0.72rem; font-weight: 800; color: var(--text-main); text-transform: uppercase; letter-spacing: 0.5px;">⭐ Personal Beats</span>
-                                <span id="pb-count-badge" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--accent);">0</span>
-                            </div>
-                            <input id="pb-search-input" type="search" placeholder="Filter by title or tag..." oninput="loadPersonalBeats()" style="background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 8px; font-size: 0.74rem; font-family: var(--font-mono);">
-                            <div id="pb-list" style="display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1;">
-                                <span style="color: var(--text-muted); font-size: 0.74rem;">No personal beats saved yet.</span>
-                            </div>
-                        </aside>
-                        <button type="button" id="tab-expand-right" onclick="toggleSidePane('right', false)" title="Expand Personal Beats pane" style="display:none;background:var(--panel-bg);color:var(--text-muted);border:1px solid var(--border-color);border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">◀</button>
                     </div>
                 </div>
 <script>
@@ -254,29 +167,23 @@ a { color: var(--accent-indigo); }
             const n = (typeof v === 'number') ? v : parseInt(v, 10);
             return (typeof n === 'number' && !Number.isNaN(n)) ? n : 1;
         }
-        let lfActiveBeatIdx = 0;
         let lfLoadingChapter = false;
         let lfVideoListenerBound = false;
         let lfPlaybackMode = 'clip';
         let lfPendingSeek = null;
-        let lfPaneState = { left: false, right: false };
+        let lfPaneState = { left: false };
 
         function toggleSidePane(side, collapse) {
             lfPaneState[side] = Boolean(collapse);
             const grid = document.getElementById('beats-workspace-grid');
             const leftPane = document.getElementById('beats-left-pane');
-            const rightPane = document.getElementById('beats-right-pane');
             const tabL = document.getElementById('tab-expand-left');
-            const tabR = document.getElementById('tab-expand-right');
             if (leftPane) leftPane.style.display = lfPaneState.left ? 'none' : 'flex';
             if (tabL) tabL.style.display = lfPaneState.left ? 'flex' : 'none';
-            if (rightPane) rightPane.style.display = lfPaneState.right ? 'none' : 'flex';
-            if (tabR) tabR.style.display = lfPaneState.right ? 'flex' : 'none';
             if (grid) {
                 const lCol = lfPaneState.left ? '18px' : '260px';
-                const rCol = lfPaneState.right ? '18px' : '300px';
-                grid.style.gap = (lfPaneState.left && lfPaneState.right) ? '4px' : '12px';
-                grid.style.gridTemplateColumns = `${lCol} minmax(0, 1fr) ${rCol}`;
+                grid.style.gap = lfPaneState.left ? '4px' : '12px';
+                grid.style.gridTemplateColumns = `${lCol} minmax(0, 1fr)`;
             }
         }
 
@@ -386,7 +293,7 @@ a { color: var(--accent-indigo); }
                 if (lfPlaybackMode === 'clip' && isActive && activeChData && Array.isArray(activeChData.beats) && activeChData.beats.length > 0) {
                     ticksHtml = activeChData.beats.map(b => {
                         const pct = Math.max(0, Math.min(99, ((b.longform_start - ch.start) / spanDur) * 100));
-                        return `<span class="lf-beat-tick" style="position:absolute;left:${pct.toFixed(1)}%;top:0;bottom:0;width:2px;background:var(--accent-amber);pointer-events:none;" title="Beat #${b.index}"></span>`;
+                        return `<span class="lf-span-tick" style="position:absolute;left:${pct.toFixed(1)}%;top:0;bottom:0;width:2px;background:var(--accent-amber);pointer-events:none;" title="Span tick #${b.index}"></span>`;
                     }).join('');
                 }
                 return `<div class="lf-span-seg${shaded ? ' is-shaded' : ''}" data-clip-num="${ch.clip_num}" onclick="onSpanStripClick(${ch.clip_num}, ${ch.start})" style="position:relative;flex:1;min-width:0;background:${bg};opacity:${op};border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-family:var(--font-mono);color:var(--text-main);overflow:hidden;" title="Part ${ch.clip_num}: ${escapeHtml(ch.title)} (${formatDuration(ch.start)}–${formatDuration(ch.end)})">
@@ -434,9 +341,9 @@ a { color: var(--accent-indigo); }
             if (gridEl) gridEl.style.display = 'none';
             if (emptyEl) {
                 const h2 = emptyEl.querySelector('h2');
-                if (h2) h2.textContent = `Episode ${epId} has no Beats data yet.`;
+                if (h2) h2.textContent = `Episode ${epId} has no clip data yet.`;
                 const p = emptyEl.querySelector('p');
-                if (p) p.textContent = reason || 'Render at least one clip in Cutroom before engineering beats here.';
+                if (p) p.textContent = reason || 'Render at least one clip in Cutroom first.';
                 emptyEl.style.display = 'block';
             }
         }
@@ -462,7 +369,6 @@ a { color: var(--accent-indigo); }
                 const openables = nextIndex.chapters.filter(c => c.openable);
                 if (openables.length === 0) {
                     showBeatsEmptyState(cleanId);
-                    loadPersonalBeats();
                     return;
                 }
 
@@ -504,7 +410,6 @@ a { color: var(--accent-indigo); }
                 await loadCompositeTimeline();
                 await selectLfChapter(targetCh.clip_num, false);
                 if (mySeq !== _beatsSwitchSeq) return;
-                loadPersonalBeats();
             } catch (err) {
                 console.error("Failed to initialize Longform Beat Studio:", err);
                 if (mySeq === _beatsSwitchSeq) {
@@ -561,13 +466,70 @@ a { color: var(--accent-indigo); }
             }).join('');
         }
 
-        function renderBelowPlayerSurface(chData) {
+
+        async function renderClipSurface(cNum, chInfo, seekVideo = false) {
             const container = document.getElementById('beats-below-player');
             if (!container) return;
-            const hasBeats = Boolean(chData && (chData.has_beats || (chData.beats && chData.beats.length > 0)));
-            const tpl = document.getElementById(hasBeats ? 'tpl-beats-editor' : 'tpl-mosaic-only-actions');
-            container.innerHTML = '';
-            if (tpl) container.appendChild(tpl.content.cloneNode(true));
+            if (chInfo && chInfo.has_beats) {
+                await renderClipManimPanel(cNum, chInfo);
+            } else {
+                const tpl = document.getElementById('tpl-mosaic-only-actions');
+                container.innerHTML = '';
+                if (tpl) container.appendChild(tpl.content.cloneNode(true));
+            }
+            if (seekVideo) {
+                const videoEl = document.getElementById('lf-studio-video-player');
+                if (videoEl && chInfo && typeof chInfo.start === 'number') {
+                    seekVideoSafely(videoEl, chInfo.start + 0.08);
+                }
+            }
+        }
+
+        async function renderClipManimPanel(cNum, chInfo) {
+            const container = document.getElementById('beats-below-player');
+            if (!container) return;
+            const ep = beatsEpisode();
+            const title = (chInfo && chInfo.title) ? chInfo.title : ('Part ' + cNum);
+            let focusHtml = 'Storyboard unavailable — reported exception, never a silent fallback.';
+            let sceneNote = '';
+            try {
+                const res = await fetch('/api/beats/storyboard?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
+                const data = await res.json();
+                if (!res.ok || !data || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
+                const sb = data.storyboard || {};
+                const scenes = Array.isArray(sb.scenes) ? sb.scenes : [];
+                const first = scenes[0] || {};
+                const eq = (sb.equation != null && String(sb.equation).trim() !== '') ? String(sb.equation).trim() : null;
+                let anchor = '';
+                const labs = first.labels;
+                if (Array.isArray(labs)) anchor = labs.join(' · ');
+                else if (typeof labs === 'string') anchor = labs.replace(/[\[\]']/g, '').split(',').map(function (s) { return s.trim(); }).filter(Boolean).join(' · ');
+                if (eq) focusHtml = 'Equation: ' + escapeHtml(eq);
+                else if (anchor) focusHtml = 'Anchor: ' + escapeHtml(anchor);
+                else if (first.title) focusHtml = 'Hook: ' + escapeHtml(first.title);
+                else focusHtml = 'Storyboard has no equation or anchor labels — reported exception.';
+                const dur = (typeof sb.total_duration === 'number') ? sb.total_duration : null;
+                sceneNote = scenes.length + ' scenes' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
+            } catch (e) {
+                focusHtml = 'Storyboard unavailable — ' + escapeHtml(e.message);
+            }
+            const hasManim = Boolean(chInfo && chInfo.has_beats);
+            const statusLine = (hasManim ? 'Manim ready' : 'No Manim artifact yet — reported exception')
+                + (sceneNote ? ' · ' + sceneNote : '')
+                + (hasManim ? ' · ' + escapeHtml(ep + '-' + cNum + '-manim.mp4') : '');
+            container.innerHTML =
+                '<div id="lf-manim-panel" style="padding:16px 20px;background:var(--bg-color);display:flex;flex-direction:column;gap:12px;">' +
+                '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
+                '<div style="font-size:0.68rem;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dark-secondary);margin-bottom:6px;">Manim · Part ' + cNum + '</div>' +
+                '<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
+                '<div style="font-size:0.84rem;color:var(--text-main);">' + focusHtml + '</div>' +
+                '</div>' +
+                '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
+                '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-bottom:10px;">' + statusLine + '</div>' +
+                '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+                '<button type="button" onclick="designArtifacts(\'clip\')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
+                '<button type="button" onclick="compositeRetrigger(\'manim\')" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Manim-only</button>' +
+                '</div></div></div>';
         }
 
         async function switchClipToManim() {
@@ -640,99 +602,15 @@ a { color: var(--accent-indigo); }
                 metaEl.innerHTML = `Part ${cNum}: ${escapeHtml(chInfo.title)} (${formatDuration(chInfo.start)} – ${formatDuration(chInfo.end)})${badge}`;
             }
 
+            renderLfSpanStrip();
             try {
-                const chData = await fetchLfChapterProgressive(cNum);
-                renderBelowPlayerSurface(chData);
-                renderLfSpanStrip();
-                const beats = chData.beats || [];
-                if (beats.length > 0) {
-                    renderLfBeatPills(beats);
-                    selectLfBeat(0, seekVideo);
-                }
+                await renderClipSurface(cNum, chInfo, seekVideo);
             } catch (err) {
-                console.error("Failed loading chapter beats:", err);
+                console.error("Failed loading clip panel:", err);
             }
         }
 
-        function renderLfBeatPills(beats) {
-            const strip = document.getElementById('lf-beat-pill-strip');
-            if (!strip) return;
-            if (!beats || beats.length === 0) {
-                strip.innerHTML = '<span style="color:var(--text-muted);font-size:0.75rem;">No beats found in this chapter.</span>';
-                return;
-            }
-            strip.innerHTML = beats.map((b, idx) => {
-                const isActive = idx === lfActiveBeatIdx;
-                const bg = isActive ? 'var(--accent-indigo)' : 'var(--panel-bg)';
-                const col = isActive ? '#ffffff' : 'var(--text-dark-secondary)';
-                const border = isActive ? 'var(--accent-indigo-hover)' : 'var(--border-color)';
-                const splitTag = (b.boundary_ok === false) ? ' <span class="beat-split-badge" style="background:var(--accent-amber-dark);color:#fef3c7;padding:1px 4px;border-radius:3px;font-size:0.58rem;margin-left:3px;">sentence split</span>' : '';
-                return `<button type="button" id="lf-beat-pill-${idx}" onclick="selectLfBeat(${idx}, true)" style="background:${bg};color:${col};border:1px solid ${border};border-radius:999px;padding:4px 10px;font-size:0.7rem;font-weight:800;cursor:pointer;font-family:var(--font-mono);white-space:nowrap;" title="${b.class_name} (${b.longform_start.toFixed(1)}s - ${b.longform_end.toFixed(1)}s)${b.boundary_reason ? ' — ' + escapeHtml(b.boundary_reason) : ''}">
-                    #${b.index} (${formatDuration(b.longform_start)})${splitTag}
-                </button>`;
-            }).join('');
-        }
 
-        function selectLfBeat(beatIdx, seekVideo = false) {
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            if (!chData || !chData.beats || !chData.beats[beatIdx]) return;
-
-            lfActiveBeatIdx = beatIdx;
-            const b = chData.beats[beatIdx];
-
-            // Highlight pill
-            chData.beats.forEach((_, idx) => {
-                const pill = document.getElementById(`lf-beat-pill-${idx}`);
-                if (!pill) return;
-                if (idx === beatIdx) {
-                    pill.style.background = 'var(--accent-indigo)';
-                    pill.style.color = '#ffffff';
-                    pill.style.borderColor = 'var(--accent-indigo-hover)';
-                } else {
-                    pill.style.background = 'var(--panel-bg)';
-                    pill.style.color = 'var(--text-dark-secondary)';
-                    pill.style.borderColor = 'var(--border-color)';
-                }
-            });
-
-            // Populate Bottom Inspector Pane
-            const badgeEl = document.getElementById('lf-beat-badge');
-            const clsEl = document.getElementById('lf-beat-classname');
-            const visEl = document.getElementById('lf-beat-visual-summary');
-            const pyEl = document.getElementById('lf-beat-pyfile-badge');
-            const timeEl = document.getElementById('lf-beat-time-range');
-            const txtEl = document.getElementById('lf-beat-spoken-text');
-            const dirInput = document.getElementById('lf-beat-directive-input');
-            const codeArea = document.getElementById('lf-beat-code-textarea');
-
-            if (badgeEl) badgeEl.innerText = `PART ${lfActiveClipNum} • BEAT ${b.index}/${chData.beats.length}`;
-            const splitEl = document.getElementById('lf-beat-split-badge');
-            if (splitEl) {
-                if (b.boundary_ok === false) {
-                    splitEl.style.display = 'inline-block';
-                    splitEl.innerText = b.boundary_reason ? `sentence split (${b.boundary_reason})` : 'sentence split';
-                } else {
-                    splitEl.style.display = 'none';
-                }
-            }
-            if (clsEl) clsEl.innerText = b.class_name;
-            if (visEl) visEl.innerText = b.visual_summary || b.title || 'Bespoke monochrome vector animation';
-            if (pyEl) pyEl.innerText = chData.py_file || `archetypes/clip_${String(lfActiveClipNum).padStart(2, '0')}_gemini_scenes.py`;
-            if (timeEl) timeEl.innerText = `${formatDuration(b.longform_start)} – ${formatDuration(b.longform_end)} (${b.longform_start.toFixed(1)}s – ${b.longform_end.toFixed(1)}s)`;
-            if (txtEl) txtEl.innerText = b.text ? `"${b.text}"` : '(Instrumental / Transition Beat)';
-
-            const videoEl = document.getElementById('lf-studio-video-player');
-            const isTyping = document.activeElement === dirInput || document.activeElement === codeArea;
-            if (!isTyping || (videoEl && videoEl.paused)) {
-                if (dirInput && document.activeElement !== dirInput) dirInput.value = b.user_notes || '';
-                if (codeArea && document.activeElement !== codeArea) codeArea.value = b.code || '';
-            }
-
-            if (seekVideo && videoEl) {
-                const useShort = (lfPlaybackMode === 'clip' && !lfTimelineIndex?.has_video);
-                seekVideoSafely(videoEl, useShort ? (b.short_video_start || 0) : (b.longform_start + 0.08));
-            }
-        }
 
         async function setClipEngine(vs) {
             const cNum = normClipNum(lfActiveClipNum);
@@ -755,93 +633,8 @@ a { color: var(--accent-indigo); }
             }
         }
 
-        async function loadPersonalBeats() {
-            const q = (document.getElementById('pb-search-input')?.value || '').trim();
-            const listEl = document.getElementById('pb-list');
-            const badgeEl = document.getElementById('pb-count-badge');
-            try {
-                const res = await fetch(`/api/beats/personal/list?q=${encodeURIComponent(q)}`);
-                const data = await res.json();
-                const beats = data.beats || [];
-                if (badgeEl) badgeEl.innerText = String(beats.length);
-                if (!listEl) return;
-                if (beats.length === 0) {
-                    listEl.innerHTML = '<span style="color:var(--text-muted);font-size:0.74rem;">No personal beats saved yet.</span>';
-                    return;
-                }
-                listEl.innerHTML = beats.map(pb => {
-                    const prov = pb.provenance || {};
-                    const tags = (pb.tags || []).map(t => `<span style="background:var(--panel-bg-darker);color:var(--text-muted);padding:1px 5px;border-radius:4px;font-size:0.64rem;">${escapeHtml(t)}</span>`).join(' ');
-                    return `<div class="pb-card" data-pb-id="${escapeHtml(pb.id)}" style="background:var(--panel-bg-darker);border:1px solid var(--border-color);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;">
-                        <div style="font-size:0.78rem;font-weight:800;color:var(--text-main);">${escapeHtml(pb.title || pb.class_name)}</div>
-                        <div style="font-size:0.66rem;color:var(--text-muted);font-family:var(--font-mono);">ep ${escapeHtml(prov.ep || '?')} • Part ${escapeHtml(prov.clip_num || '?')} • ${escapeHtml(pb.class_name || '')}</div>
-                        ${tags ? `<div style="display:flex;flex-wrap:wrap;gap:4px;">${tags}</div>` : ''}
-                        <button type="button" onclick="copyPersonalBeatToCurrent('${escapeHtml(pb.id)}')" style="margin-top:4px;background:var(--accent-indigo);color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:0.7rem;font-weight:700;cursor:pointer;">📋 Copy Visual to Beat</button>
-                    </div>`;
-                }).join('');
-            } catch (e) {
-                if (listEl) listEl.innerHTML = `<span style="color:var(--danger);font-size:0.74rem;">Failed to load personal beats</span>`;
-            }
-        }
 
-        async function saveCurrentBeatToPersonal() {
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            const beat = chData?.beats?.[lfActiveBeatIdx];
-            if (!beat) { showToast('Select a beat first.'); return; }
-            const title = prompt('Personal Beat Title:', beat.title || beat.class_name);
-            if (title === null) return;
-            const tags = prompt('Tags (comma-separated, optional):', '') || '';
-            try {
-                const res = await fetch('/api/beats/personal/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ep: beatsEpisode(),
-                        clip_num: lfActiveClipNum,
-                        beat_index: beat.index,
-                        class_name: beat.class_name,
-                        title: title.trim() || beat.class_name,
-                        tags: tags
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) throw new Error(data.error || 'Save failed');
-                showToast(`⭐ Saved "${data.beat.title}" to Personal Beats`);
-                loadPersonalBeats();
-            } catch (e) {
-                showToast('❌ Save failed: ' + e.message);
-            }
-        }
 
-        async function copyPersonalBeatToCurrent(pbId) {
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            const beat = chData?.beats?.[lfActiveBeatIdx];
-            if (!beat) { showToast('Select a target beat first.'); return; }
-            try {
-                showToast('📋 Copying visual into current beat...');
-                const res = await fetch('/api/beats/personal/copy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        id: pbId,
-                        ep: beatsEpisode(),
-                        clip_num: lfActiveClipNum,
-                        beat_index: beat.index,
-                        class_name: beat.class_name
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok || !data.success) throw new Error(data.error || 'Copy failed');
-                if (data.chapter_data) {
-                    lfChapterLRU.set(lfActiveClipNum, data.chapter_data);
-                    renderLfBeatPills(data.chapter_data.beats || []);
-                    selectLfBeat(lfActiveBeatIdx, false);
-                }
-                showToast(`✅ Visual copied into ${beat.class_name} (spoken text & timing preserved)`);
-            } catch (e) {
-                showToast('❌ Copy failed: ' + e.message);
-            }
-        }
 
         async function onLfVideoTimeUpdate(currentTime) {
             const playheadBadge = document.getElementById('lf-studio-playhead-badge');
@@ -868,9 +661,7 @@ a { color: var(--accent-indigo); }
                     renderLfChapterStrip();
                     renderLfSpanStrip();
                     try {
-                        const chData = await fetchLfChapterProgressive(activeCh.clip_num);
-                        renderBelowPlayerSurface(chData);
-                        renderLfBeatPills(chData.beats || []);
+                        await renderClipSurface(activeCh.clip_num, activeCh);
                     } catch (e) {
                         console.warn("Progressive chapter switch failed:", e);
                     } finally {
@@ -879,13 +670,7 @@ a { color: var(--accent-indigo); }
                 }
             }
 
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            if (chData && chData.beats) {
-                const bIdx = chData.beats.findIndex(b => currentTime >= b.longform_start && currentTime < b.longform_end);
-                if (bIdx !== -1 && bIdx !== lfActiveBeatIdx) {
-                    selectLfBeat(bIdx, false);
-                }
-            }
+
         }
 
         // ===== Spec H2 sections 3+4: Design artifacts + retrigger + composite timeline =====
@@ -1058,106 +843,9 @@ a { color: var(--accent-indigo); }
             }
         }
 
-        function toggleLfCodeEditor() {
-            const drawer = document.getElementById('lf-code-editor-drawer');
-            if (!drawer) return;
-            drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
-        }
 
-        function previewIsolatedLfBeat(customUrl = null) {
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            const b = chData?.beats?.[lfActiveBeatIdx];
-            if (!b) return;
 
-            const overlay = document.getElementById('lf-beat-preview-overlay');
-            const vid = document.getElementById('lf-beat-preview-video');
-            const lbl = document.getElementById('lf-beat-preview-label');
-            if (!overlay || !vid) return;
 
-            overlay.style.display = 'block';
-            if (lbl) lbl.innerText = `✨ ${b.class_name}`;
-            vid.src = customUrl || `${b.beat_video_url}&t=${Date.now()}`;
-            vid.play().catch(() => {});
-        }
-
-        function closeLfBeatPreview() {
-            const overlay = document.getElementById('lf-beat-preview-overlay');
-            const vid = document.getElementById('lf-beat-preview-video');
-            if (vid) vid.pause();
-            if (overlay) overlay.style.display = 'none';
-        }
-
-        async function regenerateLfBeatWithAI(useCustomCode = false) {
-            const chData = lfChapterLRU.get(lfActiveClipNum);
-            const b = chData?.beats?.[lfActiveBeatIdx];
-            if (!b) return;
-
-            const dirInput = document.getElementById('lf-beat-directive-input');
-            const codeArea = document.getElementById('lf-beat-code-textarea');
-            const statusEl = document.getElementById('lf-beat-compile-status');
-            const regenBtn = document.getElementById('lf-btn-regen-beat');
-            const masterVideo = document.getElementById('lf-studio-video-player');
-
-            const directive = dirInput ? dirInput.value.trim() : '';
-            const customCode = (useCustomCode && codeArea) ? codeArea.value : null;
-
-            if (!useCustomCode && !directive) {
-                alert("Please enter your Producer Feedback / change request for this beat first!");
-                return;
-            }
-
-            if (masterVideo && !masterVideo.paused) masterVideo.pause();
-            if (regenBtn) regenBtn.disabled = true;
-            if (statusEl) {
-                statusEl.style.color = 'var(--primary)';
-                statusEl.innerText = useCustomCode
-                    ? `⏳ Compiling custom Manim code for ${b.class_name} (~3s)...`
-                    : `⏳ Gemini AI rewriting ${b.class_name} & compiling 740×740 beat (~3s)...`;
-            }
-
-            const cleanId = beatsEpisode();
-
-            try {
-                const res = await fetch('/api/beats/update_beat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ep: cleanId,
-                        clip_num: lfActiveClipNum,
-                        beat_index: b.index,
-                        class_name: b.class_name,
-                        user_directive: directive,
-                        spoken_text: b.text || '',
-                        custom_code: customCode,
-                        duration: b.duration || 7.5
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok || data.error || data.success === false) {
-                    throw new Error(data.error || `HTTP ${res.status}`);
-                }
-
-                if (data.chapter_data) {
-                    lfChapterLRU.set(lfActiveClipNum, data.chapter_data);
-                }
-                selectLfBeat(lfActiveBeatIdx, false);
-
-                if (statusEl) {
-                    statusEl.style.color = 'var(--accent)';
-                    statusEl.innerText = `✅ Compiled ${b.class_name}! Previewing updated 7.5s vector beat above.`;
-                }
-                showToast(`✅ Updated ${b.class_name} in shared Longform + Short library!`);
-                previewIsolatedLfBeat(data.beat_video_url);
-            } catch (err) {
-                if (statusEl) {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.innerText = `❌ Error: ${err.message}`;
-                }
-                showToast(`❌ Archetype update failed: ${err.message}`);
-            } finally {
-                if (regenBtn) regenBtn.disabled = false;
-            }
-        }
 </script>
 <script>
 function beatsEpisode() {

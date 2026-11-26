@@ -412,6 +412,39 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, status=500)
             return
 
+        if path == "/api/beats/storyboard":
+            # Read-only: H2 clip storyboard for the Manim panel (design
+            # source of truth: title / equation-or-anchor / scenes).
+            # No runs, no writes, no substitutions. Episode 249 only.
+            ep = clean_ep(params.get("ep", ["248"])[0])
+            if ep != "249":
+                self.send_json({"success": False,
+                                "error": "storyboard serves episode 249 only"},
+                               status=400)
+                return
+            try:
+                clip_num = int(params.get("clip_num", ["1"])[0])
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"},
+                               status=400)
+                return
+            sb_path = (DDMA_DIR / "projects" / "episode_249" / "storyboards"
+                       / f"clip_{clip_num}_storyboard.json")
+            try:
+                storyboard = json.loads(sb_path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                self.send_json({"success": False, "error": (
+                    f"no storyboard for clip {clip_num} "
+                    "(reported exception, never a silent fallback)")},
+                    status=404)
+                return
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+                return
+            self.send_json({"success": True, "ep": ep, "clip_num": clip_num,
+                            "storyboard": storyboard})
+            return
+
         if path == "/api/beats/beat_video":
             ep = clean_ep(params.get("ep", ["248"])[0])
             try:
