@@ -333,7 +333,17 @@ STRICT VISUAL & CODE RULES (The Feynman-Needham Standard):
 
     return None
 
+FRESH_STAGE_KINDS = ("title", "formula", "diagram", "anchor", "title-only")
+
+
 def generate_manim_scene_python(scene_data: Dict[str, Any], scene_class_name: str, duration: float) -> str:
+    # 0. H2 fresh-cast stages: deterministic new-rules templates (title plus
+    # one equation/diagram/anchor). The fixed archetype list is NOT the
+    # design source on this path; JIT auto-coding is skipped entirely.
+    if str(scene_data.get("kind") or "").lower() in FRESH_STAGE_KINDS:
+        import manim_fresh_design as _fresh
+        return _fresh.render_stage_manim_code(
+            scene_data, scene_class_name, duration)
     # 1. JIT Auto-Coding: If archetype is a new concept, check cache or auto-code via Gemini
     jit_code = get_or_generate_archetype_code(scene_data, scene_class_name, duration)
     if jit_code:
@@ -743,7 +753,7 @@ def render_manim_infographic_mp4(
         sc_dur = max(1.0, float(sc.get("end", 0.0)) - float(sc.get("start", 0.0)))
         code = generate_manim_scene_python(sc, cls_name, sc_dur)
 
-        arch_clean = str(sc.get("archetype", "")).replace("_", " ").upper()
+        arch_clean = str(sc.get("footer_label") or sc.get("archetype", "")).replace("_", " ").upper()
         if f"class {cls_name}(Scene):" in code:
             code = code.replace(
                 f"class {cls_name}(Scene):",

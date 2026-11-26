@@ -490,45 +490,57 @@ a { color: var(--accent-indigo); }
             if (!container) return;
             const ep = beatsEpisode();
             const title = (chInfo && chInfo.title) ? chInfo.title : ('Part ' + cNum);
-            let focusHtml = 'Storyboard unavailable — reported exception, never a silent fallback.';
-            let sceneNote = '';
+            let focusHtml = 'Storyboard unavailable - reported exception, never a silent fallback.';
+            let stageNote = '';
             try {
                 const res = await fetch('/api/beats/storyboard?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
                 const data = await res.json();
                 if (!res.ok || !data || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
                 const sb = data.storyboard || {};
-                const scenes = Array.isArray(sb.scenes) ? sb.scenes : [];
-                const first = scenes[0] || {};
-                const eq = (sb.equation != null && String(sb.equation).trim() !== '') ? String(sb.equation).trim() : null;
-                let anchor = '';
-                const labs = first.labels;
-                if (Array.isArray(labs)) anchor = labs.join(' · ');
-                else if (typeof labs === 'string') anchor = labs.replace(/[\[\]']/g, '').split(',').map(function (s) { return s.trim(); }).filter(Boolean).join(' · ');
-                if (eq) focusHtml = 'Equation: ' + escapeHtml(eq);
-                else if (anchor) focusHtml = 'Anchor: ' + escapeHtml(anchor);
-                else if (first.title) focusHtml = 'Hook: ' + escapeHtml(first.title);
-                else focusHtml = 'Storyboard has no equation or anchor labels — reported exception.';
+                const design = sb.design || {};
+                const stages = Array.isArray(sb.stages) ? sb.stages : (Array.isArray(sb.scenes) ? sb.scenes : []);
                 const dur = (typeof sb.total_duration === 'number') ? sb.total_duration : null;
-                sceneNote = scenes.length + ' scenes' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
+                const kind = design.kind || '';
+                if (kind === 'formula' && design.equation_text) {
+                    focusHtml = 'Equation: ' + escapeHtml(design.equation_text);
+                    if (design.reuse_of != null && design.reuse_of !== '') focusHtml += ' (reused from Part ' + escapeHtml(String(design.reuse_of)) + ' - reported)';
+                } else if (kind === 'diagram' && design.diagram) {
+                    focusHtml = 'Diagram: ' + escapeHtml(design.diagram);
+                } else if (kind === 'anchor' && design.anchor) {
+                    focusHtml = 'Anchor: ' + escapeHtml(design.anchor.label || '') + ' - ' + escapeHtml(design.anchor.hook || '');
+                } else if (kind === 'title-only') {
+                    focusHtml = 'Title-only artifact (reported: no suitable equation, diagram, or anchor).';
+                } else {
+                    const first = stages[0] || {};
+                    const labs = first.labels;
+                    let anchor = '';
+                    if (Array.isArray(labs)) anchor = labs.join(' | ');
+                    else if (typeof labs === 'string') anchor = labs;
+                    if (anchor) focusHtml = 'Anchor: ' + escapeHtml(anchor);
+                    else if (first.title) focusHtml = 'Hook: ' + escapeHtml(first.title);
+                    else focusHtml = 'Storyboard has no equation or anchor labels - reported exception.';
+                    stageNote = stages.length + ' scenes (legacy board) ' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
+                }
+                if (!stageNote) stageNote = stages.length + ' stages' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
             } catch (e) {
-                focusHtml = 'Storyboard unavailable — ' + escapeHtml(e.message);
+                focusHtml = 'Storyboard unavailable - ' + escapeHtml(e.message);
             }
             const hasManim = Boolean(chInfo && chInfo.has_beats);
-            const statusLine = (hasManim ? 'Manim ready' : 'No Manim artifact yet — reported exception')
-                + (sceneNote ? ' · ' + sceneNote : '')
-                + (hasManim ? ' · ' + escapeHtml(ep + '-' + cNum + '-manim.mp4') : '');
+            const statusLine = (hasManim ? 'Manim ready' : 'No Manim artifact yet - reported exception')
+                + (stageNote ? ' - ' + stageNote : '')
+                + (hasManim ? ' - ' + escapeHtml(ep + '-' + cNum + '-manim.mp4') : '');
             container.innerHTML =
                 '<div id="lf-manim-panel" style="padding:16px 20px;background:var(--bg-color);display:flex;flex-direction:column;gap:12px;">' +
                 '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
-                '<div style="font-size:0.68rem;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dark-secondary);margin-bottom:6px;">Manim · Part ' + cNum + '</div>' +
+                '<div style="font-size:0.68rem;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:var(--text-dark-secondary);margin-bottom:6px;">Manim - Part ' + cNum + '</div>' +
                 '<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
                 '<div style="font-size:0.84rem;color:var(--text-main);">' + focusHtml + '</div>' +
                 '</div>' +
                 '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
                 '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-bottom:10px;">' + statusLine + '</div>' +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
-                '<button type="button" onclick="designArtifacts(\'clip\')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
-                '<button type="button" onclick="compositeRetrigger(\'manim\')" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Manim-only</button>' +
+                '<button type="button" onclick="designArtifacts(' + "'clip'" + ')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
+                '<button type="button" onclick="compositeRetrigger(' + "'manim'" + ')" style="background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Retrigger Manim-only</button>' +
                 '</div></div></div>';
         }
 

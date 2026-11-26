@@ -5219,14 +5219,82 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 custom_directive = str(req_body.get("directive") or req_body.get("instructions") or req_body.get("custom_directive") or "").strip()
 
-                storyboard = generate_or_load_storyboard_data(
-                    project_id, clip_num,
-                    force_regen=force_regen,
-                    custom_directive=custom_directive,
-                )
-                scenes = (req_body.get("scenes") or storyboard.get("scenes") or [])
+                fresh_design = None
+                fresh_reports = []
+                if str(project_id) == "episode_249" and force_regen:
+                    import manim_fresh_design as _fresh
+                    _plan_pre = load_plan(project_id) or []
+                    _pre_clip = next((c for c in _plan_pre if str(c.get("num")) == str(clip_num)), None) or {}
+                    _chunks = _pre_clip.get("caption_chunks") or []
+                    _plan_text = ' '.join(ch.get('text', '') for ch in _chunks).strip()
+                    _transcript = str(req_body.get('transcript') or _plan_text or _pre_clip.get('text') or '').strip()
+                    _title = str(req_body.get('title') or _pre_clip.get('title') or 'Deep Dive').strip()
+                    if not _transcript:
+                        raise Exception('No transcript for fresh design (caption data required; never a silent fallback)')
+                    _catalog = _fresh.fetch_episode_equations("249")
+                    if not _catalog:
+                        raise Exception('Episode-page equation catalog empty (deepdive.shutri.com/249.html unreachable?)')
+                    _sb_dir = os.path.join("projects", project_id, "storyboards")
+                    _prior = {}
+                    try:
+                        for _fn in os.listdir(_sb_dir):
+                            if not (_fn.startswith('clip_') and _fn.endswith('_storyboard.json')):
+                                continue
+                            try:
+                                _n = _fn[len('clip_'): -len('_storyboard.json')]
+                                if str(_n) == str(clip_num):
+                                    continue
+                                with open(os.path.join(_sb_dir, _fn), 'r', encoding='utf-8') as _fh:
+                                    _d = json.load(_fh).get('design') or {}
+                                if _d.get('equation_norm'):
+                                    _prior[str(_n)] = _d['equation_norm']
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                    _settings = load_settings()
+                    _api_key = _settings.get('gemini_api_key') or os.environ.get('GEMINI_API_KEY')
+                    _g_mod = genai if (HAS_GENAI and configure_gemini(_api_key)) else None
+                    _design_dur = float(_pre_clip.get("audio_duration") or _pre_clip.get("duration") or 120.0)
+                    _art, fresh_reports = _fresh.design_clip_artifact(
+                        _transcript, _title, _design_dur, _catalog,
+                        genai_mod=_g_mod, prior_equations=_prior, clip_num=clip_num)
+                    fresh_design = _art['design']
+                    _stages = _art['stages']
+                    for _st in _stages:
+                        _st.setdefault('labels', [_title.upper()[:24]])
+                        _st.setdefault('archetype', 'fresh-' + str(_st.get('kind', 'title')))
+                    storyboard = {
+                        '_rule_engine': {
+                            'standard': 'H2 fresh-cast: title plus one artifact, stages at sentence boundaries',
+                            'theme': 'Pure Monochrome Shining White on Black',
+                            'no_archetypes': True,
+                        },
+                        'clip_num': int(clip_num),
+                        'clip_title': _title,
+                        'total_duration': 0.0,
+                        'design': fresh_design,
+                        'scenes': _stages,
+                        'stages': _stages,
+                    }
+                    _plan_path0 = os.path.join("projects", project_id, "plan.json")
+                    _plan0 = load_plan(project_id) or []
+                    _tc0 = next((c for c in _plan0 if str(c.get("num")) == str(clip_num)), None)
+                    if _tc0 is None:
+                        raise Exception('Clip ' + str(clip_num) + ' not found in ' + _plan_path0)
+                    _tc0['infographic_scenes'] = _stages
+                    save_plan(project_id, _plan0)
+                    with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh0:
+                        json.dump(storyboard, _fh0, indent=2)
+                else:
+                    storyboard = generate_or_load_storyboard_data(
+                        project_id, clip_num,
+                        force_regen=force_regen,
+                        custom_directive=custom_directive,
+                    )
+                scenes = (req_body.get('scenes') or storyboard.get('scenes') or storyboard.get('stages') or [])
                 if not scenes:
-                    raise Exception("Zero scenes produced (storyboard returned 0 scenes)")
+                    raise Exception('Zero scenes produced (storyboard returned 0 scenes)')
 
                 plan_path = os.path.join("projects", project_id, "plan.json")
                 if not os.path.exists(plan_path):
@@ -5264,6 +5332,24 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     pass
                 if body_dur <= 0:
                     body_dur = float(t_clip.get("audio_duration") or t_clip.get("duration") or 120.0)
+                if fresh_design is not None and body_dur > 0:
+                    _old_total = float(storyboard.get("total_duration") or _design_dur or body_dur)
+                    if abs(_old_total - body_dur) > 0.01:
+                        _f = body_dur / _old_total if _old_total > 0 else 1.0
+                        for _st in scenes:
+                            _st["start"] = round(float(_st.get("start", 0.0)) * _f, 2)
+                            _st["end"] = round(float(_st.get("end", 0.0)) * _f, 2)
+                        scenes[-1]["end"] = round(body_dur, 2)
+                        storyboard["total_duration"] = round(body_dur, 2)
+                        storyboard["scenes"] = scenes
+                        storyboard["stages"] = scenes
+                        with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh1:
+                            json.dump(storyboard, _fh1, indent=2)
+                        t_clip["infographic_scenes"] = scenes
+                    else:
+                        storyboard["total_duration"] = round(body_dur, 2)
+                        with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh1:
+                            json.dump(storyboard, _fh1, indent=2)
 
                 infographic_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-infographic.mp4")
                 _manim_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur)
@@ -5296,6 +5382,9 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     "clip_num": int(clip_num),
                     "project_id": project_id,
                     "scenes_count": len(scenes),
+                    "fresh": fresh_design is not None,
+                    "design": fresh_design,
+                    "reports": fresh_reports,
                 }).encode('utf-8'))
                 return
             except Exception as e:

@@ -148,6 +148,16 @@ def _h2_run_design_group(group_id):
     grp = H2_DESIGN_GROUPS.get(group_id)
     if not grp:
         return
+    try:
+        _clips = _h2_load_plan_clips()
+    except Exception:
+        _clips = []
+    _by_num = {}
+    for _c in _clips:
+        try:
+            _by_num[int(_c.get("num"))] = _c
+        except Exception:
+            pass
     for job in grp["jobs"]:
         with H2_DESIGN_LOCK:
             if grp.get("cancelled"):
@@ -158,8 +168,12 @@ def _h2_run_design_group(group_id):
                 job["clip"], job.get("body_words") or [], False)
             if not cap["ok"]:
                 raise RuntimeError(cap["exception"])
+            _pc = _by_num.get(int(job["clip"]), {})
             body = json.dumps(
-                {"ep": grp["ep"], "clip_num": job["clip"]}).encode("utf-8")
+                {"ep": grp["ep"], "clip_num": job["clip"],
+                 "force_regen": True,
+                 "transcript": _h2_clip_transcript(_pc) or "",
+                 "title": str(_pc.get("title") or "")}).encode("utf-8")
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic"
                 f"?id=episode_{grp['ep']}&num={job['clip']}",
@@ -181,6 +195,55 @@ def _h2_run_design_group(group_id):
         grp["finished"] = True
 
 
+
+
+def _h2_design_stale_report(grp):
+    """Master-stale report for a finished design group (read-only).
+
+    The master is NEVER re-assembled here: design completion only reports
+    that the master is stale and a manual re-assemble (Patch / re-assemble
+    path) plus re-gate is needed before any push. The push stays manual.
+    """
+    out = {"design_reports": [], "changed_clips": [], "master_stale": False,
+           "reassemble_note": ""}
+    try:
+        if not grp or not grp.get("finished"):
+            return out
+        ep = str(grp.get("ep", H2_EPISODE))
+        master = _h2_composite_master(ep)
+        master_mtime = None
+        if master is not None:
+            try:
+                master_mtime = master.stat().st_mtime
+            except Exception:
+                master_mtime = None
+        for job in grp.get("jobs", []):
+            det = job.get("detail") or {}
+            for rep in det.get("reports") or (det.get("design") or {}).get("reports") or []:
+                out["design_reports"].append({"clip": job.get("clip"), "report": rep})
+            if job.get("status") != "done":
+                continue
+            _local_art = DDMA_DIR / "clips" / ((str(ep) + "-") + (str(job.get("clip")) + "-manim.mp4"))
+            try:
+                _local_ok = _local_art.exists()
+            except Exception:
+                _local_ok = False
+            art = _local_art if _local_ok else find_clip_media(ep, job.get("clip"))
+            try:
+                art_mtime = art.stat().st_mtime if art is not None else None
+            except Exception:
+                art_mtime = None
+            if art_mtime is not None and (master_mtime is None or art_mtime > master_mtime):
+                out["changed_clips"].append(job.get("clip"))
+        if out["changed_clips"] or (grp.get("jobs") and all(
+                j.get("status") == "done" for j in grp.get("jobs", [])) and master_mtime is None):
+            out["master_stale"] = True
+            out["reassemble_note"] = ("Master is stale: clips " + ",".join(
+                str(c) for c in out["changed_clips"]) + " have fresh Manim. Re-assemble manually "
+                "(Patch / re-assemble path), re-gate, then push manually. Nothing was auto-assembled or pushed.")
+    except Exception:
+        pass
+    return out
 def rewrite_beat_urls(ch_data):
     """Point per-beat preview URLs at this server (engine emits cockpit paths)."""
     try:
@@ -534,9 +597,14 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"success": False,
                                 "error": "unknown design group"}, status=404)
                 return
+            stale_info = _h2_design_stale_report(grp)
             self.send_json({"success": True, "group": group_id, **snap,
-                            "exceptions": [j for j in snap["jobs"]
-                                           if j["status"] == "failed"]})
+                            "exceptions": [x for x in snap["jobs"]
+                                           if x["status"] == "failed"],
+                            "design_reports": stale_info["design_reports"],
+                            "changed_clips": stale_info["changed_clips"],
+                            "master_stale": stale_info["master_stale"],
+                            "reassemble_note": stale_info["reassemble_note"]})
             return
 
         if path == "/api/beats/mosaic_status":
@@ -712,9 +780,18 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": "bad clip_num"}, status=400)
                 return
             project_id = f"episode_{ep}"
+            _re_body = {}
+            if str(ep) == H2_EPISODE:
+                try:
+                    _rc = next((c for c in _h2_load_plan_clips() if int(c.get("num")) == int(clip_num)), {})
+                except Exception:
+                    _rc = {}
+                _re_body = {"force_regen": True,
+                              "transcript": _h2_clip_transcript(_rc) or "",
+                              "title": str(_rc.get("title") or "")}
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
-                data=json.dumps({}).encode("utf-8"),
+                data=json.dumps(_re_body).encode("utf-8"),
                 headers={"Content-Type": "application/json"}, method="POST")
             try:
                 with urllib.request.urlopen(req, timeout=120) as r:
