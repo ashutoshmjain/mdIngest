@@ -248,6 +248,12 @@ a { color: var(--accent-indigo); }
         let lfChapterLRU = new Map(); // Keeps at most 3 chapters in RAM for memory safety
         const LF_MAX_LRU_CHAPTERS = 3;
         let lfActiveClipNum = 1;
+        // Clip 0 is a real clip (eps 249/250 start at 0): parse clip
+        // numbers with an explicit NaN check so 0 is never coerced to 1.
+        function normClipNum(v) {
+            const n = (typeof v === 'number') ? v : parseInt(v, 10);
+            return (typeof n === 'number' && !Number.isNaN(n)) ? n : 1;
+        }
         let lfActiveBeatIdx = 0;
         let lfLoadingChapter = false;
         let lfVideoListenerBound = false;
@@ -508,7 +514,7 @@ a { color: var(--accent-indigo); }
         }
 
         async function fetchLfChapterProgressive(clipNum) {
-            const cNum = parseInt(clipNum, 10) || 1;
+            const cNum = normClipNum(clipNum);
             if (lfChapterLRU.has(cNum)) {
                 // Refresh LRU order
                 const cached = lfChapterLRU.get(cNum);
@@ -565,7 +571,7 @@ a { color: var(--accent-indigo); }
         }
 
         async function switchClipToManim() {
-            const cNum = lfActiveClipNum || 1;
+            const cNum = normClipNum(lfActiveClipNum);
             try {
                 showToast(`🔄 Switching Part ${cNum} to Manim...`);
                 const res = await fetch('/api/beats/manim_retrigger', {
@@ -584,7 +590,7 @@ a { color: var(--accent-indigo); }
         }
 
         async function selectLfChapter(clipNum, seekVideo = false) {
-            const cNum = parseInt(clipNum, 10) || 1;
+            const cNum = normClipNum(clipNum);
             const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
             if (chInfo && chInfo.openable === false) return;
             lfActiveClipNum = cNum;
@@ -729,7 +735,7 @@ a { color: var(--accent-indigo); }
         }
 
         async function setClipEngine(vs) {
-            const cNum = lfActiveClipNum || 1;
+            const cNum = normClipNum(lfActiveClipNum);
             const chInfo = lfTimelineIndex?.chapters?.find(c => c.clip_num === cNum);
             if (vs === 'manim' && !chInfo?.has_beats) return;
             if (vs === 'mosaic' && !chInfo?.has_mosaic) return;
@@ -909,7 +915,7 @@ a { color: var(--accent-indigo); }
             const cleanId = beatsEpisode();
             if (cleanId !== '249') { showToast('Design artifacts serves episode 249 only.'); return; }
             const body = { ep: cleanId };
-            if (scope === 'clip') body.clip_num = lfActiveClipNum || 1;
+            if (scope === 'clip') body.clip_num = normClipNum(lfActiveClipNum);
             const what = (scope === 'clip') ? `Part ${body.clip_num}` : 'all 21 clips of ep 249';
             if (!confirm(`Design the Manim artifact for ${what}? One deliberate start, background queue.`)) return;
             try {
@@ -971,7 +977,7 @@ a { color: var(--accent-indigo); }
             if (cleanId !== '249') { showToast('Composite retrigger serves episode 249 only.'); return; }
             const videoEl = document.getElementById('lf-studio-video-player');
             if (videoEl && !videoEl.paused) videoEl.pause();
-            const cNum = lfActiveClipNum || 1;
+            const cNum = normClipNum(lfActiveClipNum);
             try {
                 const res = await fetch('/api/beats/composite_retrigger', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1007,7 +1013,7 @@ a { color: var(--accent-indigo); }
         }
         async function patchActiveLongformChapter() {
             const cleanId = beatsEpisode();
-            const cNum = lfActiveClipNum || 1;
+            const cNum = normClipNum(lfActiveClipNum);
             const btn = document.getElementById('btn-patch-lf-chapter');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
@@ -1187,7 +1193,7 @@ function beatsLoad() {
     initLongformBeatStudio();
 }
 async function beatsMosaicRetrigger() {
-    const cNum = lfActiveClipNum || 1;
+    const cNum = normClipNum(lfActiveClipNum);
     const st = document.getElementById('beats-mosaic-status');
     if (!confirm('Start a FRESH Mosaic RUN for Part ' + cNum + '? This spends Mosaic API.')) return;
     if (!confirm('Confirm again: run Mosaic now for Part ' + cNum + ' of ep ' + beatsEpisode() + '?')) return;
