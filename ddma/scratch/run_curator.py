@@ -4500,15 +4500,36 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 target_clip["published_url"] = clip_url
                 save_plan(project_id, plan_data, writer="curator")
 
+                # (d3) Carousel sync: add this clip's card to the episode
+                # page carousel (add-only, idempotent). The .md change
+                # rides the scoped publish commit below. Non-fatal: a
+                # refusal is reported in the publish response, never
+                # breaks the publish.
+                carousel_sync_status = 'not run'
+                try:
+                    import carousel_sync as _carousel_sync
+                    carousel_sync_status, _cs_detail = \
+                        _carousel_sync.sync_carousel_card(
+                            repo_root, ep_num, clip_num)
+                    print(f"[{project_id}][Clip {clip_num}] Carousel sync: "
+                          f"{carousel_sync_status} ({_cs_detail})")
+                except Exception as ce:
+                    carousel_sync_status = 'not added (%s)' % ce
+                    print(f"[{project_id}][Clip {clip_num}] Carousel sync "
+                          f"failed: {ce}")
+
                 # (e) Scoped git add + commit + push (cwd = repo root). ONLY the clip,
-                # the published plan copy, and both manifests.
+                # the published plan copy, both manifests, and the episode page
+                # (the carousel card; git add is a no-op when the card was
+                # already present).
                 # NOTE: forward slashes -- a backslash pathspec can silently match nothing on Git for Windows.
                 # Idempotent: if everything already matches HEAD (re-publish), report success without committing.
                 rel_clip = "src/ddma/docs/episodes/%s/clips/%s" % (ep_num, master_name)
                 rel_plancopy = "src/ddma/docs/episodes/%s/plan.json" % ep_num
                 rel_manifests = ["ddma/docs/episodes.json",
                                  "src/ddma/docs/episodes.json"]
-                rel_scope = [rel_clip, rel_plancopy] + rel_manifests
+                rel_page = "src/%s.md" % ep_num
+                rel_scope = [rel_clip, rel_plancopy] + rel_manifests + [rel_page]
                 already = False
                 try:
                     subprocess.run(["git", "add"] + rel_scope, cwd=repo_root, check=True,
@@ -4553,7 +4574,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True, "url": clip_url, "clip": master_name, "already_published": already, "persisted": True}).encode('utf-8'))
+                self.wfile.write(json.dumps({"success": True, "url": clip_url, "clip": master_name, "already_published": already, "persisted": True, "carousel": carousel_sync_status}).encode('utf-8'))
                 return
             except Exception as e:
                 print(f"[publish-clip] {project_id} clip {clip_num}: {e}")
