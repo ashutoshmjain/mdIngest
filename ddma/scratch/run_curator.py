@@ -5197,7 +5197,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             # generate_or_load_storyboard_data, then the existing Manim render
             # step (manim_infographic_engine.render_manim_infographic_mp4),
             # then the existing compile path (`ddma.py compile-clip --source
-            # manim`). Episode 249 only. Never touches Mosaic, never
+            # manim`). Serves any episode_* project. Never touches Mosaic, never
             # substitutes another file when the render produces nothing.
             try:
                 query = parse_qs(parsed_url.query)
@@ -5215,7 +5215,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not isinstance(req_body, dict):
                     req_body = {}
 
-                # Beats design-group body shape: {"ep": 249, "clip_num": N}.
+                # Beats design-group body shape: {"ep": <num>, "clip_num": N}.
                 if (not project_id) and req_body.get("ep") is not None:
                     project_id = f"episode_{req_body.get('ep')}"
                 if (clip_num is None or str(clip_num).strip() == "") and req_body.get("clip_num") is not None:
@@ -5225,12 +5225,12 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 if not project_id or clip_num is None or str(clip_num).strip() == "":
                     raise Exception("Missing id or num parameter")
-                if str(project_id) != "episode_249":
+                if not re.match(r"^episode_\d+$", str(project_id)):
                     self.send_response(400)
                     self.send_header('Content-type', 'application/json')
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
-                    self.wfile.write(json.dumps({"success": False, "error": f"Refusing: this endpoint serves episode_249 only (got {project_id})"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"success": False, "error": f"Refusing: unknown project id (got {project_id})"}).encode('utf-8'))
                     return
 
                 if os.getcwd() not in sys.path:
@@ -5242,7 +5242,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 fresh_design = None
                 fresh_reports = []
-                if str(project_id) == "episode_249" and force_regen:
+                _h2_ep_num = str(project_id).replace('episode_', '')
+                if force_regen:
                     import manim_fresh_design as _fresh
                     _plan_pre = load_plan(project_id) or []
                     _pre_clip = next((c for c in _plan_pre if str(c.get("num")) == str(clip_num)), None) or {}
@@ -5252,9 +5253,9 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     _title = str(req_body.get('title') or _pre_clip.get('title') or 'Deep Dive').strip()
                     if not _transcript:
                         raise Exception('No transcript for fresh design (caption data required; never a silent fallback)')
-                    _catalog = _fresh.fetch_episode_equations("249")
+                    _catalog = _fresh.fetch_episode_equations(_h2_ep_num)
                     if not _catalog:
-                        raise Exception('Episode-page equation catalog empty (deepdive.shutri.com/249.html unreachable?)')
+                        raise Exception(f'Episode-page equation catalog empty (deepdive.shutri.com/{_h2_ep_num}.html unreachable?)')
                     _sb_dir = os.path.join("projects", project_id, "storyboards")
                     _prior = {}
                     try:

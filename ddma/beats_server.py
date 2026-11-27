@@ -71,12 +71,12 @@ def resolve_dd_hub_root():
 DD_HUB_ROOT = resolve_dd_hub_root()
 
 
-# ---------- Spec H2 sections 3+4: composite wiring (episode 249 ONLY) ----------
+# ---------- Spec H2 sections 3+4: composite wiring (any episode) ----------
 # Design-artifacts fan-out, composite timeline, and retrigger scope live
 # here. The push endpoint and gate (Spec H sections 8/9) are UNCHANGED.
-# Guardrails: serves episode 249 only (never 250); never starts a Mosaic
-# run — no mosaic_retry call exists anywhere in this block; never writes
-# plan.json (read-only) or docs/plan.json.
+# Guardrails: H2_EPISODE is the default when no episode is given; never
+# starts a Mosaic run — no mosaic_retry call exists anywhere in this
+# block; never writes plan.json (read-only) or docs/plan.json.
 H2_EPISODE = "249"
 H2_DESIGN_GROUPS = {}
 H2_DESIGN_LOCK = threading.Lock()
@@ -84,16 +84,22 @@ H2_DESIGN_SEQ = [0]
 
 
 def _h2_refused(ep):
-    if str(ep) != H2_EPISODE:
-        return {"success": False,
-                "error": f"H2 wiring serves episode {H2_EPISODE} only "
-                         f"(refused ep {ep}; never 250)"}
+    """H2 wiring serves any episode (generalized from 249-only).
+
+    Kept as a hook so call sites stay structured; always accepts.
+    Missing plans/assets are refused downstream per episode.
+    """
     return None
 
 
-def _h2_load_plan_clips():
-    """Read-only load of the episode plan (never written by H2 wiring)."""
-    return json.loads((DDMA_DIR / "plan.json").read_text(encoding="utf-8"))
+def _h2_load_episode_plan_clips(ep):
+    """Read-only load of the SELECTED episode's plan (never written by H2 wiring).
+
+    Reads projects/episode_<ep>/plan.json — never the shared root plan copy,
+    which flips to whichever episode Cutroom last loaded.
+    """
+    plan = json.loads((DDMA_DIR / "projects" / ("episode_" + str(ep)) / "plan.json").read_text(encoding="utf-8"))
+    return plan if isinstance(plan, list) else plan.get("clips", [])
 
 
 def _h2_clip_transcript(clip):
@@ -149,7 +155,7 @@ def _h2_run_design_group(group_id):
     if not grp:
         return
     try:
-        _clips = _h2_load_plan_clips()
+        _clips = _h2_load_episode_plan_clips(grp.get("ep", H2_EPISODE))
     except Exception:
         _clips = []
     _by_num = {}
@@ -247,15 +253,16 @@ def _h2_design_stale_report(grp):
     return out
 
 
-def _h2_patch_clip_249(clip_num):
-    """Manual-trigger H2 segment re-stitch for one ep-249 clip.
+def _h2_patch_clip(ep, clip_num):
+    """Manual-trigger H2 segment re-stitch for one clip of episode <ep>.
 
     Rebuilds ONLY that clip composite segment (fresh Manim
     infographic + Mosaic run + strip + karaoke, per the H2
-    assembler) and splices it into the 249 master behind a
+    assembler) and splices it into the <ep> master behind a
     duration gate. No auto-assemble: runs only on the manual
     Patch trigger. Returns (ok, message_or_error). Missing
-    inputs are a reported refusal, never a substitution.
+    inputs are a reported refusal, never a substitution (never
+    another episode's files).
     """
     try:
         n = int(clip_num)
@@ -263,40 +270,41 @@ def _h2_patch_clip_249(clip_num):
         return False, "bad clip_num"
     try:
         import spec_h2_composite_assembler as _h2a
-        plan = json.loads((DDMA_DIR / "projects" / "episode_249" / "plan.json").read_text(encoding="utf-8"))
+        ep = str(ep)
+        plan = json.loads((DDMA_DIR / "projects" / ("episode_" + ep) / "plan.json").read_text(encoding="utf-8"))
         clips = plan if isinstance(plan, list) else plan.get("clips", [])
         t_clip = next((c for c in clips if str(c.get("num")) == str(n)), None)
         if t_clip is None:
-            return False, "clip " + str(n) + " not in episode_249 plan (refused, never substituted)"
-        chrome = DDMA_DIR / "assets" / "chrome_249.png"
-        strip = DDMA_DIR / "assets" / "strip_249.mp4"
+            return False, "clip " + str(n) + " not in episode_" + ep + " plan (refused, never substituted)"
+        chrome = DDMA_DIR / "assets" / ("chrome_" + ep + ".png")
+        strip = DDMA_DIR / "assets" / ("strip_" + ep + ".mp4")
         if not chrome.exists() or not strip.exists():
-            return False, "249 frame assets missing (refused, never substituted)"
-        art = DDMA_DIR / "clips" / ("249-" + str(n) + "-infographic.mp4")
+            return False, ep + " frame assets missing (refused, never substituted)"
+        art = DDMA_DIR / "clips" / (ep + "-" + str(n) + "-infographic.mp4")
         if not art.exists() or art.stat().st_size <= 0:
             return False, "clip " + str(n) + " has no Manim infographic yet (design it first; refused, never substituted)"
         rid = t_clip.get("mosaic_run_id")
-        inputs = _h2a.resolve_segment_inputs("249", n, rid, str(art), str(DD_HUB_ROOT), str(chrome), str(strip))
-        dur = _h2a.clip_composite_duration(t_clip, "249", str(DD_HUB_ROOT))
+        inputs = _h2a.resolve_segment_inputs(ep, n, rid, str(art), str(DD_HUB_ROOT), str(chrome), str(strip))
+        dur = _h2a.clip_composite_duration(t_clip, ep, str(DD_HUB_ROOT))
         words = [(float(w.get("start", 0)), float(w.get("end", 0)), str(w.get("word", ""))) for w in (t_clip.get("_caption_words") or [])]
         if not words:
             return False, "clip " + str(n) + " has no caption words (refused, never a silent fallback)"
-        work = DDMA_DIR / "scratch" / "249-patch"
+        work = DDMA_DIR / "scratch" / (ep + "-patch")
         work.mkdir(parents=True, exist_ok=True)
         _h2a.write_caption_ass(str(work), n, words, dur)
         seg = work / ("seg_" + str(n) + ".mp4")
-        cmd = _h2a.build_segment_cmd("249", n, inputs, dur, str(seg), str(work / ("vf_" + str(n) + ".txt")), total_clips=len(clips))
+        cmd = _h2a.build_segment_cmd(ep, n, inputs, dur, str(seg), str(work / ("vf_" + str(n) + ".txt")), total_clips=len(clips))
         r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(work))
         if r.returncode != 0 or not seg.exists():
             return False, "segment render failed: " + (r.stderr or r.stdout)[-500:]
-        master = _h2_composite_master("249")
+        master = _h2_composite_master(ep)
         if master is None or not master.exists():
-            return False, "249 master missing (refused)"
+            return False, ep + " master missing (refused)"
         m_dur = _h2_probe_duration(master)
         t0 = 0.0
         for c in clips:
             if int(c.get("num")) < n:
-                t0 += _h2a.clip_composite_duration(c, "249", str(DD_HUB_ROOT))
+                t0 += _h2a.clip_composite_duration(c, ep, str(DD_HUB_ROOT))
         seg_dur = _h2_probe_duration(seg) or dur
         t1 = t0 + seg_dur
         parts = []
@@ -315,7 +323,7 @@ def _h2_patch_clip_249(clip_num):
             parts.append(str(tail))
         lst = work / ("splice_" + str(n) + ".txt")
         _h2a.write_concat_list(parts, str(lst))
-        new_master = work / "249-longform-master-new.mp4"
+        new_master = work / (ep + "-longform-master-new.mp4")
         rc = subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy", str(new_master)], capture_output=True, text=True, cwd=str(work))
         if rc.returncode != 0:
             return False, "concat failed: " + (rc.stderr or rc.stdout)[-500:]
@@ -323,7 +331,7 @@ def _h2_patch_clip_249(clip_num):
         if new_dur is None or m_dur is None or abs(new_dur - m_dur) > 0.10:
             return False, "duration gate failed (master %.3f, rebuilt %.3f; refused)" % (m_dur or -1, new_dur or -1)
         new_master.replace(master)
-        return True, "Part " + str(n) + " patched into ep 249 master."
+        return True, "Part " + str(n) + " patched into ep " + ep + " master."
     except Exception as e:
         return False, "patch failed: " + str(e)[:300]
 def rewrite_beat_urls(ch_data):
@@ -562,20 +570,15 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/beats/storyboard":
             # Read-only: H2 clip storyboard for the Manim panel (design
             # source of truth: title / equation-or-anchor / scenes).
-            # No runs, no writes, no substitutions. Episode 249 only.
-            ep = clean_ep(params.get("ep", ["248"])[0])
-            if ep != "249":
-                self.send_json({"success": False,
-                                "error": "storyboard serves episode 249 only"},
-                               status=400)
-                return
+            # No runs, no writes, no substitutions. Serves any episode.
+            ep = clean_ep(params.get("ep", [""])[0] or H2_EPISODE)
             try:
                 clip_num = int(params.get("clip_num", ["1"])[0])
             except ValueError:
                 self.send_json({"success": False, "error": "bad clip_num"},
                                status=400)
                 return
-            sb_path = (DDMA_DIR / "projects" / "episode_249" / "storyboards"
+            sb_path = (DDMA_DIR / "projects" / ("episode_" + str(ep)) / "storyboards"
                        / f"clip_{clip_num}_storyboard.json")
             try:
                 storyboard = json.loads(sb_path.read_text(encoding="utf-8"))
@@ -642,7 +645,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/beats/composite_timeline":
             # Spec H2 s4: the longform preview timeline comes from the
             # composite master itself — probed, never the hardcoded 54:14.
-            ep = clean_ep(params.get("ep", ["248"])[0])
+            ep = clean_ep(params.get("ep", [""])[0] or H2_EPISODE)
             if _h2_refused(ep):
                 self.send_json({"success": False, "ep": ep,
                                 "error": _h2_refused(ep)["error"]}, status=400)
@@ -658,7 +661,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 return
             total = _h2_probe_duration(master)
             try:
-                clips = _h2_load_plan_clips()
+                clips = _h2_load_episode_plan_clips(ep)
             except Exception as e:
                 self.send_json({"success": False,
                                 "error": f"plan unreadable: {e}"}, status=500)
@@ -807,14 +810,14 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/beats/patch":
-            ep = clean_ep(data.get("ep", "248"))
+            ep = clean_ep(data.get("ep") or H2_EPISODE)
             try:
                 clip_num = int(data.get("clip_num", 1))
             except ValueError:
                 self.send_json({"success": False, "error": "bad clip_num"}, status=400)
                 return
-            if str(ep) == "249":
-                _ok, _msg = _h2_patch_clip_249(clip_num)
+            if str(ep) in ("249", "250"):
+                _ok, _msg = _h2_patch_clip(ep, clip_num)
                 if _ok:
                     self.send_json({"success": True, "message": _msg})
                 else:
@@ -890,23 +893,21 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/beats/manim_retrigger":
             # Production action only — never writes visual_source (Spec C §7).
-            ep = clean_ep(data.get("ep", "248"))
+            ep = clean_ep(data.get("ep") or H2_EPISODE)
             try:
                 clip_num = int(data.get("clip_num", 1))
             except ValueError:
                 self.send_json({"success": False, "error": "bad clip_num"}, status=400)
                 return
             project_id = f"episode_{ep}"
-            _re_body = {}
-            if str(ep) == H2_EPISODE:
-                try:
-                    _rc = next((c for c in _h2_load_plan_clips() if int(c.get("num")) == int(clip_num)), {})
-                except Exception:
-                    _rc = {}
-                _re_body = {"force_regen": True,
-                              "transcript": _h2_clip_transcript(_rc) or "",
-                              "title": str(_rc.get("title") or ""),
-                              "directive": str(data.get("directive") or "")}
+            try:
+                _rc = next((c for c in _h2_load_episode_plan_clips(ep) if int(c.get("num")) == int(clip_num)), {})
+            except Exception:
+                _rc = {}
+            _re_body = {"force_regen": True,
+                          "transcript": _h2_clip_transcript(_rc) or "",
+                          "title": str(_rc.get("title") or ""),
+                          "directive": str(data.get("directive") or "")}
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
                 data=json.dumps(_re_body).encode("utf-8"),
@@ -929,15 +930,15 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/beats/design_artifacts":
             # Spec H2 s3: ONE deliberate start; fans out one design call per
             # clip; queued background renders with per-clip progress;
-            # exceptions-only reporting. Serves 249 only; never starts Mosaic.
-            ep = clean_ep(data.get("ep", "248"))
+            # exceptions-only reporting. Never starts Mosaic.
+            ep = clean_ep(data.get("ep") or H2_EPISODE)
             refused = _h2_refused(ep)
             if refused:
                 self.send_json(refused, status=400)
                 return
             try:
                 import spec_h2_composite_assembler as spec_h2
-                clips = _h2_load_plan_clips()
+                clips = _h2_load_episode_plan_clips(ep)
             except Exception as e:
                 self.send_json({"success": False,
                                 "error": f"plan unreadable: {e}"}, status=500)
@@ -986,7 +987,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             # for ONE clip. Planner only: validates the duration lock and
             # returns the restitch scope. Never starts a Mosaic run; never
             # touches duration or the hard-coded frame.
-            ep = clean_ep(data.get("ep", "248"))
+            ep = clean_ep(data.get("ep") or H2_EPISODE)
             refused = _h2_refused(ep)
             if refused:
                 self.send_json(refused, status=400)
@@ -1000,7 +1001,7 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             side = str(data.get("side", "")).strip().lower()
             try:
                 import spec_h2_composite_assembler as spec_h2
-                clips = _h2_load_plan_clips()
+                clips = _h2_load_episode_plan_clips(ep)
                 clip = next((c for c in clips if c.get("num") == clip_num),
                             None)
                 if clip is None:
