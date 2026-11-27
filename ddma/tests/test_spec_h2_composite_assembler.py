@@ -91,12 +91,13 @@ class TestSegmentBuild(unittest.TestCase):
         self.assertNotIn("crop", f)
 
     def test_filter_graph_center_footer_text(self):
-        # Per-clip center footer: "Part N of total" with N = the clip's
-        # on-screen part number (249 parts are 0-based: P1 -> "Part 1").
-        self.assertIn("text='Part 0 of 21'", H2.segment_filter(0, 21))
-        self.assertIn("text='Part 1 of 21'", H2.segment_filter(1, 21))
-        self.assertIn("text='Part 9 of 21'", H2.segment_filter(9, 21))
-        self.assertIn("text='Part 20 of 21'", H2.segment_filter(20, 21))
+        # Per-clip center footer: "N/total" with N = the clip's
+        # on-screen part number (249 parts are 0-based); clip 0
+        # (the intro) shows no center text.
+        self.assertIn("text=''", H2.segment_filter(0, 21))
+        self.assertIn("text='1/21'", H2.segment_filter(1, 21))
+        self.assertIn("text='9/21'", H2.segment_filter(9, 21))
+        self.assertIn("text='20/21'", H2.segment_filter(20, 21))
         self.assertIn("x=(w-text_w)/2", H2.segment_filter(0, 21))
         self.assertIn("fontsize=14", H2.segment_filter(0, 21))
         self.assertIn("fontcolor=0x888888", H2.segment_filter(0, 21))

@@ -102,11 +102,13 @@ class TestFreshDesign(unittest.TestCase):
         kinds = {s["kind"] for s in art["stages"]}
         self.assertTrue(kinds <= {"title", "diagram"})
 
-    def test_title_only_reported(self):
+    def test_title_only_retired_never_emitted(self):
         g = _FakeGenai(_choice(kind="title-only"))
         art, _ = F.design_clip_artifact(TR, "Clip T", 30.0, CATALOG, genai_mod=g, clip_num=1)
-        self.assertEqual(art["design"]["kind"], "title-only")
-        self.assertTrue(any("title-only" in r for r in art["design"]["reports"]))
+        d = art["design"]
+        self.assertNotEqual(d["kind"], "title-only")
+        self.assertIn(d["kind"], ("anchor", "formula", "diagram"))
+        self.assertFalse(any("title-only" in r for r in d["reports"]))
 
     def test_templates_compile_no_tex(self):
         vis = {"formula": {"type": "formula", "full": "x = y + 1 over two for all cases here"},

@@ -6,8 +6,8 @@ It generates a new design from the clip's transcript text + title + the
 episode-page equation catalog, implements the new rules (one sustained
 artifact per clip: title first, one equation OR one diagram OR one anchor
 label+arrow, stages at sentence boundaries, no archetype list, no reuse
-without a report), and renders deterministic Manim code (white-on-black
-Text only -- no LaTeX/Tex in this environment).
+without a report), and renders deterministic Manim code (white-on-black Text
+plus vector-path math (KaTeX-validated TeX via SVGMobject) for formula stages).
 """
 
 import json
@@ -18,7 +18,7 @@ from html.parser import HTMLParser
 
 EPISODE_PAGE_URL = "https://deepdive.shutri.com/{ep}.html"
 
-FRESH_KINDS = ("title", "formula", "diagram", "anchor", "title-only")
+FRESH_KINDS = ("title", "formula", "diagram", "anchor")
 DIAGRAM_KINDS = ("tunnel", "numberline", "groundzero")
 
 _ZW = "\u200b\ue020\uf000\uf001"
@@ -151,12 +151,12 @@ Equations already used by other clips (avoid; reuse must be reported, so prefer 
 
 NEW DESIGN RULES (absolute):
 1. ONE design call for this clip; output ONE artifact: the clip title first, plus AT MOST ONE of: (a) an equation from the catalog above, (b) one diagram, (c) one anchor (a label + arrow keyed to the hook sentence below). Never a list of per-beat scenes. Never a figurative cartoon, never an archetype.
-2. Equation ONLY if it is that clip's own (it must match the transcript topic). If none fits, choose diagram or anchor. If the clip has no suitable artifact at all, choose title-only.
+2. Equation ONLY if it is that clip's own (it must match the transcript topic). If none fits, choose diagram or anchor. If the clip has no suitable artifact at all, choose anchor with the title words as the label (title-only is retired; never emit it).
 3. Hook sentence (first sentence, for the anchor fallback): {hook}
 4. Formula reuse across clips is allowed only when the equation genuinely belongs to both clips; it is reported, never silent.
 
 Return ONLY a JSON object, no other text:
-{{"kind": "equation|diagram|anchor|title-only",
+{{"kind": "equation|diagram|anchor",
   "equation_ref": <catalog index or null>,
   "equation_display": "<short display form, <=140 chars, plain unicode, no TeX commands>",
   "anchor_label": "<1-4 WORD LABEL or null>",
@@ -194,7 +194,7 @@ def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
                 raw = raw.split("```")[1].split("```")[0].strip()
             choice = json.loads(raw)
             if isinstance(choice, dict) and choice.get("kind") in (
-                    "equation", "diagram", "anchor", "title-only"):
+                    "equation", "diagram", "anchor"):
                 return choice
         except Exception as e_m:
             print(f"[FreshDesign] Gemini {m_name} failed: {e_m}")
@@ -260,7 +260,7 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
     """Fresh-cast ONE artifact. Returns (storyboard_design_dict, reports).
 
     Never reads caches or plan scenes. The returned equation (if any) is
-    always a catalog member; anything else degrades to anchor/title-only
+    always a catalog member; anything else degrades to anchor
     and is reported. A non-empty directive (per-clip design instruction)
     is honored deterministically: unnegated "anchor" forces kind anchor;
     an equation name picks the best-matching catalog member (never
@@ -367,11 +367,6 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
         kind = "anchor"
         visual = {"type": "anchor", "label": lab[:32],
                   "hook": hook[:220]}
-    elif want == "title-only":
-        kind = "title-only"
-        visual = {"type": "title"}
-        reports.append("title-only: no suitable equation/diagram/anchor "
-                       "for this clip")
     stages, _ = _build_stages(title, kind, visual, transcript, body_duration)
     design = {"kind": kind, "title": title,
               "equation_text": visual.get("full") if kind == "formula"
@@ -571,6 +566,189 @@ def _lit(s):
 FOCUS_MAX_CHARS = 36
 SUB_ROW_FONT_SIZE = 14
 
+# Equation TeX sources, verbatim from the author's page markdown
+# (deepDive src/249.md display blocks, in page order). The stored
+# plain-text norms are lossy renderings of these same equations.
+EPISODE_TEX_SOURCES = [
+    r'x = x_0 e_0 + \sum_{i=1}^7 x_i e_i',
+    r'[x, y, z] \equiv (xy)z - x(yz) \neq 0',
+    r'(ux)(yu) = u(xy)u',
+    r'L_x y \equiv xy \quad \text{for } x, y \in \mathbb{O}',
+    (r'F = \mathbb{E}_{q(\eta)} \left[ \ln q(\eta) - \ln p(\eta, s) '
+     r'\right] = D_{\mathrm{KL}}\left(q(\eta) \,||\, p(\eta | s)'
+     r'\right) - \ln p(s)'),
+    (r'\alpha_t^\rho(A) = \Delta^{it} A \Delta^{-it} \quad \forall A '
+     r'\in \mathcal{M}, \; t \in \mathbb{R}'),
+    r't_{\mathrm{thermal}} = -\frac{1}{\beta} \ln \rho',
+]
+
+
+def match_tex_for_norm(norm):
+    """Map a stored plain-text equation norm to its TeX source index.
+
+    Returns the index into EPISODE_TEX_SOURCES, or None when the norm
+    is not one of the four equations the 249 designs use (the caller
+    must refuse to render math in that case, never invent TeX).
+    """
+    t = str(norm or '')
+    if 'D KL (' in t and t.startswith('F = E q'):
+        return 4
+    if t.startswith('[ x , y , z ]'):
+        return 1
+    if t.startswith('t thermal'):
+        return 6
+    if t.startswith('\u03b1 t \u03c1'):
+        return 5
+    return None
+
+
+def split_tex_rows(tex):
+    """Split TeX into rows at top-level operators only.
+
+    Breaks before depth-0 ``=`` (always binary) and depth-0 ``+``/``-``
+    that follow an operand (never unary, never mid-number, never inside
+    any ``{}``/``()``/``[]``/``\\left…\\right`` group). Returns the
+    list of row strings; a single row when nothing qualifies.
+    """
+    ops = []
+    depth = 0
+    i, n = 0, len(tex)
+    while i < n:
+        ch = tex[i]
+        if ch == '\\':
+            j = i + 1
+            if j < n and tex[j] == '\\':
+                i += 2
+                continue
+            if j < n and tex[j] == ' ':
+                i += 2
+                continue
+            k = j
+            while k < n and tex[k].isalpha():
+                k += 1
+            word = tex[j:k]
+            if word in ('left', 'right'):
+                depth += 1 if word == 'left' else -1
+                i = k
+                if k < n and tex[k] in '([{':
+                    i = k + 1
+                elif k < n and tex[k] == '.':
+                    i = k + 1
+                continue
+            i = k if k > j else j + 1
+            continue
+        if ch in '{([':
+            depth += 1
+        elif ch in '})]':
+            depth -= 1
+        elif depth == 0 and ch == '=':
+            ops.append(i)
+        elif depth == 0 and ch in '+-':
+            j = i - 1
+            while j >= 0 and tex[j] in ' \t':
+                j -= 1
+            if j >= 0 and (tex[j].isalnum() or tex[j] in ')}]'):
+                ops.append(i)
+        i += 1
+    if not ops:
+        return [tex.strip()]
+    rows, start = [], 0
+    for o in ops:
+        rows.append(tex[start:o].strip())
+        start = o
+    rows.append(tex[start:].strip())
+    return [r for r in rows if r]
+
+
+ROW_MAX_PT = 440.0
+
+
+def _katex_validate(tex):
+    """Strict-parse gate: the TeX must be valid KaTeX (npm global).
+
+    Raises on any failure (missing node/katex or a parse error) so the
+    caller refuses instead of rendering something unvalidated.
+    """
+    import os
+    import shutil
+    import subprocess
+    node = shutil.which('node')
+    if not node:
+        raise RuntimeError('katex gate: node not found')
+    npm = shutil.which('npm')
+    node_path = os.environ.get('NODE_PATH') or ''
+    if not node_path and npm:
+        try:
+            p = subprocess.run(
+                [npm, 'root', '-g'], capture_output=True, text=True,
+                timeout=30)
+            if p.returncode == 0 and p.stdout.strip():
+                node_path = p.stdout.strip()
+        except Exception:
+            pass
+    js = ('const k=require("katex");'
+          'k.renderToString(%s,{throwOnError:true});'
+          'console.log("TEX-OK");' % __import__('json').dumps(tex))
+    env = dict(os.environ)
+    if node_path:
+        env['NODE_PATH'] = (node_path + os.pathsep +
+                            env.get('NODE_PATH', ''))
+    r = subprocess.run([node, '-e', js], capture_output=True, text=True,
+                       timeout=60, env=env)
+    if r.returncode != 0 or 'TEX-OK' not in (r.stdout or ''):
+        raise RuntimeError('katex gate rejected TeX: ' +
+                           ((r.stderr or r.stdout)[:300] if r else '?'))
+
+
+def _svg_width_pt(path):
+    import re as _re2
+    with open(path, 'rb') as fh:
+        raw = fh.read()[:2000].decode('utf-8', 'replace')
+    m = _re2.search(r'width="([\d.]+)pt"', raw)
+    return float(m.group(1)) if m else 0.0
+
+
+def _render_one_tex_svg(tex, path, fontsize=22):
+    import matplotlib
+    matplotlib.use('SVG')
+    import matplotlib.pyplot as plt
+    fig = plt.figure(figsize=(8, 2))
+    fig.patch.set_alpha(0.0)
+    fig.text(0.01, 0.4, '$%s$' % tex, fontsize=fontsize, color='white')
+    fig.savefig(path, format='svg', transparent=True,
+                bbox_inches='tight', pad_inches=0.05)
+    plt.close(fig)
+
+
+def render_tex_rows_svg(tex, out_dir, tag, fontsize=22):
+    """Validate (KaTeX gate), split if needed, render TeX rows to SVG.
+
+    Returns row SVG paths (absolute, forward slashes). Single row when
+    the whole equation fits ROW_MAX_PT; otherwise split at top-level
+    operators only. The Manim side additionally scales the row group
+    to the pane, so fit is guaranteed twice over.
+    """
+    import os as _os
+    _katex_validate(tex)
+    _os.makedirs(out_dir, exist_ok=True)
+    whole = _os.path.join(out_dir, '%s_row0.svg' % tag)
+    _render_one_tex_svg(tex, whole, fontsize=fontsize)
+    if _svg_width_pt(whole) <= ROW_MAX_PT:
+        return [whole.replace('\\', '/')]
+    rows = split_tex_rows(tex)
+    if len(rows) <= 1:
+        return [whole.replace('\\', '/')]
+    try:
+        _os.remove(whole)
+    except OSError:
+        pass
+    out = []
+    for idx, row in enumerate(rows):
+        path = _os.path.join(out_dir, '%s_row%d.svg' % (tag, idx))
+        _render_one_tex_svg(row, path, fontsize=fontsize)
+        out.append(path.replace('\\', '/'))
+    return out
+
 
 def _format_focus(text, limit=FOCUS_MAX_CHARS):
     """Uppercase footer focus label, numeric section prefix stripped,
@@ -586,55 +764,44 @@ def _format_focus(text, limit=FOCUS_MAX_CHARS):
     return cut + "\u2026"
 
 
-def _stage_focus(stage):
-    """Clip-level focus for the footer sub-row, derived from the stage
-    visual. The render driver overrides this per clip via the transient
-    in-memory ``_render_focus`` hint (storyboard files are never edited);
-    title-kind stages carry no focus of their own, so without the hint
-    they render a blank below-left."""
-    hint = (stage or {}).get("_render_focus")
-    if hint is not None:
-        return _format_focus(hint)
-    visual = (stage or {}).get("visual") or {}
-    vtype = str(visual.get("type") or (stage or {}).get("kind")
-                or "").lower()
-    if vtype == "formula":
-        return _format_focus(visual.get("section") or "")
-    if vtype == "anchor":
-        return _format_focus(visual.get("label") or "")
-    if vtype == "diagram":
-        return _format_focus(visual.get("diagram") or "")
-    return ""
+def _chrome_bottom(title, archetype="", ep=None):
+    """Two-row footer: clip PLAN title above the divider line; below the
+    line the archetype type (left) and the fixed credit (right).
 
-
-def _chrome_bottom(title, focus_left="", ep=None):
-    """Two-row footer: clip title above the divider line; below the line
-    the design focus (left) and ``deepDive podcast`` credit (right).
+    Below-left is the clip's archetype (ANCHOR / FORMULA / DIAGRAM),
+    constant through the clip -- never the focus. Below-right is
+    always ``deepDive podcast \u00b7 Ep {ep}`` (mixed case,
+    middle-dot, episode number always present). The footer title
+    shrink-fits long titles (clip 0) instead of truncating.
 
     The untouched render engine's base scene draws its own duplicate
     rule + sub-row at y ~-3.35/-3.6; this module may not touch the
     engine file, so the chrome first paints a black cover strip over
     that region, then draws the single canonical footer on top.
     """
+    arch = str(archetype or "ANCHOR").upper()
+    if arch not in ("ANCHOR", "FORMULA", "DIAGRAM"):
+        arch = "ANCHOR"
     right = ("deepDive podcast \u00b7 Ep " + str(ep) if ep
              else "deepDive podcast")
     parts = [
         f'    _cover = Rectangle(width=8.0, height=0.8, '
         f'fill_color="#000000", fill_opacity=1, '
         f'stroke_width=0).move_to([0, -3.66, 0])\n',
-        f'    bottom = Text({_lit(title.upper()[:40])}, font="DejaVu Sans", '
-        f'font_size=22, color="#FFFFFF").move_to([0, -2.70, 0])\n',
+        f'    bottom = Text({_lit(title.upper())}, font="DejaVu Sans", '
+        f'font_size=22, color="#FFFFFF")\n',
+        f'    _btw = bottom.width\n',
+        f'    if _btw > 6.8:\n',
+        f'        bottom.scale_to_fit_width(6.8)\n',
+        f'    bottom.move_to([0, -2.70, 0])\n',
         f'    foot = Line([-3.4, -3.45, 0], [3.4, -3.45, 0], '
         f'color="#FFFFFF", stroke_width=2, stroke_opacity=0.35)\n',
+        f'    _arch_l = Text({_lit(arch)}, font="DejaVu Sans", '
+        f'font_size={SUB_ROW_FONT_SIZE}, color="#FFFFFF")\n'
+        f'    _arch_l.move_to('
+        f'[-3.4 + _arch_l.width / 2, -3.72, 0])\n',
     ]
-    adds = ['_cover', 'bottom', 'foot']
-    if focus_left:
-        parts.append(
-            f'    _focus_l = Text({_lit(focus_left)}, font="DejaVu Sans", '
-            f'font_size={SUB_ROW_FONT_SIZE}, color="#FFFFFF")\n'
-            f'    _focus_l.move_to('
-            f'[-3.4 + _focus_l.width / 2, -3.72, 0])\n')
-        adds.append('_focus_l')
+    adds = ['_cover', 'bottom', 'foot', '_arch_l']
     parts.append(
         f'    _focus_r = Text({_lit(right)}, font="DejaVu Sans", '
         f'font_size={SUB_ROW_FONT_SIZE}, color="#FFFFFF")\n'
@@ -656,24 +823,65 @@ def _timings(duration):
 def _render_stage_body(stage, cls_name, duration):
     """Deterministic white-on-black Manim code for one fresh stage.
 
-    Uses Text only (no LaTeX in this environment). Every template keeps the
-    clip title chrome at the bottom, fills the canvas (never left-empty),
-    and ends with slow ambient motion so the frame is visibly alive.
+    Formula stages embed KaTeX-validated TeX as vector paths;
+    every stage also shows its sentence text on the pane. Every
+    template keeps the clip title chrome at the bottom, fills the
+    canvas (never left-empty), and ends with slow ambient motion
+    so the frame is visibly alive.
     """
     kind = str(stage.get("kind") or "title").lower()
     title = str(stage.get("title") or "DEEP DIVE")
     visual = stage.get("visual") or {}
     t_enter, t_build, t_hold = _timings(duration)
-    focus = _stage_focus(stage)
+    arch = str((stage or {}).get("_render_archetype") or "").upper()
+    if arch not in ("ANCHOR", "FORMULA", "DIAGRAM"):
+        _ak = str(stage.get("kind") or "").lower()
+        arch = {"formula": "FORMULA",
+                "diagram": "DIAGRAM"}.get(_ak, "ANCHOR")
     ep = (stage or {}).get("_render_ep")
     # Above-line chrome title is the clip's PLAN title (transient
-    # in-memory ``_render_title`` hint from the render driver; the
-    # design label stays below-left as the focus). Falls back to the
-    # stage title when no hint is present.
+    # in-memory ``_render_title`` hint from the render driver; falls
+    # back to the stage title when no hint is present). Below-left is
+    # the clip-constant archetype (transient ``_render_archetype``
+    # hint from the driver, taken from the board design kind).
     chrome_title = str((stage or {}).get("_render_title") or title)
+    sent_txt = _wrap_lines(str((stage or {}).get("text") or " ").strip()
+                           or " ", 36)
     head = (f"class {cls_name}(Scene):\n    def construct(self):\n"
-            + _chrome_bottom(chrome_title, focus_left=focus, ep=ep))
+            + _chrome_bottom(chrome_title, archetype=arch, ep=ep)
+            + f'    _sent = Text({_lit(sent_txt)}, font="DejaVu Sans", '
+            f'font_size=16, color="#FFFFFF")\n'
+            f'    _ssw = _sent.width\n'
+            f'    _ssh = _sent.height\n'
+            f'    _sent.scale(min(1.0, 6.2 / _ssw if _ssw > 0 else 1.0, '
+            f'1.5 / _ssh if _ssh > 0 else 1.0))\n'
+            f'    _sent.move_to([0, 3.05, 0])\n')
     if kind == "formula":
+        svg_rows = (stage or {}).get("_render_svg_rows") or []
+        if svg_rows:
+            # Real math: KaTeX-validated TeX rendered to SVG rows by
+            # the driver, embedded as vector paths. The row group is
+            # scaled to the pane (width 5.8u ~= 536px, height-capped),
+            # so fit is guaranteed regardless of equation width.
+            parts = []
+            for i, p in enumerate(svg_rows):
+                parts.append(
+                    f'    _eqr{i} = SVGMobject({_lit(p)})\n')
+            group = ('    _eq_rows = VGroup(%s).arrange(DOWN, buff=0.35, '
+                     'aligned_edge=ORIGIN)\n'
+                     % ", ".join("_eqr%d" % i
+                                 for i in range(len(svg_rows))))
+            return (head + "".join(parts) + group +
+                    '    _eq_rows.scale(min(1.6, 5.8 / _eq_rows.width))\n'
+                    '    _eq_rows.scale(min(1.0, 4.2 / _eq_rows.height))\n'
+                    '    _eq_rows.move_to([0, 0.5, 0])\n'
+                    f'    self.play(FadeIn(_eq_rows), FadeIn(_sent), run_time={t_enter})\n'
+                    '    self.play(_eq_rows.animate.shift(UP * 0.25).scale('
+                    '1.02), '
+                    f'run_time={t_build})\n'
+                    '    self.play(_eq_rows.animate.shift(DOWN * 0.25).scale('
+                    '1 / 1.02), '
+                    f'run_time={t_hold})\n')
         full = str(visual.get("full") or title)
         toks = full.split()
         prog = float(visual.get("progress") or 1.0)
@@ -683,7 +891,7 @@ def _render_stage_body(stage, cls_name, duration):
                 f'    eq = Text({_lit(shown)}, font="DejaVu Sans", '
                 f'font_size=20, color="#FFFFFF")\n'
                 f'    eq.scale_to_fit_width(6.4).move_to([0, 0.5, 0])\n'
-                f'    self.play(FadeIn(eq), run_time={t_enter})\n'
+                f'    self.play(FadeIn(eq), FadeIn(_sent), run_time={t_enter})\n'
                 f'    self.play(eq.animate.shift(UP * 0.25).scale(1.02), '
                 f'run_time={t_build})\n'
                 f'    self.play(eq.animate.shift(DOWN * 0.25).scale(1 / 1.02), '
@@ -702,7 +910,7 @@ def _render_stage_body(stage, cls_name, duration):
                     f'    sqs = [{squares}]\n'
                     f'    tunnel = VGroup(*sqs).move_to([0, 0.3, 0])\n'
                     f'    dot = Dot(color="#FFFFFF").move_to([-3, 0.3, 0])\n'
-                    f'    self.play(FadeIn(tunnel), run_time={t_enter})\n'
+                    f'    self.play(FadeIn(tunnel), FadeIn(_sent), run_time={t_enter})\n'
                     f'    self.play(*[FadeIn(sqs[{{i}}]) for i in range({n})], '
                     f'run_time={t_build})\n'
                     f'    self.play(dot.animate.move_to([3, 0.3, 0]), '
@@ -716,7 +924,7 @@ def _render_stage_body(stage, cls_name, duration):
                     f'color="#FFFFFF", stroke_width=4) for x in '
                     f'[-2.4, -1.2, 0.0, 1.2, 2.4][: {n}]])\n'
                     f'    dot = Dot(color="#FFFFFF").move_to([-3.2, 0.3, 0])\n'
-                    f'    self.play(FadeIn(line), run_time={t_enter})\n'
+                    f'    self.play(FadeIn(line), FadeIn(_sent), run_time={t_enter})\n'
                     f'    self.play(FadeIn(ticks), run_time={t_build})\n'
                     f'    self.play(dot.animate.move_to([3.2, 0.3, 0]), '
                     f'run_time={t_hold})\n')
@@ -728,7 +936,7 @@ def _render_stage_body(stage, cls_name, duration):
                 f'    rings = [{rings}]\n'
                 f'    gz = VGroup(*rings).move_to([0, 0.3, 0])\n'
                 f'    core = Dot(color="#FFFFFF").scale(1.4).move_to([0, 0.3, 0])\n'
-                f'    self.play(FadeIn(gz), run_time={t_enter})\n'
+                f'    self.play(FadeIn(gz), FadeIn(_sent), run_time={t_enter})\n'
                 f'    self.play(*[FadeIn(rings[{{i}}]) for i in range({n})], '
                 f'FadeIn(core), run_time={t_build})\n'
                 f'    self.play(core.animate.scale(1.6), run_time={t_hold / 2:.2f})\n'
@@ -745,7 +953,7 @@ def _render_stage_body(stage, cls_name, duration):
                 f'    hook = Text({_lit(hook_txt)}, font="DejaVu Sans", '
                 f'font_size=14, color="#FFFFFF").move_to([0, -1.5, 0])\n'
                 f'    hook.scale_to_fit_width(6.2)\n'
-                f'    self.play(FadeIn(lab), run_time={t_enter})\n'
+                f'    self.play(FadeIn(lab), FadeIn(_sent), run_time={t_enter})\n'
                 f'    self.play(GrowArrow(arr), FadeIn(hook), '
                 f'run_time={t_build})\n'
                 f'    self.play(lab.animate.shift(UP * 0.15), '
@@ -755,7 +963,7 @@ def _render_stage_body(stage, cls_name, duration):
             f'    big = Text({_lit(big)}, font="DejaVu Sans", weight=BOLD, '
             f'font_size=42, color="#FFFFFF").move_to([0, 0.5, 0])\n'
             f'    big.scale_to_fit_width(6.4)\n'
-            f'    self.play(FadeIn(big), run_time={t_enter})\n'
+            f'    self.play(FadeIn(big), FadeIn(_sent), run_time={t_enter})\n'
             f'    self.play(big.animate.shift(UP * 0.2), run_time={t_build})\n'
             f'    self.play(big.animate.shift(DOWN * 0.2), '
             f'run_time={t_hold})\n')

@@ -333,7 +333,7 @@ STRICT VISUAL & CODE RULES (The Feynman-Needham Standard):
 
     return None
 
-FRESH_STAGE_KINDS = ("title", "formula", "diagram", "anchor", "title-only")
+FRESH_STAGE_KINDS = ("title", "formula", "diagram", "anchor")
 
 
 def generate_manim_scene_python(scene_data: Dict[str, Any], scene_class_name: str, duration: float) -> str:

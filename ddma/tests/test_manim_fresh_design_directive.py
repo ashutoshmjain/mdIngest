@@ -73,8 +73,7 @@ class TestDirective(unittest.TestCase):
             TR, "Clip T", 60.0, CATALOG, genai_mod=None, clip_num=5,
             directive="lean into the mirror idea")
         d = art["design"]
-        self.assertIn(d["kind"], ("anchor", "formula", "diagram",
-                                  "title-only"))
+        self.assertIn(d["kind"], ("anchor", "formula", "diagram"))
         self.assertEqual(d["directive"], "lean into the mirror idea")
         if d["kind"] == "formula":
             self.assertIn(d["equation_norm"],

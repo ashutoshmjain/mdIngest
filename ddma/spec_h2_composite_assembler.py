@@ -108,7 +108,7 @@ def composite_frame_spec():
                         "right": f"Mosaic {PANEL_SIZE}x{PANEL_SIZE}",
                         "origins": {"art": ART_POS, "mosaic": MOS_POS}},
         "footer": {"style": "Mosaic", "left": "Manim",
-                   "center": "Part N of total (per-clip drawtext)",
+                   "center": "N/total (per-clip drawtext; blank on clip 0)",
                    "right": "Mosaic", "rule": "delimiter line above",
                    "copy": "no invented copy"},
     }
@@ -388,20 +388,20 @@ def segment_filter(clip_num, total_clips):
     """Exact trial filter graph for clip n (caps_{n}.ass burned in).
 
     The chrome image carries the static footer (Manim left, Mosaic
-    right, delimiter rule); the center "Part N of total" is drawn per
-    clip here since it varies. total_clips comes from the episode plan
-    via the caller -- never hardcoded.
+    right, delimiter rule); the center "N/total" is drawn per clip
+    here since it varies (clip 0, the intro, shows no center text).
+    total_clips comes from the episode plan via the caller
+    -- never hardcoded.
     """
     total = int(total_clips)
     if total <= 0:
         raise ValueError("segment_filter: total_clips must be positive "
                          "(derived from the episode plan, never hardcoded)")
-    # NOTE (deviation from the spec's `clip_num + 1` line, per V1 + UI):
-    # Beats Studio numbers 249's parts 0-based (P0 -> "Part 0"), so the
-    # footer must read Part {clip_num}, matching the on-screen part name
-    # and V1's literal "Part 1 of 21" for clip 1. (A +1 would print
-    # "Part 2 of 21" on clip 1's segment and fail V1.)
-    center = f"Part {int(clip_num)} of {total}"
+    # V2 ruling: center is N/total with N = the clip number; clip 0
+    # (the intro) shows no center text. Beats Studio numbers the
+    # parts 0-based, so clip 1 reads "1/21" on its segment.
+    n = int(clip_num)
+    center = "" if n == 0 else f"{n}/{total}"
     return ("[1:v]setsar=1[art];"
             "[2:v]scale=740:740,setsar=1[mos];"
             "[0:v][3:v]overlay=0:0[base];"
