@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <title>Beats Studio — longform video workflow</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 <style>
 :root {
   --bg-light: #fbf9f5;
@@ -75,7 +77,7 @@ a { color: var(--accent-indigo); }
                         <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0 0 16px 0;">Render at least one clip in Cutroom first.</p>
                         <a class="btn-mini" data-cutroom-home data-cutroom-page="curator.html">Go to Cutroom</a>
                     </div>
-                    <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 12px; align-items: start;">
+                    <div id="beats-workspace-grid" style="display: grid; grid-template-columns: 260px minmax(0, 1fr) 360px; gap: 12px; align-items: start;">
 
                         <!-- LEFT PANE: Clips / Chapters -->
                         <button type="button" id="tab-expand-left" onclick="toggleSidePane('left', false)" title="Expand Clips pane" style="display:none;background:var(--panel-bg);color:var(--text-muted);border:1px solid var(--border-color);border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">▶</button>
@@ -95,7 +97,7 @@ a { color: var(--accent-indigo); }
                             </div>
                         </aside>
 
-                        <!-- MIDDLE PANE: Player + Beat Scrubber + Beat Editor -->
+                        <!-- MIDDLE PANE: Player + Beat Scrubber + Status/Landing -->
                         <main id="beats-middle-pane" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); overflow: hidden; display: flex; flex-direction: column;">
                             <div style="background: var(--panel-bg); padding: 12px 16px; border-bottom: 2px solid var(--border-color);">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
@@ -110,7 +112,7 @@ a { color: var(--accent-indigo); }
                                         </div>
                                         <span id="lf-player-hint" style="display:none;font-family:var(--font-mono);font-size:0.66rem;color:var(--accent-amber);"></span>
                                         <span id="lf-studio-playhead-badge" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dark-secondary); background: var(--panel-bg-darker); padding: 3px 9px; border-radius: 5px;">00:00 / 00:00</span>
-                                        <span id="beats-mosaic-status" style="font-size:0.7rem;color:var(--primary);"></span><button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button><button type="button" class="btn-cmd" id="btn-design-artifacts" onclick="designArtifacts('episode')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="One deliberate start: design the Manim artifact for every clip, queued in the background (Spec H2 s3)">🎨 Design artifacts</button><button type="button" class="btn-cmd" id="btn-retrigger-manim" onclick="compositeRetrigger('manim')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Manim left pane only for this clip, re-stitch its segment (Spec H2 s4)">↻ Retrigger Manim-only</button><button type="button" class="btn-cmd" id="btn-retrigger-mosaic" onclick="compositeRetrigger('mosaic')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Mosaic right pane only for this clip (double-confirmed; Spec H2 s4)">↻ Retrigger Mosaic-only</button>
+                                        <button type="button" class="btn-cmd" id="btn-push-longform-ddhub" onclick="pushLongformToDdHub()" style="font-size: 0.7rem; padding: 4px 10px; background: var(--primary); color: #fff; border: 1px solid var(--primary-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Gate the master, then push the movie to dd_hub (Spec H)">⬆ Push movie to dd_hub</button><button type="button" class="btn-cmd" id="btn-design-artifacts" onclick="designArtifacts('episode')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent); color: #fff; border: 1px solid var(--accent-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="One deliberate start: design the Manim artifact for every clip, queued in the background (Spec H2 s3)">🎨 Design artifacts</button><button type="button" class="btn-cmd" id="btn-retrigger-manim" onclick="compositeRetrigger('manim')" style="font-size: 0.7rem; padding: 4px 10px; background: var(--accent-indigo); color: #fff; border: 1px solid var(--accent-indigo-hover); border-radius: 6px; font-weight: 700; cursor: pointer;" title="Pause the preview, re-render the Manim left pane only for this clip, re-stitch its segment (Spec H2 s4)">↻ Retrigger Manim-only</button>
                                     </div>
                                 </div>
 
@@ -118,18 +120,28 @@ a { color: var(--accent-indigo); }
                                 <div style="position: relative; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 8px;">
                                     <video id="lf-studio-video-player" style="width: 100%; aspect-ratio: 16/9; display: block; background: #000;" controls preload="metadata"></video>
                                     <div id="lf-no-media-hint" style="display:none; padding:24px; text-align:center; color:var(--text-muted); font-size:0.82rem; font-family:var(--font-mono);">No clip render or longform master available for this clip yet.</div>
-                                                                    </div>
+                                </div>
                                 <!-- Chapter Span Strip + Beat Boundary Ticks (Spec C §3.1) -->
                                 <div id="lf-span-strip" style="display:flex; gap:2px; align-items:stretch; height:22px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:2px; overflow:hidden;"></div>
                             </div>
 
-                            <!-- Below-Player Surface: always the clip Manim panel (Spec H2 X, ep 249) -->
+                            <!-- Below-Player Surface: always the clip Manim status/landing panel -->
                             <div id="beats-below-player"></div>
                             <div id="h2-design-panel" style="display:none;padding:8px 16px;font-family:var(--font-mono);font-size:0.72rem;background:var(--panel-bg-darker);border-top:1px solid var(--border-color);color:var(--text-main);"></div>
                         </main>
 
-
-                        
+                        <!-- RIGHT PANE: Manim Configurator (MANIM — Design) -->
+                        <aside id="beats-right-pane" style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; max-height: calc(100vh - 84px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; gap: 4px;">
+                                <button type="button" id="btn-collapse-right" onclick="toggleSidePane('right', true)" title="Collapse Manim Configurator pane" style="background:transparent;border:none;color:var(--text-muted);cursor:pointer;font-size:0.72rem;padding:2px 4px;">▶</button>
+                                <span style="font-size: 0.85rem; font-weight: 800; color: var(--text-main); letter-spacing: 0.08em;">MANIM &mdash; Design</span>
+                                <span id="lf-configurator-part-badge" style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--primary); font-weight: 700;">Part 1</span>
+                            </div>
+                            <div id="lf-manim-configurator">
+                                <span style="color: var(--text-muted); font-size: 0.75rem;">Loading Manim configurator...</span>
+                            </div>
+                        </aside>
+                        <button type="button" id="tab-expand-right" onclick="toggleSidePane('right', false)" title="Expand Manim Configurator pane" style="display:none;background:var(--panel-bg);color:var(--text-muted);border:1px solid var(--border-color);border-radius:6px;padding:8px 2px;font-size:0.7rem;cursor:pointer;align-items:center;justify-content:center;width:18px;min-height:80px;">◀</button>
 
                     </div>
                 </div>
@@ -158,19 +170,24 @@ a { color: var(--accent-indigo); }
         let lfVideoListenerBound = false;
         let lfPlaybackMode = 'clip';
         let lfPendingSeek = null;
-        let lfPaneState = { left: false };
+        let lfPaneState = { left: false, right: false };
 
         function toggleSidePane(side, collapse) {
             lfPaneState[side] = Boolean(collapse);
             const grid = document.getElementById('beats-workspace-grid');
             const leftPane = document.getElementById('beats-left-pane');
+            const rightPane = document.getElementById('beats-right-pane');
             const tabL = document.getElementById('tab-expand-left');
+            const tabR = document.getElementById('tab-expand-right');
             if (leftPane) leftPane.style.display = lfPaneState.left ? 'none' : 'flex';
             if (tabL) tabL.style.display = lfPaneState.left ? 'flex' : 'none';
+            if (rightPane) rightPane.style.display = lfPaneState.right ? 'none' : 'flex';
+            if (tabR) tabR.style.display = lfPaneState.right ? 'flex' : 'none';
             if (grid) {
                 const lCol = lfPaneState.left ? '18px' : '260px';
-                grid.style.gap = lfPaneState.left ? '4px' : '12px';
-                grid.style.gridTemplateColumns = `${lCol} minmax(0, 1fr)`;
+                const rCol = lfPaneState.right ? '18px' : '360px';
+                grid.style.gap = (lfPaneState.left && lfPaneState.right) ? '4px' : '12px';
+                grid.style.gridTemplateColumns = `${lCol} minmax(0, 1fr) ${rCol}`;
             }
         }
 
@@ -441,6 +458,8 @@ a { color: var(--accent-indigo); }
         }
 
 
+        let lfConfigState = null;
+
         async function renderClipSurface(cNum, chInfo, seekVideo = false) {
             await renderClipManimPanel(cNum, chInfo || {});
             if (seekVideo) {
@@ -451,6 +470,310 @@ a { color: var(--accent-indigo); }
             }
         }
 
+        function renderKatexMathHtml(tex, fallbackNorm) {
+            const rawTex = String(tex || '').trim();
+            if (rawTex && typeof katex !== 'undefined' && katex.renderToString) {
+                try {
+                    return katex.renderToString(rawTex, { displayMode: false, throwOnError: false });
+                } catch (e) {}
+            }
+            return '<code>' + escapeHtml(fallbackNorm || rawTex || '') + '</code>';
+        }
+
+        function composeClientEffectivePrompt(cfg) {
+            if (!cfg) return '';
+            const transcript = String(cfg.transcript || '').slice(0, 6000);
+            const title = String(cfg.title || 'Deep Dive');
+            const dur = Number(cfg.body_duration || 120.0).toFixed(1);
+            const sents = String(cfg.transcript || '').split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+            const cat = Array.isArray(cfg.catalog) ? cfg.catalog : [];
+            const catLines = cat.map((c, i) => `[${i}] (${String(c.section || '').slice(0, 60)}) ${String(c.norm || '').slice(0, 200)}`).join('\n') || '(none)';
+            const priorStr = JSON.stringify(cfg.prior_equations || {}).slice(0, 800) || '(none)';
+            const hookStr = String(cfg.anchor_hook || cfg.hook || '').slice(0, 300);
+            let prompt = `You design ONE sustained Manim artifact for a single podcast clip.\nTranscript (this clip only):\n${transcript}\n\nClip title: ${title}\nClip duration: ${dur}s. Sentences (${sents.length}): ${JSON.stringify(sents.slice(0, 12)).slice(0, 1500)}\n\nCandidate equations from the episode page (use ONLY these; never invent):\n${catLines}\n\nEquations already used by other clips (avoid; reuse must be reported, so prefer an unused one):\n${priorStr}\n\nNEW DESIGN RULES (absolute):\n1. ONE design call for this clip; output ONE artifact: the clip title first, plus AT MOST ONE of: (a) an equation from the catalog above, (b) one diagram, (c) one anchor (a label + arrow keyed to the hook sentence below). Never a list of per-beat scenes. Never a figurative cartoon, never an archetype.\n2. Equation ONLY if it is that clip's own (it must match the transcript topic). If none fits, choose diagram or anchor. If the clip has no suitable artifact at all, choose anchor with the title words as the label (title-only is retired; never emit it).\n3. Hook sentence (first sentence, for the anchor fallback): ${hookStr}\n4. Formula reuse across clips is allowed only when the equation genuinely belongs to both clips; it is reported, never silent.\n\nReturn ONLY a JSON object, no other text:\n{"kind": "equation|diagram|anchor",\n  "equation_ref": <catalog index or null>,\n  "equation_display": "<short display form, <=140 chars, plain unicode, no TeX commands>",\n  "anchor_label": "<1-4 WORD LABEL or null>",\n  "diagram": "tunnel|numberline|groundzero|null",\n  "reason": "<one line: why this artifact is this clip's own>"}`;
+            const k = String(cfg.kind || 'anchor').toLowerCase();
+            const sp = [`kind=${k.toUpperCase()}`];
+            if (k === 'formula' && cfg.equation_ref != null && String(cfg.equation_ref) !== '') {
+                sp.push(`equation_ref=${cfg.equation_ref}`);
+            } else if (k === 'diagram' && cfg.diagram) {
+                sp.push(`diagram=${cfg.diagram}`);
+            } else if (k === 'anchor') {
+                if (cfg.anchor_label) sp.push(`anchor_label='${String(cfg.anchor_label).trim().toUpperCase().slice(0, 32)}'`);
+                if (cfg.anchor_hook) sp.push(`anchor_hook='${String(cfg.anchor_hook).trim().slice(0, 220)}'`);
+            }
+            prompt += `\nStructured design parameters: ${sp.join(', ')}`;
+            if (cfg.directive && String(cfg.directive).trim()) {
+                prompt += `\nUser design instruction for this clip (honor it; the catalog-membership rule still applies): ${String(cfg.directive).trim().slice(0, 300)}`;
+            }
+            return prompt;
+        }
+
+        function syncConfiguratorFromDom() {
+            if (!lfConfigState) return;
+            const kindSel = document.getElementById('lf-cfg-kind');
+            if (kindSel) lfConfigState.kind = kindSel.value;
+            const diagSel = document.getElementById('lf-cfg-diagram');
+            if (diagSel) lfConfigState.diagram = diagSel.value;
+            const labInp = document.getElementById('lf-cfg-anchor-label');
+            if (labInp) lfConfigState.anchor_label = labInp.value;
+            const hookInp = document.getElementById('lf-cfg-anchor-hook');
+            if (hookInp) lfConfigState.anchor_hook = hookInp.value;
+            const dirBox = document.getElementById('lf-manim-directive');
+            if (dirBox) lfConfigState.directive = dirBox.value;
+        }
+
+        function updateConfiguratorPromptIfClean() {
+            if (!lfConfigState) return;
+            syncConfiguratorFromDom();
+            const composed = composeClientEffectivePrompt(lfConfigState);
+            lfConfigState.composed_prompt = composed;
+            const pBox = document.getElementById('lf-cfg-effective-prompt');
+            if (pBox && !lfConfigState.prompt_dirty) {
+                pBox.value = composed;
+            }
+        }
+
+        function onConfiguratorKindChange() {
+            if (!lfConfigState) return;
+            const kindSel = document.getElementById('lf-cfg-kind');
+            if (kindSel) lfConfigState.kind = kindSel.value;
+            syncConfiguratorFromDom();
+            renderConfiguratorSlot();
+            updateConfiguratorPromptIfClean();
+        }
+
+        function toggleEquationDropdown() {
+            const listEl = document.getElementById('lf-cfg-eq-dropdown-list');
+            if (!listEl) return;
+            listEl.style.display = (listEl.style.display === 'none') ? 'flex' : 'none';
+        }
+
+        function selectCatalogEquation(idx) {
+            if (!lfConfigState) return;
+            lfConfigState.equation_ref = idx;
+            renderConfiguratorSlot();
+            updateConfiguratorPromptIfClean();
+        }
+
+        function onConfiguratorPromptInput() {
+            if (!lfConfigState) return;
+            const pBox = document.getElementById('lf-cfg-effective-prompt');
+            if (!pBox) return;
+            lfConfigState.prompt_dirty = (pBox.value.trim() !== String(lfConfigState.composed_prompt || '').trim());
+            lfConfigState.prompt_override = lfConfigState.prompt_dirty ? pBox.value : '';
+        }
+
+        function resetConfiguratorPrompt() {
+            if (!lfConfigState) return;
+            syncConfiguratorFromDom();
+            lfConfigState.prompt_dirty = false;
+            lfConfigState.prompt_override = '';
+            const composed = composeClientEffectivePrompt(lfConfigState);
+            lfConfigState.composed_prompt = composed;
+            const pBox = document.getElementById('lf-cfg-effective-prompt');
+            if (pBox) pBox.value = composed;
+        }
+
+        function renderConfiguratorSlot() {
+            const slotEl = document.getElementById('lf-cfg-slot-container');
+            if (!slotEl || !lfConfigState) return;
+            const kind = String(lfConfigState.kind || 'anchor').toLowerCase();
+            if (kind === 'formula') {
+                const cat = Array.isArray(lfConfigState.catalog) ? lfConfigState.catalog : [];
+                const selIdx = (lfConfigState.equation_ref != null && cat[lfConfigState.equation_ref]) ? Number(lfConfigState.equation_ref) : 0;
+                lfConfigState.equation_ref = cat.length ? selIdx : null;
+                const selEntry = cat[selIdx] || null;
+                const selLabelHtml = selEntry
+                    ? ('<div style="font-weight:700;font-size:0.74rem;color:var(--text-main);">[' + selIdx + '] ' + escapeHtml(selEntry.section || 'Equation') + '</div>' +
+                       '<div style="font-size:0.78rem;margin-top:3px;overflow-x:auto;">' + renderKatexMathHtml(selEntry.tex, selEntry.norm) + '</div>')
+                    : '<div style="font-size:0.74rem;color:var(--text-muted);">No catalog equations on episode page</div>';
+                const rowsHtml = cat.map(function (c, idx) {
+                    const isSel = (idx === selIdx);
+                    const rowBg = isSel ? 'var(--panel-bg-darker)' : 'var(--card-bg)';
+                    const check = isSel ? '<span style="color:var(--accent-indigo);font-weight:800;">✓</span>' : '';
+                    return '<div class="lf-cfg-eq-row" data-eq-index="' + idx + '" onclick="selectCatalogEquation(' + idx + ')" style="padding:8px 10px;background:' + rowBg + ';border-bottom:1px solid var(--border-color);cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+                        '<div style="min-width:0;flex:1;">' +
+                        '<div style="font-size:0.72rem;font-weight:700;color:var(--text-main);">[' + idx + '] ' + escapeHtml(c.section || ('Equation ' + idx)) + '</div>' +
+                        '<div style="font-size:0.78rem;margin-top:3px;overflow-x:auto;">' + renderKatexMathHtml(c.tex, c.norm) + '</div>' +
+                        '</div>' + check + '</div>';
+                }).join('');
+                slotEl.innerHTML =
+                    '<div style="font-size:0.7rem;font-weight:800;color:var(--text-dark-secondary);text-transform:uppercase;margin-bottom:4px;">FORMULA slot</div>' +
+                    '<label style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Equation</label>' +
+                    '<input type="hidden" id="lf-cfg-equation-ref" value="' + (cat.length ? selIdx : '') + '">' +
+                    '<div id="lf-cfg-eq-picker" style="position:relative;">' +
+                    '<button type="button" id="lf-cfg-eq-trigger" onclick="toggleEquationDropdown()" style="width:100%;text-align:left;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:6px;">' +
+                    '<div style="min-width:0;flex:1;">' + selLabelHtml + '</div><span style="font-size:0.75rem;color:var(--text-muted);">▾</span></button>' +
+                    '<div id="lf-cfg-eq-dropdown-list" style="display:none;flex-direction:column;max-height:220px;overflow-y:auto;border:1px solid var(--border-color);border-radius:6px;margin-top:4px;background:var(--card-bg);box-shadow:0 6px 16px rgba(0,0,0,0.12);">' +
+                    rowsHtml + '</div></div>';
+            } else if (kind === 'diagram') {
+                const curD = String(lfConfigState.diagram || 'numberline').toLowerCase();
+                const opts = [
+                    { v: 'tunnel', l: 'Tunnel' },
+                    { v: 'numberline', l: 'Numberline' },
+                    { v: 'groundzero', l: 'Ground zero' }
+                ];
+                slotEl.innerHTML =
+                    '<div style="font-size:0.7rem;font-weight:800;color:var(--text-dark-secondary);text-transform:uppercase;margin-bottom:4px;">DIAGRAM slot</div>' +
+                    '<label for="lf-cfg-diagram" style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Diagram</label>' +
+                    '<select id="lf-cfg-diagram" onchange="updateConfiguratorPromptIfClean()" style="width:100%;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.78rem;font-family:var(--font-mono);cursor:pointer;">' +
+                    opts.map(o => '<option value="' + o.v + '"' + (o.v === curD ? ' selected' : '') + '>' + o.l + '</option>').join('') +
+                    '</select>';
+            } else {
+                const lab = lfConfigState.anchor_label || '';
+                const hk = lfConfigState.anchor_hook || '';
+                slotEl.innerHTML =
+                    '<div style="font-size:0.7rem;font-weight:800;color:var(--text-dark-secondary);text-transform:uppercase;margin-bottom:4px;">ANCHOR slot</div>' +
+                    '<label for="lf-cfg-anchor-label" style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Label</label>' +
+                    '<input type="text" id="lf-cfg-anchor-label" value="' + escapeHtml(lab) + '" oninput="updateConfiguratorPromptIfClean()" placeholder="1-4 WORD LABEL" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.78rem;font-family:var(--font-mono);margin-bottom:8px;">' +
+                    '<label for="lf-cfg-anchor-hook" style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Hook</label>' +
+                    '<input type="text" id="lf-cfg-anchor-hook" value="' + escapeHtml(hk) + '" oninput="updateConfiguratorPromptIfClean()" placeholder="Hook sentence" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.78rem;font-family:var(--font-mono);">';
+            }
+        }
+
+        async function renderManimConfigurator(cNum, storedStoryboard, outcomeHtml) {
+            const cfgContainer = document.getElementById('lf-manim-configurator');
+            const partBadge = document.getElementById('lf-configurator-part-badge');
+            if (partBadge) partBadge.innerText = 'Part ' + cNum;
+            if (!cfgContainer) return;
+            const ep = beatsEpisode();
+            let pData = null;
+            try {
+                const res = await fetch('/api/beats/design_prompt?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
+                if (res.ok) pData = await res.json();
+            } catch (e) {}
+            const defs = (pData && pData.defaults) ? pData.defaults : {};
+            const sbDesign = (storedStoryboard && storedStoryboard.design) ? storedStoryboard.design : ((pData && pData.stored_design) || null);
+            const hasStoredDesign = Boolean((storedStoryboard && (storedStoryboard.design || storedStoryboard.stages || storedStoryboard.scenes)) || (pData && pData.has_storyboard));
+            const cat = (pData && Array.isArray(pData.catalog)) ? pData.catalog : [];
+            let initKind = String((sbDesign && sbDesign.kind) || defs.kind || 'anchor').toLowerCase();
+            if (!['formula', 'anchor', 'diagram'].includes(initKind)) initKind = 'anchor';
+            let initEqRef = (sbDesign && sbDesign.equation_ref != null) ? sbDesign.equation_ref : defs.equation_ref;
+            if (initEqRef == null && sbDesign && sbDesign.equation_norm) {
+                const foundIdx = cat.findIndex(c => c.norm === sbDesign.equation_norm);
+                if (foundIdx >= 0) initEqRef = foundIdx;
+            }
+            if (initEqRef == null && cat.length > 0) initEqRef = 0;
+            const initDiag = String((sbDesign && sbDesign.diagram) || defs.diagram || 'numberline').toLowerCase();
+            const initAnc = (sbDesign && sbDesign.anchor) ? sbDesign.anchor : {};
+            const initLabel = (initAnc.label != null) ? initAnc.label : (defs.anchor_label || '');
+            const initHook = (initAnc.hook != null) ? initAnc.hook : (defs.anchor_hook || (pData && pData.hook) || '');
+            const initDir = String((sbDesign && sbDesign.directive) || defs.directive || '');
+            const initPo = String((sbDesign && sbDesign.prompt_override) || defs.prompt_override || '');
+
+            lfConfigState = {
+                ep: ep,
+                clip_num: cNum,
+                title: (pData && pData.title) || (storedStoryboard && storedStoryboard.clip_title) || ('Part ' + cNum),
+                transcript: (pData && pData.transcript) || '',
+                body_duration: (pData && pData.body_duration) || (storedStoryboard && storedStoryboard.total_duration) || 120.0,
+                hook: (pData && pData.hook) || initHook,
+                catalog: cat,
+                prior_equations: (pData && pData.prior_equations) || {},
+                has_storyboard: hasStoredDesign,
+                kind: initKind,
+                equation_ref: initEqRef,
+                diagram: ['tunnel', 'numberline', 'groundzero'].includes(initDiag) ? initDiag : 'numberline',
+                anchor_label: initLabel,
+                anchor_hook: initHook,
+                directive: initDir,
+                prompt_override: initPo,
+                prompt_dirty: Boolean(initPo && initPo.trim() !== ''),
+                composed_prompt: ''
+            };
+            lfConfigState.composed_prompt = (pData && pData.composed_prompt) || composeClientEffectivePrompt(lfConfigState);
+            const shownPrompt = lfConfigState.prompt_dirty ? lfConfigState.prompt_override : lfConfigState.composed_prompt;
+            const rerenderEnabled = hasStoredDesign;
+            const rerenderTitle = rerenderEnabled
+                ? 'Re-render Manim from stored design + configurator overrides (layers 2+3)'
+                : 'No stored design yet — run Design this clip first';
+
+            cfgContainer.innerHTML =
+                '<div style="display:flex;flex-direction:column;gap:10px;">' +
+                '<div>' +
+                '<label for="lf-cfg-kind" style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Kind</label>' +
+                '<select id="lf-cfg-kind" onchange="onConfiguratorKindChange()" style="width:100%;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.78rem;font-weight:700;font-family:var(--font-mono);cursor:pointer;">' +
+                '<option value="formula"' + (initKind === 'formula' ? ' selected' : '') + '>FORMULA</option>' +
+                '<option value="anchor"' + (initKind === 'anchor' ? ' selected' : '') + '>ANCHOR</option>' +
+                '<option value="diagram"' + (initKind === 'diagram' ? ' selected' : '') + '>DIAGRAM</option>' +
+                '</select>' +
+                '</div>' +
+                '<div id="lf-cfg-slot-container" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:10px;"></div>' +
+                '<div>' +
+                '<label for="lf-manim-directive" style="display:block;font-size:0.74rem;font-weight:700;color:var(--text-main);margin-bottom:4px;">Directive (override)</label>' +
+                '<textarea id="lf-manim-directive" rows="2" oninput="updateConfiguratorPromptIfClean()" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.78rem;font-family:var(--font-mono);" placeholder="Instruction for this clip&#39;s Manim — e.g. make this an anchor, or use the thermal-time equation">' + escapeHtml(initDir) + '</textarea>' +
+                '</div>' +
+                '<div>' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+                '<label for="lf-cfg-effective-prompt" style="font-size:0.74rem;font-weight:700;color:var(--text-main);">Effective prompt</label>' +
+                '<button type="button" id="btn-reset-effective-prompt" onclick="resetConfiguratorPrompt()" style="background:var(--panel-bg-darker);color:var(--text-dark-secondary);border:1px solid var(--border-color);border-radius:5px;padding:2px 8px;font-size:0.68rem;font-family:var(--font-mono);cursor:pointer;">Reset to default</button>' +
+                '</div>' +
+                '<textarea id="lf-cfg-effective-prompt" rows="6" oninput="onConfiguratorPromptInput()" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:7px 10px;font-size:0.74rem;font-family:var(--font-mono);">' + escapeHtml(shownPrompt) + '</textarea>' +
+                (outcomeHtml ? '<div id="lf-cfg-last-outcome" style="font-size:0.74rem;color:var(--text-dark-secondary);margin-top:4px;">' + outcomeHtml + '</div>' : '') +
+                '</div>' +
+                '<button type="button" id="btn-rerender-manim" onclick="rerenderActiveClipManim()" title="' + escapeHtml(rerenderTitle) + '" style="width:100%;background:var(--accent-indigo);color:#fff;border:none;border-radius:6px;padding:9px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;' +
+                (rerenderEnabled ? '' : 'opacity:0.45;cursor:not-allowed;') + '"' +
+                (rerenderEnabled ? '' : ' disabled') + '>Re-render</button>' +
+                '</div>';
+            renderConfiguratorSlot();
+        }
+
+        function collectConfiguratorPayload() {
+            syncConfiguratorFromDom();
+            const out = {};
+            const kindSel = document.getElementById('lf-cfg-kind');
+            const kind = kindSel ? kindSel.value : (lfConfigState ? lfConfigState.kind : '');
+            if (kind) out.kind = kind;
+            if (kind === 'formula') {
+                const eqInp = document.getElementById('lf-cfg-equation-ref');
+                const eqVal = (eqInp && eqInp.value !== '') ? eqInp.value : (lfConfigState ? lfConfigState.equation_ref : null);
+                if (eqVal != null && String(eqVal) !== '') out.equation_ref = Number(eqVal);
+            } else if (kind === 'diagram') {
+                const diagSel = document.getElementById('lf-cfg-diagram');
+                const diagVal = diagSel ? diagSel.value : (lfConfigState ? lfConfigState.diagram : 'numberline');
+                if (diagVal) out.diagram = diagVal;
+            } else if (kind === 'anchor') {
+                const labInp = document.getElementById('lf-cfg-anchor-label');
+                const hookInp = document.getElementById('lf-cfg-anchor-hook');
+                const labVal = labInp ? labInp.value.trim() : (lfConfigState ? String(lfConfigState.anchor_label || '').trim() : '');
+                const hookVal = hookInp ? hookInp.value.trim() : (lfConfigState ? String(lfConfigState.anchor_hook || '').trim() : '');
+                if (labVal) out.anchor_label = labVal;
+                if (hookVal) out.anchor_hook = hookVal;
+            }
+            const dirBox = document.getElementById('lf-manim-directive');
+            const dirVal = dirBox ? dirBox.value.trim() : (lfConfigState ? String(lfConfigState.directive || '').trim() : '');
+            if (dirVal) out.directive = dirVal;
+            const pBox = document.getElementById('lf-cfg-effective-prompt');
+            if (pBox && lfConfigState) {
+                const pVal = pBox.value.trim();
+                const compVal = String(lfConfigState.composed_prompt || '').trim();
+                if (pVal && pVal !== compVal) {
+                    out.prompt_override = pVal;
+                }
+            }
+            return out;
+        }
+
+        async function rerenderActiveClipManim() {
+            const cleanId = beatsEpisode();
+            const cNum = normClipNum(lfActiveClipNum);
+            if (!lfConfigState || !lfConfigState.has_storyboard) {
+                showToast('Run Design this clip first.');
+                return;
+            }
+            const body = Object.assign({ ep: cleanId, clip_num: cNum, rerender: true, force_regen: false }, collectConfiguratorPayload());
+            try {
+                const res = await fetch('/api/beats/design_artifacts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
+                showToast(`Re-render started: Part ${cNum} queued in the background.`);
+                pollDesignStatus(data.group);
+            } catch (e) { showToast('Re-render failed: ' + e.message); }
+        }
+
         async function renderClipManimPanel(cNum, chInfo) {
             const container = document.getElementById('beats-below-player');
             if (!container) return;
@@ -458,18 +781,19 @@ a { color: var(--accent-indigo); }
             const title = (chInfo && chInfo.title) ? chInfo.title : ('Part ' + cNum);
             let focusHtml = '';
             let stageNote = '';
-            let directiveVal = '';
             let outcomeHtml = '';
             let artMtime = null;
             let masterMtime = null;
             let hasManim = Boolean(chInfo && chInfo.has_beats);
             let stagesListHtml = '';
             let previewVideoHtml = '';
+            let loadedStoryboard = null;
             try {
                 const res = await fetch('/api/beats/storyboard?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
                 const data = await res.json();
                 if (!res.ok || !data || data.success === false) throw new Error((data && data.error) || ('HTTP ' + res.status));
                 const sb = data.storyboard || {};
+                loadedStoryboard = sb;
                 const design = sb.design || {};
                 const stages = Array.isArray(sb.stages) ? sb.stages : (Array.isArray(sb.scenes) ? sb.scenes : []);
                 const dur = (typeof sb.total_duration === 'number') ? sb.total_duration : null;
@@ -505,7 +829,6 @@ a { color: var(--accent-indigo); }
                             return '<div><b>Stage ' + (idx + 1) + ' (' + s0 + 's–' + s1 + 's, ' + kTag + '):</b> ' + txt + '</div>';
                         }).join('') + '</div>';
                 }
-                if (design.directive) directiveVal = design.directive;
                 if (design.directive_report) outcomeHtml = 'Last outcome: ' + escapeHtml(design.directive_report);
                 if (typeof data.manim_artifact_mtime === 'number') {
                     artMtime = data.manim_artifact_mtime;
@@ -560,22 +883,23 @@ a { color: var(--accent-indigo); }
                 '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-bottom:10px;">' + statusLine + '</div>' +
                 (hasManim ? stagesListHtml : '') +
                 (hasManim ? previewVideoHtml : '') +
-                '<label for="lf-manim-directive" style="display:block;font-size:0.78rem;font-weight:700;color:var(--text-main);margin-bottom:6px;">Design instruction for this clip&#39;s Manim</label>' +
-                '<textarea id="lf-manim-directive" rows="2" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;font-size:0.84rem;" placeholder="Instruction for this clip&#39;s Manim — e.g. make this an anchor, or use the thermal-time equation">' + escapeHtml(directiveVal) + '</textarea>' +
                 (outcomeHtml ? '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-top:6px;">' + outcomeHtml + '</div>' : '') +
                 '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">' +
-                '<button type="button" onclick="designArtifacts(' + "'clip'" + ')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
+                '<button type="button" id="btn-design-this-clip" onclick="designArtifacts(' + "'clip'" + ')" style="background:var(--primary);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:0.8rem;font-weight:800;cursor:pointer;">Design this clip</button>' +
+                '</div></div>' +
+                '<div id="lf-manim-patch-bar" style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">' +
                 patchBtnHtml +
-                '</div>' + (patchHintHtml ? '<div style="font-size:0.76rem;color:var(--text-dark-secondary);margin-top:6px;">' + patchHintHtml + '</div>' : '') + '</div></div>';
+                (patchHintHtml ? '<span style="font-size:0.76rem;color:var(--text-dark-secondary);">' + patchHintHtml + '</span>' : '') +
+                '</div></div>';
+            if (typeof renderManimConfigurator === 'function') {
+                await renderManimConfigurator(cNum, loadedStoryboard, outcomeHtml);
+            }
         }
 
 
         async function switchClipToManim() {
             const cNum = normClipNum(lfActiveClipNum);
-            const dirBox = document.getElementById('lf-manim-directive');
-            const dirVal = dirBox ? dirBox.value.trim() : '';
-            const switchBody = { ep: beatsEpisode(), clip_num: cNum };
-            if (dirVal) switchBody.directive = dirVal;
+            const switchBody = Object.assign({ ep: beatsEpisode(), clip_num: cNum }, collectConfiguratorPayload());
             try {
                 showToast(`🔄 Switching Part ${cNum} to Manim...`);
                 const res = await fetch('/api/beats/manim_retrigger', {
@@ -679,11 +1003,9 @@ a { color: var(--accent-indigo); }
             // call per clip as queued background jobs with per-clip progress.
             const cleanId = beatsEpisode();
             const body = { ep: cleanId };
-            if (scope === 'clip') body.clip_num = normClipNum(lfActiveClipNum);
             if (scope === 'clip') {
-                const dirBox = document.getElementById('lf-manim-directive');
-                const dirVal = dirBox ? dirBox.value.trim() : '';
-                if (dirVal) body.directive = dirVal;
+                body.clip_num = normClipNum(lfActiveClipNum);
+                Object.assign(body, collectConfiguratorPayload());
             }
             const chCount = (lfComposite && lfComposite.chapters) ? lfComposite.chapters.length : null;
             const what = (scope === 'clip') ? `Part ${body.clip_num}` : (chCount ? `all ${chCount} clips of ep ${cleanId}` : `all clips of ep ${cleanId}`);
@@ -747,10 +1069,8 @@ a { color: var(--accent-indigo); }
         }
 
         async function compositeRetrigger(side) {
-            // Spec H2 s4: pause the longform preview, retrigger ONE side for
-            // the active clip. Manim re-renders via the existing Manim path
-            // (left pane only); Mosaic via the existing double-confirmed
-            // path (right pane only). Duration + frame stay locked.
+            // Spec H2 s4: pause the longform preview, retrigger Manim for
+            // the active clip (left pane only). Mosaic runs happen in Cutroom.
             const cleanId = beatsEpisode();
             const videoEl = document.getElementById('lf-studio-video-player');
             if (videoEl && !videoEl.paused) videoEl.pause();
@@ -765,8 +1085,6 @@ a { color: var(--accent-indigo); }
                 showToast(`Retrigger ${side} scoped to Part ${cNum}: re-stitch only its segment, duration + frame locked.`);
                 if (side === 'manim') {
                     await switchClipToManim();
-                } else {
-                    await beatsMosaicRetrigger();
                 }
             } catch (e) { showToast('Retrigger refused: ' + e.message); }
         }
@@ -888,22 +1206,6 @@ function beatsLoad() {
     lfChapterLRU.clear();
     lfActiveClipNum = 1;
     initLongformBeatStudio();
-}
-async function beatsMosaicRetrigger() {
-    const cNum = normClipNum(lfActiveClipNum);
-    const st = document.getElementById('beats-mosaic-status');
-    if (!confirm('Start a FRESH Mosaic RUN for Part ' + cNum + '? This spends Mosaic API.')) return;
-    if (!confirm('Confirm again: run Mosaic now for Part ' + cNum + ' of ep ' + beatsEpisode() + '?')) return;
-    if (st) st.innerText = 'starting Mosaic run...';
-    try {
-        const res = await fetch('/api/beats/mosaic_retry', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ep: beatsEpisode(), clip_num: cNum })
-        });
-        const data = await res.json();
-        if (st) st.innerText = (!res.ok || data.success === false) ? ('refused: ' + (data.error || res.status)) : 'Mosaic run started.';
-        showToast((!res.ok || data.success === false) ? ('Mosaic retrigger refused: ' + (data.error || res.status)) : 'Mosaic run started for Part ' + cNum);
-    } catch (e) { if (st) st.innerText = 'error: ' + e.message; }
 }
 async function initBeatsEpisodeSelect() {
     const sel = document.getElementById('beats-ep');

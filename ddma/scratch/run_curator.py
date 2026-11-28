@@ -5300,6 +5300,18 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 import manim_infographic_engine as _manim_engine
 
                 custom_directive = str(req_body.get("directive") or req_body.get("instructions") or req_body.get("custom_directive") or "").strip()
+                req_kind = req_body.get("kind")
+                req_eq_ref = req_body.get("equation_ref")
+                req_diagram = req_body.get("diagram")
+                req_anchor_label = req_body.get("anchor_label")
+                req_anchor_hook = req_body.get("anchor_hook")
+                req_prompt_override = req_body.get("prompt_override")
+                is_rerender = bool(req_body.get("rerender")) or (
+                    not force_regen and any(
+                        req_body.get(k) is not None and str(req_body.get(k)).strip() != ""
+                        for k in ("kind", "equation_ref", "diagram", "anchor_label", "anchor_hook", "prompt_override")
+                    )
+                )
 
                 fresh_design = None
                 fresh_reports = []
@@ -5344,13 +5356,25 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         _transcript, _title, _design_dur, _catalog,
                         genai_mod=_g_mod, prior_equations=_prior,
                         clip_num=clip_num,
-                        directive=custom_directive or None)
+                        directive=custom_directive or None,
+                        kind=req_kind, equation_ref=req_eq_ref,
+                        diagram=req_diagram, anchor_label=req_anchor_label,
+                        anchor_hook=req_anchor_hook,
+                        prompt_override=req_prompt_override)
                     fresh_design = _art['design']
                     _tex_norm = (fresh_design or {}).get("equation_norm")
                     if _tex_norm:
                         _tex_idx = _fresh.match_tex_for_norm(_tex_norm)
                         if _tex_idx is not None:
                             fresh_design["equation_tex"] = _fresh.EPISODE_TEX_SOURCES[_tex_idx]
+                        else:
+                            _eq_ref_idx = (fresh_design or {}).get("equation_ref")
+                            _cat_entry = (_catalog[_eq_ref_idx]
+                                          if (_eq_ref_idx is not None and 0 <= int(_eq_ref_idx) < len(_catalog))
+                                          else next((c for c in _catalog if c.get("norm") == _tex_norm), None))
+                            _resolved_tex = _fresh.resolve_catalog_tex(_cat_entry, idx=_eq_ref_idx, ep_num=_h2_ep_num)
+                            if _resolved_tex:
+                                fresh_design["equation_tex"] = _resolved_tex
                     _stages = _art['stages']
                     for _st in _stages:
                         _st.setdefault('labels', [_title.upper()[:24]])
@@ -5377,13 +5401,65 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     rev1 = save_plan(project_id, _plan0)
                     with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh0:
                         json.dump(storyboard, _fh0, indent=2)
+                elif is_rerender:
+                    import manim_fresh_design as _fresh
+                    _sb_file = get_storyboard_filepath(project_id, clip_num)
+                    if not os.path.exists(_sb_file):
+                        raise Exception(f"No stored design for clip {clip_num} (run Design this clip first)")
+                    with open(_sb_file, "r", encoding="utf-8") as _fhr:
+                        storyboard = json.load(_fhr)
+                    _plan_pre = load_plan(project_id) or []
+                    _pre_clip = next((c for c in _plan_pre if str(c.get("num")) == str(clip_num)), None) or {}
+                    _chunks = _pre_clip.get("caption_chunks") or []
+                    _plan_text = ' '.join(ch.get('text', '') for ch in _chunks).strip()
+                    _transcript = str(req_body.get('transcript') or _plan_text or _pre_clip.get('text') or '').strip()
+                    _title = str(req_body.get('title') or storyboard.get('clip_title') or _pre_clip.get('title') or 'Deep Dive').strip()
+                    _catalog = _fresh.fetch_episode_equations(_h2_ep_num)
+                    _sb_dir = os.path.join("projects", project_id, "storyboards")
+                    _prior = {}
+                    try:
+                        for _fn in os.listdir(_sb_dir):
+                            if not (_fn.startswith('clip_') and _fn.endswith('_storyboard.json')):
+                                continue
+                            try:
+                                _n = _fn[len('clip_'): -len('_storyboard.json')]
+                                if str(_n) == str(clip_num):
+                                    continue
+                                with open(os.path.join(_sb_dir, _fn), 'r', encoding='utf-8') as _fh:
+                                    _d = json.load(_fh).get('design') or {}
+                                if _d.get('equation_norm'):
+                                    _prior[str(_n)] = _d['equation_norm']
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                    _design_dur = float(storyboard.get("total_duration") or _pre_clip.get("audio_duration") or _pre_clip.get("duration") or 120.0)
+                    storyboard, _changed = _fresh.apply_configurator_overrides_to_storyboard(
+                        storyboard, _transcript, _title, _design_dur, _catalog,
+                        prior_equations=_prior, clip_num=clip_num,
+                        kind=req_kind, equation_ref=req_eq_ref,
+                        diagram=req_diagram, anchor_label=req_anchor_label,
+                        anchor_hook=req_anchor_hook,
+                        directive=req_body.get("directive"),
+                        prompt_override=req_prompt_override,
+                        ep_num=_h2_ep_num)
+                    if _changed:
+                        fresh_design = storyboard.get("design")
+                        fresh_reports = (fresh_design or {}).get("reports") or []
+                        _plan0 = load_plan(project_id) or []
+                        _tc0 = next((c for c in _plan0 if str(c.get("num")) == str(clip_num)), None)
+                        if _tc0 is not None:
+                            _tc0['infographic_scenes'] = storyboard.get('stages') or storyboard.get('scenes') or []
+                            rev1 = save_plan(project_id, _plan0)
+                        with open(_sb_file, "w", encoding="utf-8") as _fh0:
+                            json.dump(storyboard, _fh0, indent=2)
                 else:
                     storyboard = generate_or_load_storyboard_data(
                         project_id, clip_num,
                         force_regen=force_regen,
                         custom_directive=custom_directive,
                     )
-                if fresh_design is not None and wants_async:
+                if (fresh_design is not None or is_rerender) and wants_async:
                     scenes_a = (storyboard.get("scenes") or storyboard.get("stages") or [])
                     if not scenes_a:
                         raise Exception("Zero scenes produced (storyboard returned 0 scenes)")
@@ -5399,7 +5475,10 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     _h2_prog(project_id, clip_num, 15, "designed")
                     host = self.headers.get("Host", "127.0.0.1:8000")
                     sync_url = f"http://{host}/generate-manim-infographic?id={project_id}&num={clip_num}"
-                    sync_body = json.dumps({k: v for k, v in req_body.items() if k != "async"}).encode("utf-8")
+                    sync_body_dict = {k: v for k, v in req_body.items() if k != "async"}
+                    if is_rerender:
+                        sync_body_dict = {"ep": _h2_ep_num, "clip_num": clip_num, "force_regen": False}
+                    sync_body = json.dumps(sync_body_dict).encode("utf-8")
                     th = threading.Thread(target=_h2_manim_async_run, args=(job_id, sync_url, sync_body), daemon=True)
                     th.start()
                     self.send_response(200)
@@ -5409,7 +5488,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({
                         "success": True, "accepted": True, "job_id": job_id,
                         "clip_num": int(clip_num), "project_id": project_id,
-                        "design": fresh_design, "reports": fresh_reports,
+                        "design": fresh_design if fresh_design is not None else storyboard.get("design"),
+                        "reports": fresh_reports,
                     }).encode('utf-8'))
                     return
                 scenes = (req_body.get('scenes') or storyboard.get('scenes') or storyboard.get('stages') or [])

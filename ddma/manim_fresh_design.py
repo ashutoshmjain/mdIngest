@@ -101,38 +101,79 @@ class _DisplayMathParser(HTMLParser):
             self.buf.append(data)
 
 
+def _src_markdown_display_blocks(ep_num):
+    """Extract display math $$...$$ blocks in page order from src/<ep>.md."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "src", f"{ep_num}.md"),
+        os.path.join(here, "src", f"{ep_num}.md"),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    txt = f.read()
+                return [b.strip() for b in re.findall(r"\$\$([\s\S]*?)\$\$", txt)
+                        if b.strip()]
+            except Exception:
+                pass
+    return []
+
+
+def resolve_catalog_tex(entry, idx=None, ep_num=None):
+    """Resolve TeX source for a catalog entry (explicit tex, norm match, or src/<ep>.md index)."""
+    if isinstance(entry, dict) and entry.get("tex"):
+        return str(entry["tex"]).strip()
+    norm = entry.get("norm", "") if isinstance(entry, dict) else str(entry or "")
+    m_idx = match_tex_for_norm(norm)
+    if m_idx is not None and 0 <= m_idx < len(EPISODE_TEX_SOURCES):
+        return EPISODE_TEX_SOURCES[m_idx]
+    if ep_num is not None and idx is not None:
+        blocks = _src_markdown_display_blocks(ep_num)
+        if 0 <= int(idx) < len(blocks):
+            return blocks[int(idx)]
+    return None
+
+
 def fetch_episode_equations(ep_num, cache_path=None, refresh=False):
-    """Episode-page equation catalog: [{section, text, norm}]. Cached JSON."""
+    """Episode-page equation catalog: [{section, text, norm, tex?}]. Cached JSON."""
     if cache_path is None:
         here = os.path.dirname(os.path.abspath(__file__))
         cache_path = os.path.join(here, "scratch", f"ep{ep_num}_equations_v2.json")
+    catalog = None
     if os.path.exists(cache_path) and not refresh:
         try:
             with open(cache_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                catalog = json.load(f)
+        except Exception:
+            catalog = None
+    if catalog is None:
+        url = EPISODE_PAGE_URL.format(ep=ep_num)
+        req = urllib.request.Request(url, headers={"User-Agent": "deepdive-h2/1.0"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            html_text = r.read().decode("utf-8", "replace")
+        parser = _DisplayMathParser()
+        parser.feed(html_text)
+        catalog = []
+        seen = set()
+        for b in parser.blocks:
+            norm = normalize_eq(b["text"])
+            if len(norm) < 6 or norm in seen:
+                continue
+            seen.add(norm)
+            catalog.append({"section": b["section"], "text": b["text"][:400],
+                            "norm": norm})
+        try:
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(catalog, f, ensure_ascii=False, indent=1)
         except Exception:
             pass
-    url = EPISODE_PAGE_URL.format(ep=ep_num)
-    req = urllib.request.Request(url, headers={"User-Agent": "deepdive-h2/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        html_text = r.read().decode("utf-8", "replace")
-    parser = _DisplayMathParser()
-    parser.feed(html_text)
-    catalog = []
-    seen = set()
-    for b in parser.blocks:
-        norm = normalize_eq(b["text"])
-        if len(norm) < 6 or norm in seen:
-            continue
-        seen.add(norm)
-        catalog.append({"section": b["section"], "text": b["text"][:400],
-                        "norm": norm})
-    try:
-        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        with open(cache_path, "w", encoding="utf-8") as f:
-            json.dump(catalog, f, ensure_ascii=False, indent=1)
-    except Exception:
-        pass
+    for idx, entry in enumerate(catalog):
+        if isinstance(entry, dict) and not entry.get("tex"):
+            tex = resolve_catalog_tex(entry, idx=idx, ep_num=ep_num)
+            if tex:
+                entry["tex"] = tex
     return catalog
 
 
@@ -164,11 +205,19 @@ Return ONLY a JSON object, no other text:
   "reason": "<one line: why this artifact is this clip's own>"}}"""
 
 
-def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
-                         genai_mod, hook, instruction=None):
-    if genai_mod is None:
-        return None
-    cat_lines = [f"[{i}] ({c['section'][:60]}) {c['norm'][:200]}"
+def compose_design_prompt(transcript, title, body_duration, catalog,
+                          prior_equations=None, hook=None, directive=None,
+                          kind=None, equation_ref=None, diagram=None,
+                          anchor_label=None, anchor_hook=None):
+    """Compose the full effective prompt the design system uses for a clip."""
+    transcript = str(transcript or "").strip()
+    title = str(title or "Deep Dive").strip()
+    body_duration = float(body_duration or 120.0)
+    catalog = list(catalog or [])
+    prior = prior_equations or {}
+    if hook is None:
+        hook = hook_sentence(transcript)
+    cat_lines = [f"[{i}] ({c.get('section', '')[:60]}) {c.get('norm', '')[:200]}"
                  for i, c in enumerate(catalog)]
     sents = split_sentences(transcript)
     prompt = _FRESH_PROMPT.format(
@@ -177,11 +226,41 @@ def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
         sent_list=json.dumps(sents[:12], ensure_ascii=False)[:1500],
         catalog="\n".join(cat_lines) if cat_lines else "(none)",
         prior=json.dumps(prior, ensure_ascii=False)[:800] or "(none)",
-        hook=hook[:300])
-    if instruction:
+        hook=str(hook)[:300])
+    struct_parts = []
+    k_clean = str(kind or "").strip().lower()
+    if k_clean in ("formula", "equation", "anchor", "diagram"):
+        k_norm = "formula" if k_clean == "equation" else k_clean
+        struct_parts.append(f"kind={k_norm.upper()}")
+        if k_norm == "formula" and equation_ref is not None and str(equation_ref) != "":
+            struct_parts.append(f"equation_ref={equation_ref}")
+        elif k_norm == "diagram" and diagram:
+            struct_parts.append(f"diagram={str(diagram).strip().lower()}")
+        elif k_norm == "anchor":
+            if anchor_label:
+                struct_parts.append(f"anchor_label={str(anchor_label).strip().upper()[:32]!r}")
+            if anchor_hook:
+                struct_parts.append(f"anchor_hook={str(anchor_hook).strip()[:220]!r}")
+    if struct_parts:
+        prompt += "\nStructured design parameters: " + ", ".join(struct_parts)
+    if directive and str(directive).strip():
         prompt += ("\nUser design instruction for this clip (honor it; the "
                    "catalog-membership rule still applies): "
-                   + str(instruction)[:300])
+                   + str(directive).strip()[:300])
+    return prompt
+
+
+def _gemini_fresh_choice(transcript, title, body_duration, catalog, prior,
+                         genai_mod, hook, instruction=None,
+                         prompt_override=None):
+    if genai_mod is None:
+        return None
+    if prompt_override and str(prompt_override).strip():
+        prompt = str(prompt_override).strip()
+    else:
+        prompt = compose_design_prompt(
+            transcript, title, body_duration, catalog,
+            prior_equations=prior, hook=hook, directive=instruction)
     for m_name in ["gemini-3.5-flash-lite", "gemini-flash-lite-latest",
                    "gemini-3.5-flash", "gemini-3.8-flash"]:
         try:
@@ -254,9 +333,19 @@ def _build_stages(title, kind, visual, transcript, body_duration):
     return stages, []
 
 
+def _normalize_anchor_label(raw_label, fallback_title):
+    words = [w for w in str(raw_label or "").strip().split() if w][:4]
+    if words:
+        return " ".join(words).upper()[:32]
+    twords = [w for w in re.sub(r"[^A-Za-z0-9 ]", "", str(fallback_title or "")).split() if w][:4]
+    return (" ".join(twords).upper() or str(fallback_title or "DEEP DIVE").upper())[:24]
+
+
 def design_clip_artifact(transcript, title, body_duration, catalog,
                          genai_mod=None, prior_equations=None, clip_num=None,
-                         directive=None):
+                         directive=None, kind=None, equation_ref=None,
+                         diagram=None, anchor_label=None, anchor_hook=None,
+                         prompt_override=None):
     """Fresh-cast ONE artifact. Returns (storyboard_design_dict, reports).
 
     Never reads caches or plan scenes. The returned equation (if any) is
@@ -264,16 +353,32 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
     and is reported. A non-empty directive (per-clip design instruction)
     is honored deterministically: unnegated "anchor" forces kind anchor;
     an equation name picks the best-matching catalog member (never
-    invented); anything else acts as a topic hint. Empty directive means
-    exactly the historical behavior (no directive keys are stored).
+    invented); anything else acts as a topic hint. Structured parameters
+    (kind, equation_ref, diagram, anchor_label, anchor_hook, prompt_override)
+    from the Manim configurator are resolved deterministically with full
+    catalog-guard enforcement. Empty directive + no structured params means
+    exactly the historical behavior (no extra keys are stored).
     """
     reports = []
     transcript = str(transcript or "").strip()
     title = str(title or "Deep Dive").strip()
-    hook = hook_sentence(transcript)
+    default_hook = hook_sentence(transcript)
+    hook = str(anchor_hook).strip()[:220] if (anchor_hook is not None and str(anchor_hook).strip()) else default_hook
     prior = prior_equations or {}
     directive = str(directive or "").strip()
-    directive_outcome = ""
+    p_override = str(prompt_override or "").strip()
+    req_kind = str(kind or "").strip().lower()
+    if req_kind == "equation":
+        req_kind = "formula"
+    has_structured = bool(
+        req_kind in ("formula", "anchor", "diagram")
+        or (equation_ref is not None and str(equation_ref).strip() != "")
+        or (diagram is not None and str(diagram).strip() != "")
+        or (anchor_label is not None and str(anchor_label).strip() != "")
+        or (anchor_hook is not None and str(anchor_hook).strip() != "")
+        or p_override
+    )
+    outcome_parts = []
     forced = None
     if directive:
         if _directive_forces_anchor(directive):
@@ -287,11 +392,29 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
                 forced = ("anchor", None,
                           "directive-unmatched: no catalog equation matched '"
                           + directive[:120] + "'; degraded to anchor")
+
+    choice = None
+    used_gemini_override = False
+    if p_override and genai_mod is not None:
+        g_choice = _gemini_fresh_choice(
+            transcript, title, body_duration, catalog, prior, genai_mod, hook,
+            instruction=directive or None, prompt_override=p_override)
+        if g_choice is not None:
+            choice = g_choice
+            used_gemini_override = True
+            outcome_parts.append("prompt-override: gemini")
+            reports.append("prompt-override: gemini")
+
+    if p_override and not used_gemini_override:
+        outcome_parts.append("prompt-override: fallback-deterministic")
+        reports.append("prompt-override: fallback-deterministic")
+
     if forced is not None:
         kind_name, ref = forced[0], forced[1]
-        directive_outcome = forced[2]
+        outcome_parts.append(forced[2])
         if kind_name == "anchor":
-            choice = {"kind": "anchor", "anchor_label": None,
+            choice = {"kind": "anchor",
+                      "anchor_label": _normalize_anchor_label(anchor_label, title) if anchor_label else None,
                       "equation_ref": None, "equation_display": "",
                       "diagram": None,
                       "reason": "directive forced anchor"}
@@ -302,17 +425,99 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
                       "anchor_label": None, "diagram": None,
                       "reason": "directive picked catalog member"}
         reports.append("directive: " + directive[:200])
-        reports.append(directive_outcome)
-    else:
-        choice = _gemini_fresh_choice(transcript, title, body_duration,
-                                     catalog, prior, genai_mod, hook,
-                                     instruction=directive or None)
+        reports.append(forced[2])
+    elif req_kind in ("formula", "anchor", "diagram") and not used_gemini_override:
         if directive:
             reports.append("directive: " + directive[:200])
-    kind, visual = "anchor", {"type": "anchor",
-                              "label": title.upper()[:24],
-                              "hook": hook[:220]}
+        if req_kind == "anchor":
+            outcome_parts.append("kind-forced: anchor")
+            reports.append("kind-forced: anchor")
+            lab_val = _normalize_anchor_label(anchor_label, title)
+            if anchor_label and str(anchor_label).strip():
+                outcome_parts.append("anchor-label: " + lab_val)
+                reports.append("anchor-label: " + lab_val)
+            choice = {"kind": "anchor",
+                      "anchor_label": lab_val,
+                      "equation_ref": None, "equation_display": "",
+                      "diagram": None,
+                      "reason": "kind-forced: anchor"}
+        elif req_kind == "diagram":
+            d_val = str(diagram or "").strip().lower()
+            if d_val not in DIAGRAM_KINDS:
+                d_val = "groundzero"
+            outcome_parts.append("kind-forced: diagram")
+            outcome_parts.append("diagram-picked: " + d_val)
+            reports.append("kind-forced: diagram")
+            reports.append("diagram-picked: " + d_val)
+            choice = {"kind": "diagram", "diagram": d_val,
+                      "equation_ref": None, "equation_display": "",
+                      "anchor_label": None,
+                      "reason": "kind-forced: diagram (" + d_val + ")"}
+        elif req_kind == "formula":
+            outcome_parts.append("kind-forced: formula")
+            reports.append("kind-forced: formula")
+            ref_idx = None
+            if equation_ref is not None and str(equation_ref).strip() != "":
+                try:
+                    cand_idx = int(equation_ref)
+                    if 0 <= cand_idx < len(catalog):
+                        ref_idx = cand_idx
+                except Exception:
+                    ref_idx = None
+            if ref_idx is not None:
+                entry = catalog[ref_idx]
+                outcome_parts.append(f"equation-picked: catalog {ref_idx}")
+                reports.append(f"equation-picked: catalog {ref_idx}")
+                choice = {"kind": "equation", "equation_ref": ref_idx,
+                          "equation_display": entry.get("norm", ""),
+                          "anchor_label": None, "diagram": None,
+                          "reason": f"equation-picked: catalog {ref_idx}"}
+            else:
+                bad_msg = (f"equation-rejected-not-on-page: invalid equation_ref "
+                           f"{equation_ref!r}; degraded to anchor")
+                outcome_parts.append(bad_msg)
+                reports.append(bad_msg)
+                choice = {"kind": "anchor",
+                          "anchor_label": _normalize_anchor_label(anchor_label, title),
+                          "equation_ref": None, "equation_display": "",
+                          "diagram": None,
+                          "reason": "invalid equation_ref degraded to anchor"}
+    elif choice is None:
+        if equation_ref is not None and str(equation_ref).strip() != "":
+            try:
+                cand_idx = int(equation_ref)
+                if not (0 <= cand_idx < len(catalog)):
+                    raise ValueError("out of range")
+                entry = catalog[cand_idx]
+                outcome_parts.append(f"equation-picked: catalog {cand_idx}")
+                reports.append(f"equation-picked: catalog {cand_idx}")
+                choice = {"kind": "equation", "equation_ref": cand_idx,
+                          "equation_display": entry.get("norm", ""),
+                          "anchor_label": None, "diagram": None,
+                          "reason": f"equation-picked: catalog {cand_idx}"}
+            except Exception:
+                bad_msg = (f"equation-rejected-not-on-page: invalid equation_ref "
+                           f"{equation_ref!r}; degraded to anchor")
+                outcome_parts.append(bad_msg)
+                reports.append(bad_msg)
+                choice = {"kind": "anchor",
+                          "anchor_label": _normalize_anchor_label(anchor_label, title),
+                          "equation_ref": None, "equation_display": "",
+                          "diagram": None,
+                          "reason": "invalid equation_ref degraded to anchor"}
+        else:
+            choice = _gemini_fresh_choice(transcript, title, body_duration,
+                                          catalog, prior, genai_mod, hook,
+                                          instruction=directive or None,
+                                          prompt_override=p_override or None)
+            if directive:
+                reports.append("directive: " + directive[:200])
+
+    kind_out, visual = "anchor", {"type": "anchor",
+                                  "label": _normalize_anchor_label(anchor_label, title),
+                                  "hook": hook[:220]}
     equation_norm, equation_section = None, ""
+    resolved_eq_ref = None
     reuse_of = None
     if choice is None:
         choice = _deterministic_choice(transcript, title, hook, catalog,
@@ -322,22 +527,30 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
     if want == "equation":
         try:
             ref = int(choice.get("equation_ref"))
+            if ref < 0 or ref >= len(catalog):
+                raise IndexError("negative or out-of-range catalog ref")
             entry = catalog[ref]
+            resolved_eq_ref = ref
             equation_norm = entry["norm"]
             equation_section = entry.get("section", "")
         except Exception:
             entry = None
         if entry is None:
             text_norm = normalize_eq(choice.get("equation_display") or "")
-            entry = next((c for c in catalog if c["norm"] == text_norm),
-                         None)
-            if entry is not None:
-                equation_norm = entry["norm"]
-                equation_section = entry.get("section", "")
+            for c_idx, c in enumerate(catalog):
+                if c["norm"] == text_norm:
+                    entry = c
+                    resolved_eq_ref = c_idx
+                    equation_norm = entry["norm"]
+                    equation_section = entry.get("section", "")
+                    break
         if entry is None:
-            reports.append("equation-rejected-not-on-page: "
-                           "design call returned an equation outside the "
-                           "episode catalog; degraded to anchor")
+            rej = ("equation-rejected-not-on-page: "
+                   "design call returned an equation outside the "
+                   "episode catalog; degraded to anchor")
+            reports.append(rej)
+            if has_structured:
+                outcome_parts.append(rej)
             want = "anchor"
         else:
             disp = normalize_eq(choice.get("equation_display") or "")
@@ -351,39 +564,133 @@ def design_clip_artifact(transcript, title, body_duration, catalog,
             if reuse_of is not None:
                 reports.append(f"formula-reuse: same equation as clip "
                                f"{reuse_of} (reported, never silent)")
-            kind = "formula"
+            kind_out = "formula"
             visual = {"type": "formula", "full": disp[:280],
                       "section": equation_section}
     if want == "diagram":
-        d = str(choice.get("diagram") or "").strip().lower()
+        d = str(choice.get("diagram") or diagram or "").strip().lower()
         if d not in DIAGRAM_KINDS:
             d = "groundzero"
-        kind = "diagram"
+        kind_out = "diagram"
         visual = {"type": "diagram", "diagram": d}
     elif want == "anchor":
-        lab = str(choice.get("anchor_label") or "").strip().upper()
-        if not lab:
-            lab = title.upper()[:24]
-        kind = "anchor"
+        raw_lab = anchor_label if (anchor_label is not None and str(anchor_label).strip()) else choice.get("anchor_label")
+        lab = _normalize_anchor_label(raw_lab, title)
+        kind_out = "anchor"
         visual = {"type": "anchor", "label": lab[:32],
                   "hook": hook[:220]}
-    stages, _ = _build_stages(title, kind, visual, transcript, body_duration)
-    design = {"kind": kind, "title": title,
-              "equation_text": visual.get("full") if kind == "formula"
+    stages, _ = _build_stages(title, kind_out, visual, transcript, body_duration)
+    design = {"kind": kind_out, "title": title,
+              "equation_text": visual.get("full") if kind_out == "formula"
               else None,
               "equation_norm": equation_norm,
               "equation_section": equation_section,
               "reuse_of": reuse_of,
               "anchor": {"label": visual.get("label"),
                          "hook": visual.get("hook")}
-              if kind == "anchor" else None,
-              "diagram": visual.get("diagram") if kind == "diagram" else None,
+              if kind_out == "anchor" else None,
+              "diagram": visual.get("diagram") if kind_out == "diagram" else None,
               "reports": reports,
               "reason": str((choice or {}).get("reason") or "")[:300]}
+    if resolved_eq_ref is not None and has_structured:
+        design["equation_ref"] = resolved_eq_ref
+    if p_override:
+        design["prompt_override"] = p_override
+    directive_outcome = "; ".join(p for p in outcome_parts if p)
     if directive:
         design["directive"] = directive
         design["directive_report"] = directive_outcome
+    elif has_structured and directive_outcome:
+        design["directive_report"] = directive_outcome
     return {"design": design, "stages": stages}, reports
+
+
+def apply_configurator_overrides_to_storyboard(
+        storyboard, transcript, title, body_duration, catalog,
+        prior_equations=None, clip_num=None, kind=None, equation_ref=None,
+        diagram=None, anchor_label=None, anchor_hook=None, directive=None,
+        prompt_override=None, ep_num=None):
+    """Update a stored storyboard in-place with explicit configurator overrides
+    for Re-render (layers 2+3). If no fields changed from the stored design,
+    leaves the storyboard dict untouched (pure redraw, byte-identical)."""
+    if not isinstance(storyboard, dict):
+        raise ValueError("storyboard must be a dict")
+    stored = storyboard.get("design") or {}
+    catalog = list(catalog or [])
+    prior = prior_equations or {}
+    stored_kind = str(stored.get("kind") or "anchor").lower()
+    req_kind = str(kind or stored_kind).strip().lower()
+    if req_kind == "equation":
+        req_kind = "formula"
+    if req_kind not in ("formula", "anchor", "diagram"):
+        req_kind = stored_kind if stored_kind in ("formula", "anchor", "diagram") else "anchor"
+
+    # Determine stored equation_ref
+    stored_eq_ref = stored.get("equation_ref")
+    if stored_eq_ref is None and stored.get("equation_norm"):
+        for idx, c in enumerate(catalog):
+            if c.get("norm") == stored.get("equation_norm"):
+                stored_eq_ref = idx
+                break
+    stored_diag = stored.get("diagram")
+    stored_anc = stored.get("anchor") or {}
+    stored_lab = stored_anc.get("label") or ""
+    stored_hook = stored_anc.get("hook") or ""
+    stored_dir = str(stored.get("directive") or "")
+    stored_po = str(stored.get("prompt_override") or "")
+
+    eff_eq_ref = stored_eq_ref if (equation_ref is None or str(equation_ref).strip() == "") else equation_ref
+    eff_diag = (str(diagram).strip().lower() if (diagram is not None and str(diagram).strip() != "")
+                else (stored_diag or "groundzero"))
+    eff_lab = (str(anchor_label).strip() if (anchor_label is not None and str(anchor_label).strip() != "")
+               else stored_lab)
+    eff_hook = (str(anchor_hook).strip() if (anchor_hook is not None and str(anchor_hook).strip() != "")
+                else (stored_hook or hook_sentence(transcript)))
+    eff_dir = str(directive).strip() if directive is not None else stored_dir
+    eff_po = str(prompt_override).strip() if prompt_override is not None else stored_po
+
+    # Check if anything actually changed from the stored design
+    same_kind = (req_kind == stored_kind)
+    same_dir = (eff_dir == stored_dir)
+    same_po = (eff_po == stored_po)
+    same_slot = False
+    if req_kind == "anchor":
+        same_slot = (_normalize_anchor_label(eff_lab, title) == stored_lab and eff_hook == stored_hook)
+    elif req_kind == "diagram":
+        same_slot = (eff_diag == stored_diag)
+    elif req_kind == "formula":
+        try:
+            same_slot = (int(eff_eq_ref) == int(stored_eq_ref))
+        except Exception:
+            same_slot = False
+
+    if same_kind and same_slot and same_dir and same_po and storyboard.get("stages"):
+        return storyboard, False
+
+    art, reports = design_clip_artifact(
+        transcript, title, body_duration, catalog,
+        genai_mod=None, prior_equations=prior, clip_num=clip_num,
+        directive=eff_dir or None, kind=req_kind, equation_ref=eff_eq_ref,
+        diagram=eff_diag, anchor_label=eff_lab, anchor_hook=eff_hook,
+        prompt_override=eff_po or None)
+    new_design = art["design"]
+    if new_design.get("kind") == "formula" and new_design.get("equation_norm"):
+        eq_idx = new_design.get("equation_ref")
+        tex = resolve_catalog_tex(
+            catalog[eq_idx] if (eq_idx is not None and 0 <= eq_idx < len(catalog)) else {"norm": new_design["equation_norm"]},
+            idx=eq_idx, ep_num=ep_num)
+        if tex:
+            new_design["equation_tex"] = tex
+    stages = art["stages"]
+    for st in stages:
+        st.setdefault("labels", [str(title).upper()[:24]])
+        st.setdefault("archetype", "fresh-" + str(st.get("kind", "title")))
+    updated = dict(storyboard)
+    updated["design"] = new_design
+    updated["scenes"] = stages
+    updated["stages"] = stages
+    updated["total_duration"] = round(float(body_duration), 2)
+    return updated, True
 
 
 

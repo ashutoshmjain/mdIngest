@@ -175,12 +175,18 @@ def _h2_run_design_group(group_id):
             if not cap["ok"]:
                 raise RuntimeError(cap["exception"])
             _pc = _by_num.get(int(job["clip"]), {})
-            body = json.dumps(
-                {"ep": grp["ep"], "clip_num": job["clip"],
-                 "force_regen": True,
-                 "transcript": _h2_clip_transcript(_pc) or "",
-                 "title": str(_pc.get("title") or ""),
-                 "directive": str(job.get("directive") or "")}).encode("utf-8")
+            _req_payload = {
+                "ep": grp["ep"], "clip_num": job["clip"],
+                "force_regen": bool(job.get("force_regen", True)),
+                "transcript": _h2_clip_transcript(_pc) or "",
+                "title": str(_pc.get("title") or ""),
+                "directive": str(job.get("directive") or ""),
+            }
+            for _sk in ("kind", "equation_ref", "diagram", "anchor_label",
+                        "anchor_hook", "prompt_override", "rerender"):
+                if job.get(_sk) is not None and str(job.get(_sk)) != "":
+                    _req_payload[_sk] = job[_sk]
+            body = json.dumps(_req_payload).encode("utf-8")
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic"
                 f"?id=episode_{grp['ep']}&num={job['clip']}&async=1",
@@ -635,6 +641,132 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, status=500)
             return
 
+        if path == "/api/beats/design_prompt":
+            # Read-only configurator helper: returns the episode equation
+            # catalog (with TeX), the deterministic default choice (no design
+            # call, no render), the stored design if a storyboard exists, and
+            # the composed effective prompt.
+            ep = clean_ep(params.get("ep", [""])[0] or H2_EPISODE)
+            try:
+                clip_num = int(params.get("clip_num", ["1"])[0])
+            except ValueError:
+                self.send_json({"success": False, "error": "bad clip_num"},
+                               status=400)
+                return
+            try:
+                import manim_fresh_design as _fresh
+                clips = _h2_load_episode_plan_clips(ep)
+                clip = next((c for c in clips if int(c.get("num")) == clip_num), {}) or {}
+                transcript = _h2_clip_transcript(clip)
+                if not transcript:
+                    chunks = clip.get("caption_chunks") or []
+                    transcript = " ".join(str(ch.get("text") or "") for ch in chunks).strip() or str(clip.get("text") or "").strip()
+                title = str(clip.get("title") or f"Part {clip_num}").strip()
+                body_dur = float(clip.get("audio_duration") or clip.get("duration") or 120.0)
+                hook = _fresh.hook_sentence(transcript)
+                try:
+                    catalog = _fresh.fetch_episode_equations(ep)
+                except Exception:
+                    catalog = []
+                sb_dir = DDMA_DIR / "projects" / ("episode_" + str(ep)) / "storyboards"
+                prior = {}
+                if sb_dir.exists():
+                    for fn in sb_dir.iterdir():
+                        if not (fn.name.startswith("clip_") and fn.name.endswith("_storyboard.json")):
+                            continue
+                        try:
+                            n = fn.name[len("clip_"):-len("_storyboard.json")]
+                            if str(n) == str(clip_num):
+                                continue
+                            d = json.loads(fn.read_text(encoding="utf-8")).get("design") or {}
+                            if d.get("equation_norm"):
+                                prior[str(n)] = d["equation_norm"]
+                        except Exception:
+                            pass
+                sb_path = sb_dir / f"clip_{clip_num}_storyboard.json"
+                has_storyboard = sb_path.exists()
+                stored_design = None
+                if has_storyboard:
+                    try:
+                        stored_design = json.loads(sb_path.read_text(encoding="utf-8")).get("design") or {}
+                    except Exception:
+                        stored_design = None
+                det_choice = _fresh._deterministic_choice(
+                    transcript, title, hook, catalog, prior, directive=None)
+                det_kind = "formula" if det_choice.get("kind") == "equation" else str(det_choice.get("kind") or "anchor")
+                det_eq_ref = det_choice.get("equation_ref") if det_kind == "formula" else (0 if catalog else None)
+                det_label = det_choice.get("anchor_label") or _fresh._normalize_anchor_label(None, title)
+
+                # Resolve active defaults from stored_design if present, else deterministic pick
+                if stored_design:
+                    cur_kind = str(stored_design.get("kind") or det_kind).lower()
+                    if cur_kind not in ("formula", "anchor", "diagram"):
+                        cur_kind = det_kind
+                    cur_eq_ref = stored_design.get("equation_ref")
+                    if cur_eq_ref is None and stored_design.get("equation_norm"):
+                        for idx, c in enumerate(catalog):
+                            if c.get("norm") == stored_design.get("equation_norm"):
+                                cur_eq_ref = idx
+                                break
+                    if cur_eq_ref is None and catalog:
+                        cur_eq_ref = 0
+                    cur_diag = stored_design.get("diagram") or "numberline"
+                    anc = stored_design.get("anchor") or {}
+                    cur_label = anc.get("label") or det_label
+                    cur_hook = anc.get("hook") or hook
+                    cur_dir = str(stored_design.get("directive") or "")
+                    cur_po = str(stored_design.get("prompt_override") or "")
+                else:
+                    cur_kind = det_kind
+                    cur_eq_ref = det_eq_ref
+                    cur_diag = "numberline"
+                    cur_label = det_label
+                    cur_hook = hook
+                    cur_dir = ""
+                    cur_po = ""
+
+                # Allow query overrides when the client asks to re-compose for current UI state
+                q_kind = params.get("kind", [None])[0]
+                q_eq = params.get("equation_ref", [None])[0]
+                q_diag = params.get("diagram", [None])[0]
+                q_lab = params.get("anchor_label", [None])[0]
+                q_hook = params.get("anchor_hook", [None])[0]
+                q_dir = params.get("directive", [None])[0]
+                eff_kind = str(q_kind).strip().lower() if q_kind else cur_kind
+                eff_eq = q_eq if (q_eq is not None and str(q_eq) != "") else cur_eq_ref
+                eff_diag = str(q_diag).strip().lower() if q_diag else cur_diag
+                eff_lab = str(q_lab).strip() if q_lab is not None else cur_label
+                eff_hook = str(q_hook).strip() if q_hook is not None else cur_hook
+                eff_dir = str(q_dir).strip() if q_dir is not None else cur_dir
+
+                composed = _fresh.compose_design_prompt(
+                    transcript, title, body_dur, catalog,
+                    prior_equations=prior, hook=eff_hook or hook,
+                    directive=eff_dir or None, kind=eff_kind,
+                    equation_ref=eff_eq, diagram=eff_diag,
+                    anchor_label=eff_lab, anchor_hook=eff_hook)
+                self.send_json({
+                    "success": True, "ep": ep, "clip_num": clip_num,
+                    "title": title, "transcript": transcript,
+                    "body_duration": body_dur, "hook": hook,
+                    "catalog": catalog, "prior_equations": prior,
+                    "has_storyboard": has_storyboard,
+                    "stored_design": stored_design,
+                    "defaults": {
+                        "kind": cur_kind,
+                        "equation_ref": cur_eq_ref,
+                        "diagram": cur_diag,
+                        "anchor_label": cur_label,
+                        "anchor_hook": cur_hook,
+                        "directive": cur_dir,
+                        "prompt_override": cur_po,
+                    },
+                    "composed_prompt": composed,
+                })
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, status=500)
+            return
+
         if path == "/api/beats/storyboard":
             # Read-only: H2 clip storyboard for the Manim panel (design
             # source of truth: title / equation-or-anchor / scenes).
@@ -914,36 +1046,10 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/api/beats/mosaic_retry":
-            # EXPLICIT-ONLY manual trigger: the page double-confirms before
-            # calling this; the server only forwards to the curator's manual
-            # /export-to-mosaic endpoint and never spawns a pipeline itself.
-            ep = clean_ep(data.get("ep", "248"))
-            try:
-                clip_num = int(data.get("clip_num", 1))
-            except ValueError:
-                self.send_json({"success": False, "error": "bad clip_num"}, status=400)
-                return
-            project_id = f"episode_{ep}"
-            body = json.dumps({"directive": str(data.get("directive", "")),
-                               "prompt": str(data.get("prompt", ""))}).encode("utf-8")
-            req = urllib.request.Request(
-                f"{CURATOR_BASE}/export-to-mosaic?id={project_id}&num={clip_num}",
-                data=body, headers={"Content-Type": "application/json"}, method="POST")
-            try:
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    self.send_json(json.loads(r.read().decode("utf-8")))
-            except urllib.error.HTTPError as he:
-                try:
-                    detail = he.read().decode("utf-8")[:500]
-                except Exception:
-                    detail = str(he)
-                self.send_json({"success": False, "error": f"curator refused: {detail}"},
-                               status=he.code)
-            except Exception as e:
-                self.send_json(
-                    {"success": False,
-                     "error": f"curator unreachable on :8000 — open Cutroom first: {e}"},
-                    status=502)
+            self.send_json(
+                {"success": False,
+                 "error": "Mosaic runs happen in Cutroom"},
+                status=400)
             return
 
         if path == "/api/beats/set_engine":
@@ -979,10 +1085,14 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 _rc = next((c for c in _h2_load_episode_plan_clips(ep) if int(c.get("num")) == int(clip_num)), {})
             except Exception:
                 _rc = {}
-            _re_body = {"force_regen": True,
+            _re_body = {"force_regen": bool(data.get("force_regen", True)),
                           "transcript": _h2_clip_transcript(_rc) or "",
                           "title": str(_rc.get("title") or ""),
                           "directive": str(data.get("directive") or "")}
+            for _sk in ("kind", "equation_ref", "diagram", "anchor_label",
+                        "anchor_hook", "prompt_override", "rerender"):
+                if data.get(_sk) is not None and str(data.get(_sk)) != "":
+                    _re_body[_sk] = data[_sk]
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic?id={project_id}&num={clip_num}",
                 data=json.dumps(_re_body).encode("utf-8"),
@@ -1027,7 +1137,18 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json({"success": False, "error": "bad clip_num"},
                                status=400)
                 return
-            _clip_directive = (str(data.get("directive") or "") if (only is not None and str(only) != "") else "")
+            _is_clip_scope = (only is not None and str(only) != "")
+            _clip_directive = (str(data.get("directive") or "") if _is_clip_scope else "")
+            _is_rerender = bool(data.get("rerender")) and _is_clip_scope
+            _force_regen = (not _is_rerender) if "force_regen" not in data else bool(data.get("force_regen"))
+            if _is_rerender:
+                _sb_check = (DDMA_DIR / "projects" / ("episode_" + str(ep)) / "storyboards"
+                             / f"clip_{int(only)}_storyboard.json")
+                if not _sb_check.exists():
+                    self.send_json({"success": False,
+                                    "error": f"no stored design for clip {int(only)} (run Design this clip first)"},
+                                   status=400)
+                    return
             if not targets:
                 self.send_json({"success": False,
                                 "error": "no such clip in plan"}, status=404)
@@ -1042,10 +1163,19 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                     words = [(float(w.get("start", 0)), float(w.get("end", 0)),
                               str(w.get("word", "")))
                              for w in (c.get("_caption_words") or [])]
-                    jobs.append({"clip": c.get("num"), "status": "queued",
-                                 "transcript_chars": len(_h2_clip_transcript(c)),
-                                 "body_words": words, "shape": desc["shape"], "directive": _clip_directive,
-                                 "progress": 0, "stage": "queued"})
+                    j_entry = {"clip": c.get("num"), "status": "queued",
+                               "transcript_chars": len(_h2_clip_transcript(c)),
+                               "body_words": words, "shape": desc["shape"],
+                               "directive": _clip_directive,
+                               "force_regen": _force_regen,
+                               "rerender": _is_rerender,
+                               "progress": 0, "stage": "queued"}
+                    if _is_clip_scope:
+                        for _sk in ("kind", "equation_ref", "diagram",
+                                    "anchor_label", "anchor_hook", "prompt_override"):
+                            if data.get(_sk) is not None and str(data.get(_sk)) != "":
+                                j_entry[_sk] = data[_sk]
+                    jobs.append(j_entry)
                 H2_DESIGN_GROUPS[group_id] = {"ep": ep, "finished": False,
                                               "jobs": jobs}
             threading.Thread(target=_h2_run_design_group,
@@ -1075,6 +1205,12 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                                status=400)
                 return
             side = str(data.get("side", "")).strip().lower()
+            if side == "mosaic":
+                self.send_json(
+                    {"success": False,
+                     "error": "Mosaic runs happen in Cutroom"},
+                    status=400)
+                return
             try:
                 import spec_h2_composite_assembler as spec_h2
                 clips = _h2_load_episode_plan_clips(ep)

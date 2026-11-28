@@ -404,5 +404,302 @@ eval(panelFn);
                 BS.DDMA_DIR = old_ddma
 
 
+class TestManimConfiguratorAndMosaicRemoval(unittest.TestCase):
+    """Pin the Spec H2 Manim configurator (V1-V9) and Mosaic retrigger removal."""
+
+    CATALOG = [
+        {"section": "1. Octonionic Substrate",
+         "text": "x = x_0 e_0 + sum x_i e_i",
+         "norm": "x = x 0 e 0 + i = 1 sum 7 x i e i",
+         "tex": r"x = x_0 e_0 + \sum_{i=1}^7 x_i e_i"},
+        {"section": "1. Associator",
+         "text": "[x, y, z] = (xy)z - x(yz) != 0",
+         "norm": "[ x , y , z ] = ( x y ) z - x ( yz ) != 0",
+         "tex": r"[x, y, z] \equiv (xy)z - x(yz) \neq 0"},
+    ]
+    TR = "Clip one, the ultimate anchor. Is infinity a boundless horizon or a terminal wall? That is the big question."
+
+    def test_v2_kind_forces_anchor_formula_diagram(self):
+        import manim_fresh_design as F
+        # Kind=ANCHOR + label
+        art_a, rep_a = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="anchor",
+            anchor_label="BOUNDLESS HORIZON",
+            anchor_hook="Is infinity a boundless horizon?")
+        da = art_a["design"]
+        self.assertEqual(da["kind"], "anchor")
+        self.assertEqual(da["anchor"]["label"], "BOUNDLESS HORIZON")
+        self.assertEqual(da["anchor"]["hook"], "Is infinity a boundless horizon?")
+        self.assertIn("kind-forced: anchor", da["directive_report"])
+        self.assertTrue(any("kind-forced: anchor" in r for r in rep_a))
+
+        # Kind=FORMULA + catalog index
+        art_f, rep_f = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="formula", equation_ref=1)
+        df = art_f["design"]
+        self.assertEqual(df["kind"], "formula")
+        self.assertEqual(df["equation_ref"], 1)
+        self.assertEqual(df["equation_norm"], self.CATALOG[1]["norm"])
+        self.assertIn("kind-forced: formula", df["directive_report"])
+        self.assertIn("equation-picked: catalog 1", df["directive_report"])
+
+        # Kind=DIAGRAM + tunnel
+        art_d, rep_d = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="diagram", diagram="tunnel")
+        dd = art_d["design"]
+        self.assertEqual(dd["kind"], "diagram")
+        self.assertEqual(dd["diagram"], "tunnel")
+        self.assertIn("kind-forced: diagram", dd["directive_report"])
+        self.assertIn("diagram-picked: tunnel", dd["directive_report"])
+
+    def test_v3_guard_out_of_range_equation_ref_degrades_to_anchor(self):
+        import manim_fresh_design as F
+        art, rep = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="formula", equation_ref=99)
+        d = art["design"]
+        self.assertEqual(d["kind"], "anchor")
+        self.assertIsNone(d["equation_norm"])
+        self.assertIn("equation-rejected-not-on-page", d["directive_report"])
+        self.assertTrue(any("equation-rejected-not-on-page" in r for r in rep))
+
+    def test_v4_prompt_override_records_fallback_deterministic_and_gemini(self):
+        import json
+        import manim_fresh_design as F
+        # With Gemini unavailable (None / 401), deterministic fallback runs from structured params
+        art_fb, rep_fb = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="diagram", diagram="numberline",
+            prompt_override="Custom edited prompt text")
+        dfb = art_fb["design"]
+        self.assertEqual(dfb["kind"], "diagram")
+        self.assertEqual(dfb["diagram"], "numberline")
+        self.assertEqual(dfb["prompt_override"], "Custom edited prompt text")
+        self.assertIn("prompt-override: fallback-deterministic", dfb["directive_report"])
+        self.assertTrue(any("prompt-override: fallback-deterministic" in r for r in rep_fb))
+
+        # With Gemini available, prompt_override is passed verbatim and reported as prompt-override: gemini
+        seen_prompts = []
+        class _FakeModel:
+            def generate_content(self, p):
+                seen_prompts.append(p)
+                class _R:
+                    text = json.dumps({"kind": "diagram", "diagram": "groundzero",
+                                       "equation_ref": None, "equation_display": "",
+                                       "anchor_label": None, "reason": "gemini override"})
+                return _R()
+        class _FakeGen:
+            def GenerativeModel(self, name):
+                return _FakeModel()
+
+        art_g, rep_g = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=_FakeGen(), clip_num=1,
+            prompt_override="VERBATIM OVERRIDE PROMPT")
+        dg = art_g["design"]
+        self.assertEqual(seen_prompts[0], "VERBATIM OVERRIDE PROMPT")
+        self.assertEqual(dg["kind"], "diagram")
+        self.assertEqual(dg["diagram"], "groundzero")
+        self.assertIn("prompt-override: gemini", dg["directive_report"])
+
+    def test_v5_rerender_unchanged_storyboard_vs_changed_override(self):
+        import json
+        import manim_fresh_design as F
+        art, _ = F.design_clip_artifact(
+            self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            genai_mod=None, clip_num=1, kind="anchor",
+            anchor_label="ULTIMATE ANCHOR",
+            anchor_hook="Clip one, the ultimate anchor.")
+        sb = {
+            "clip_num": 1, "clip_title": "Ultimate Anchor",
+            "total_duration": 90.0,
+            "design": art["design"],
+            "scenes": art["stages"],
+            "stages": art["stages"],
+        }
+        orig_bytes = json.dumps(sb, sort_keys=True)
+        # Re-render with identical configurator values: pure redraw, changed=False, bytes identical
+        sb_same, changed_same = F.apply_configurator_overrides_to_storyboard(
+            sb, self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            clip_num=1, kind="anchor", anchor_label="ULTIMATE ANCHOR",
+            anchor_hook="Clip one, the ultimate anchor.")
+        self.assertFalse(changed_same)
+        self.assertEqual(json.dumps(sb_same, sort_keys=True), orig_bytes)
+
+        # Re-render with modified Kind (FORMULA + catalog 0): updates storyboard deterministically
+        sb_mod, changed_mod = F.apply_configurator_overrides_to_storyboard(
+            sb, self.TR, "Ultimate Anchor", 90.0, self.CATALOG,
+            clip_num=1, kind="formula", equation_ref=0, ep_num="249")
+        self.assertTrue(changed_mod)
+        self.assertEqual(sb_mod["design"]["kind"], "formula")
+        self.assertEqual(sb_mod["design"]["equation_ref"], 0)
+        self.assertEqual(sb_mod["design"]["equation_tex"], self.CATALOG[0]["tex"])
+
+    def test_v6_mosaic_retrigger_removed_from_page_and_refused_by_server(self):
+        import io
+        import json
+        import beats_server as BS
+        beats_html = (DDMA_DIR / "beats.html").read_text(encoding="utf-8")
+        self.assertNotIn("btn-retrigger-mosaic", beats_html)
+        self.assertNotIn("Retrigger Mosaic-only", beats_html)
+        self.assertNotIn("beatsMosaicRetrigger", beats_html)
+        self.assertIn("btn-retrigger-manim", beats_html)
+        self.assertIn("Retrigger Manim-only", beats_html)
+
+        # Exercise BeatsHandler POST /api/beats/composite_retrigger with side="mosaic"
+        # and POST /api/beats/mosaic_retry: both must refuse with HTTP 400 and
+        # "Mosaic runs happen in Cutroom" without touching the curator.
+        for path, payload in (
+            ("/api/beats/composite_retrigger", {"ep": "249", "clip_num": 1, "side": "mosaic"}),
+            ("/api/beats/mosaic_retry", {"ep": "249", "clip_num": 1}),
+        ):
+            raw_body = json.dumps(payload).encode("utf-8")
+            sent = {}
+            handler = BS.BeatsHandler.__new__(BS.BeatsHandler)
+            handler.path = path
+            handler.headers = {"Content-Length": str(len(raw_body))}
+            handler.rfile = io.BytesIO(raw_body)
+            handler.send_json = lambda data, status=200, _s=sent: _s.update({"status": status, "data": data})
+            handler.do_POST()
+            self.assertEqual(sent.get("status"), 400)
+            self.assertFalse(sent["data"].get("success", True))
+            self.assertIn("Mosaic runs happen in Cutroom", sent["data"].get("error", ""))
+
+    def test_v1_v9_configurator_dom_prefill_reset_and_clip_switch(self):
+        import json
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not available")
+        beats_html = (DDMA_DIR / "beats.html").read_text(encoding="utf-8")
+        js_harness = f"""
+const htmlSrc = {json.dumps(beats_html)};
+function extractFn(src, name) {{
+    const marker = name.includes('function ') ? name : ('function ' + name);
+    const start = src.indexOf(marker);
+    if (start < 0) throw new Error('missing ' + name);
+    let depth = 0, i = src.indexOf('{{', start);
+    for (; i < src.length; i++) {{
+        if (src[i] === '{{') depth++;
+        else if (src[i] === '}}') {{
+            depth--;
+            if (depth === 0) return src.slice(start, i + 1);
+        }}
+    }}
+    throw new Error('unclosed ' + name);
+}}
+let lfConfigState = null;
+let lfActiveClipNum = 3;
+const elements = {{}};
+function getEl(id) {{
+    if (!elements[id]) elements[id] = {{ id, innerHTML: '', innerText: '', value: '', style: {{}} }};
+    return elements[id];
+}}
+const document = {{ getElementById: getEl }};
+const katex = {{ renderToString: (t) => '<span class="katex">' + t + '</span>' }};
+function beatsEpisode() {{ return '249'; }}
+const clipPayloads = {{
+    3: {{
+        success: true, ep: '249', clip_num: 3,
+        title: 'Division Algebras', transcript: 'Clip three, division algebras.',
+        body_duration: 87.17, hook: 'Clip three, division algebras.',
+        catalog: [
+            {{ section: '1. Octonions', norm: 'x = x0 e0', tex: 'x = x_0 e_0' }},
+            {{ section: '1. Associator', norm: '[x,y,z] != 0', tex: '[x,y,z] \\\\neq 0' }}
+        ],
+        prior_equations: {{}},
+        has_storyboard: true,
+        stored_design: {{
+            kind: 'formula', equation_norm: '[x,y,z] != 0',
+            directive: 'use the associator equation',
+            directive_report: 'directive-honored: equation 1',
+            prompt_override: 'STORED OVERRIDE CLIP 3'
+        }},
+        defaults: {{
+            kind: 'formula', equation_ref: 1, diagram: 'numberline',
+            anchor_label: 'DIVISION ALGEBRAS', anchor_hook: 'Clip three, division algebras.',
+            directive: 'use the associator equation', prompt_override: 'STORED OVERRIDE CLIP 3'
+        }},
+        composed_prompt: 'COMPOSED DEFAULT CLIP 3'
+    }},
+    1: {{
+        success: true, ep: '250', clip_num: 1,
+        title: 'Ultimate Anchor', transcript: 'Clip one, the ultimate anchor.',
+        body_duration: 134.65, hook: 'Clip one, the ultimate anchor.',
+        catalog: [{{ section: '2.1 Cancellation Law', norm: 'a(x-y)=0', tex: 'a(x-y)=0' }}],
+        prior_equations: {{}},
+        has_storyboard: false,
+        stored_design: null,
+        defaults: {{
+            kind: 'anchor', equation_ref: 0, diagram: 'numberline',
+            anchor_label: 'ULTIMATE ANCHOR', anchor_hook: 'Clip one, the ultimate anchor.',
+            directive: '', prompt_override: ''
+        }},
+        composed_prompt: 'COMPOSED DEFAULT CLIP 1'
+    }}
+}};
+async function fetch(url) {{
+    const m = url.match(/clip_num=(\\d+)/);
+    const c = m ? Number(m[1]) : 3;
+    return {{ ok: true, status: 200, json: async () => clipPayloads[c] }};
+}}
+for (const fn of [
+    'escapeHtml', 'renderKatexMathHtml', 'composeClientEffectivePrompt',
+    'syncConfiguratorFromDom', 'updateConfiguratorPromptIfClean',
+    'onConfiguratorKindChange', 'toggleEquationDropdown', 'selectCatalogEquation',
+    'onConfiguratorPromptInput', 'resetConfiguratorPrompt', 'renderConfiguratorSlot',
+    'async function renderManimConfigurator', 'collectConfiguratorPayload'
+]) {{
+    eval(extractFn(htmlSrc, fn));
+}}
+(async () => {{
+    // 1. Load clip 3 (stored FORMULA design with prompt override)
+    await renderManimConfigurator(3, {{ design: clipPayloads[3].stored_design }}, 'Last outcome: directive-honored: equation 1');
+    const html3 = getEl('lf-manim-configurator').innerHTML;
+    const slot3 = getEl('lf-cfg-slot-container').innerHTML;
+    const state3 = Object.assign({{}}, lfConfigState);
+    // Simulate unsubmitted typing on clip 3
+    getEl('lf-manim-directive').value = 'UNSUBMITTED TYPING';
+    getEl('lf-cfg-effective-prompt').value = 'UNSUBMITTED PROMPT EDIT';
+    onConfiguratorPromptInput();
+    // Reset prompt on clip 3 restores composed default
+    resetConfiguratorPrompt();
+    const afterResetPrompt = getEl('lf-cfg-effective-prompt').value;
+    // 2. Switch to clip 1 (no stored storyboard): unsubmitted typing must not carry over, Re-render disabled
+    getEl('lf-manim-directive').value = 'UNSUBMITTED TYPING';
+    await renderManimConfigurator(1, null, '');
+    const html1 = getEl('lf-manim-configurator').innerHTML;
+    const slot1 = getEl('lf-cfg-slot-container').innerHTML;
+    const state1 = Object.assign({{}}, lfConfigState);
+    console.log(JSON.stringify({{
+        html3, slot3, state3, afterResetPrompt, html1, slot1, state1
+    }}));
+}})();
+"""
+        proc = subprocess.run([node, "-e", js_harness],
+                              capture_output=True, text=True, timeout=15)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        res = json.loads(proc.stdout.strip())
+        # V1: clip 3 prefilled with formula, catalog equation 1, directive, stored prompt override, Re-render enabled
+        self.assertEqual(res["state3"]["kind"], "formula")
+        self.assertEqual(res["state3"]["equation_ref"], 1)
+        self.assertIn("STORED OVERRIDE CLIP 3", res["html3"])
+        self.assertIn("katex", res["slot3"])
+        self.assertIn("1. Associator", res["slot3"])
+        self.assertNotIn("disabled>Re-render", res["html3"])
+        # V4: Reset to default restores composed prompt
+        self.assertIn("You design ONE sustained Manim artifact", res["afterResetPrompt"])
+        # V9: Switching to clip 1 drops unsubmitted typing, prefills clip 1 anchor defaults, disables Re-render (no stored design)
+        self.assertEqual(res["state1"]["kind"], "anchor")
+        self.assertEqual(res["state1"]["directive"], "")
+        self.assertNotIn("UNSUBMITTED TYPING", res["html1"])
+        self.assertIn("ULTIMATE ANCHOR", res["slot1"])
+        self.assertIn("disabled>Re-render", res["html1"])
+
+
 if __name__ == "__main__":
     unittest.main()
