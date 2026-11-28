@@ -463,6 +463,8 @@ a { color: var(--accent-indigo); }
             let artMtime = null;
             let masterMtime = null;
             let hasManim = Boolean(chInfo && chInfo.has_beats);
+            let stagesListHtml = '';
+            let previewVideoHtml = '';
             try {
                 const res = await fetch('/api/beats/storyboard?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum);
                 const data = await res.json();
@@ -493,12 +495,39 @@ a { color: var(--accent-indigo); }
                     stageNote = stages.length + ' scenes (legacy board) ' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
                 }
                 if (!stageNote) stageNote = stages.length + ' stages' + (dur != null ? ', ' + dur.toFixed(2) + 's' : '');
+                if (stages.length > 0) {
+                    stagesListHtml = '<div id="lf-manim-stages-list" style="margin-top:6px;margin-bottom:10px;display:flex;flex-direction:column;gap:3px;font-size:0.74rem;color:var(--text-dark-secondary);">' +
+                        stages.map(function (st, idx) {
+                            const s0 = (typeof st.start === 'number') ? st.start.toFixed(1) : '0.0';
+                            const s1 = (typeof st.end === 'number') ? st.end.toFixed(1) : '?';
+                            const kTag = escapeHtml(String(st.kind || 'stage').toUpperCase());
+                            const txt = escapeHtml(String(st.text || st.title || '').slice(0, 96));
+                            return '<div><b>Stage ' + (idx + 1) + ' (' + s0 + 's–' + s1 + 's, ' + kTag + '):</b> ' + txt + '</div>';
+                        }).join('') + '</div>';
+                }
                 if (design.directive) directiveVal = design.directive;
                 if (design.directive_report) outcomeHtml = 'Last outcome: ' + escapeHtml(design.directive_report);
-                if (typeof data.manim_artifact_mtime === 'number') artMtime = data.manim_artifact_mtime;
+                if (typeof data.manim_artifact_mtime === 'number') {
+                    artMtime = data.manim_artifact_mtime;
+                    hasManim = true;
+                    if (chInfo) chInfo.has_beats = true;
+                }
                 if (typeof data.master_mtime === 'number') masterMtime = data.master_mtime;
             } catch (e) {
                 hasManim = false;
+            }
+            if (hasManim) {
+                const mediaSrc = '/api/beats/clip_media?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum + (artMtime != null ? ('&t=' + Math.floor(artMtime)) : '');
+                previewVideoHtml = '<div style="margin-top:6px;margin-bottom:10px;"><video id="lf-manim-infographic-video" src="' + escapeHtml(mediaSrc) + '" controls preload="metadata" style="max-width:360px;width:100%;max-height:240px;background:#000;border-radius:6px;border:1px solid var(--border-color);display:block;"></video></div>';
+                if (!lfTimelineIndex || !lfTimelineIndex.has_video) {
+                    const topVideoEl = document.getElementById('lf-studio-video-player');
+                    if (topVideoEl && artMtime != null) {
+                        const curAttr = topVideoEl.getAttribute('src') || '';
+                        if (curAttr.indexOf('/api/beats/clip_media') !== -1 && curAttr !== mediaSrc) {
+                            topVideoEl.src = mediaSrc;
+                        }
+                    }
+                }
             }
             const statusLine = hasManim
                 ? ('Manim ready' + (stageNote ? ' - ' + stageNote : '') + ' - ' + escapeHtml(ep + '-' + cNum + '-manim.mp4'))
@@ -509,20 +538,19 @@ a { color: var(--accent-indigo); }
                 : ('<div style="font-size:1rem;font-weight:800;color:var(--text-main);margin-bottom:4px;">' + escapeHtml(title) + '</div>' +
                    (focusHtml ? '<div style="font-size:0.84rem;color:var(--text-main);margin-bottom:8px;">' + focusHtml + '</div>' : '') +
                    '<div style="font-size:0.84rem;color:var(--text-main);">No Manim yet</div>');
-            // Patch gate (stored state, survives reload): enabled only when the
-            // Manim artifact is newer than the master (designed but not patched).
+            // Patch gate (stored state, survives reload): enabled when a Manim
+            // artifact exists and is newer than the master (or when no master
+            // exists yet, so a landed design enables the button per Spec H2).
             let patchEnabled = false;
             let patchHintHtml = '';
             let patchTitle = '';
             if (!hasManim || artMtime == null) {
                 patchTitle = 'Run Design this clip first';
                 patchHintHtml = 'Run Design this clip first.';
-            } else if (masterMtime == null) {
-                patchTitle = 'No master to patch into yet';
-                patchHintHtml = 'No master to patch into yet.';
-            } else if (artMtime > masterMtime) {
+            } else if (masterMtime == null || artMtime > masterMtime) {
                 patchEnabled = true;
                 patchTitle = 'Hot-patch ONLY the active chapter into the Master (takes a few minutes)';
+                if (masterMtime == null) patchHintHtml = 'No master to patch into yet.';
             } else {
                 patchTitle = 'Already patched — run Design this clip again to enable Patch';
                 patchHintHtml = 'Up to date — run Design this clip again to enable Patch.';
@@ -539,6 +567,8 @@ a { color: var(--accent-indigo); }
                 '</div>' +
                 '<div style="background:var(--card-bg);border:1px solid var(--border-color);border-radius:10px;padding:12px 16px;">' +
                 '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-bottom:10px;">' + statusLine + '</div>' +
+                (hasManim ? stagesListHtml : '') +
+                (hasManim ? previewVideoHtml : '') +
                 '<label for="lf-manim-directive" style="display:block;font-size:0.78rem;font-weight:700;color:var(--text-main);margin-bottom:6px;">Design instruction for this clip&#39;s Manim</label>' +
                 '<textarea id="lf-manim-directive" rows="2" style="width:100%;box-sizing:border-box;background:var(--bg-color);color:var(--text-main);border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;font-size:0.84rem;" placeholder="Instruction for this clip&#39;s Manim — e.g. make this an anchor, or use the thermal-time equation">' + escapeHtml(directiveVal) + '</textarea>' +
                 (outcomeHtml ? '<div style="font-size:0.78rem;color:var(--text-dark-secondary);margin-top:6px;">' + outcomeHtml + '</div>' : '') +

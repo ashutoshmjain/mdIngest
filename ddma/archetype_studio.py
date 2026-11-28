@@ -1141,7 +1141,10 @@ def _lf_cache_key(clean_ep: str) -> str:
         for p in sorted(glob.glob(os.path.join(d, "clip_*_gemini_scenes.py")) +
                         glob.glob(os.path.join(d, "clip_*_meta.json"))):
             parts.append(f"{os.path.basename(p)}:{os.path.getmtime(p)}")
-    for p in sorted(glob.glob(os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-*-mosaic*.mp4"))):
+    for p in sorted(glob.glob(os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-*-mosaic*.mp4")) +
+                    glob.glob(os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-*-manim.mp4")) +
+                    glob.glob(os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-*-infographic.mp4")) +
+                    glob.glob(os.path.join(SCRIPT_DIR, "projects", f"episode_{clean_ep}", "storyboards", "clip_*_storyboard.json"))):
         parts.append(f"{os.path.basename(p)}:{os.path.getmtime(p)}")
     return "|".join(parts)
 
@@ -1248,16 +1251,21 @@ def _has_master_video(clean_ep: str) -> bool:
 # never triggers a run, never writes any plan.
 
 def _h2_manim_artifact_exists(clean_ep: str, clip_num: int) -> bool:
-    """H2 Manim artifact existence: {ep}-{clip}-manim.mp4, hub or local."""
+    """H2 Manim artifact existence: {ep}-{clip}-manim.mp4 or {ep}-{clip}-infographic.mp4, hub or local."""
     try:
         c = int(clip_num)
     except Exception:
         return False
-    cands = [os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-manim.mp4")]
+    cands = [
+        os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-manim.mp4"),
+        os.path.join(SCRIPT_DIR, "clips", f"{clean_ep}-{c}-infographic.mp4"),
+    ]
     hub = _resolve_dd_hub_root()
     if hub:
-        cands.append(os.path.join(hub, "episodes", clean_ep,
-                                  f"{clean_ep}-{c}-manim.mp4"))
+        cands.extend([
+            os.path.join(hub, "episodes", clean_ep, f"{clean_ep}-{c}-manim.mp4"),
+            os.path.join(hub, "episodes", clean_ep, f"{clean_ep}-{c}-infographic.mp4"),
+        ])
     for p in cands:
         try:
             if os.path.exists(p) and os.path.getsize(p) > 0:
@@ -1420,7 +1428,7 @@ def get_longform_all_chapter_mappings(ep_num: str = "248", total_duration: Optio
         chapters[c_num]["visual_source"] = configured_vs
         chapters[c_num]["mosaic_body"] = mosaic_body
         chapters[c_num]["locked"] = bool(configured_vs == "mosaic" and mosaic_body)
-        chapters[c_num]["has_beats"] = (h2_manim if h2_covered else legacy_has_beats)
+        chapters[c_num]["has_beats"] = (h2_manim if h2_covered else (h2_manim or legacy_has_beats))
         chapters[c_num]["has_mosaic"] = bool(actual_mosaic_body)
         chapters[c_num]["openable"] = openable
         chapters[c_num]["published"] = published

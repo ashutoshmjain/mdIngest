@@ -212,5 +212,160 @@ class TestEpisode249DurationPin(unittest.TestCase):
                              f"{self.ORACLE_TOTAL:.3f}s")
 
 
+class TestIssue143ManimPanelLanding(unittest.TestCase):
+    """Pin the Issue 143 panel-landing path for completed H2 Manim designs.
+
+    Proves:
+    (1) Partial-coverage episodes (e.g. 250 with 4/14 mosaic_run_ids) still
+        report has_beats=True when a clip's H2 Manim artifact exists, and
+        _lf_cache_key invalidates when a Manim artifact or storyboard changes.
+    (2) renderClipManimPanel lands a completed 250-1 design (kind ANCHOR,
+        label ULTIMATE ANCHOR, hook Clip one, the ultimate anchor., stages
+        list, playable video, Patch enabled) even when chInfo.has_beats was
+        initially stale/false, and survives a page reload.
+    """
+    def test_partial_coverage_episode_reports_h2_manim_has_beats(self):
+        import tempfile
+        import archetype_studio as AS
+        with tempfile.TemporaryDirectory() as td:
+            old_script_dir = AS.SCRIPT_DIR
+            try:
+                AS.SCRIPT_DIR = td
+                AS._LF_INTERVALS_CACHE.clear()
+                proj_dir = Path(td) / "projects" / "episode_250"
+                proj_dir.mkdir(parents=True, exist_ok=True)
+                clips_dir = Path(td) / "clips"
+                clips_dir.mkdir(parents=True, exist_ok=True)
+                # Episode 250 shape: clip 1 has mosaic_run_id + infographic_ready,
+                # clip 4 has no mosaic_run_id (so h2_covered is False).
+                plan = [
+                    {"num": 1, "title": "Ultimate Anchor", "start": 0.0,
+                     "end": 134.65, "duration": 134.65,
+                     "mosaic_run_id": "4dc08028-5f8a-4d51-97e2-490e4cadc68d",
+                     "infographic_ready": True},
+                    {"num": 4, "title": "Part 4", "start": 134.65,
+                     "end": 250.0, "duration": 115.35,
+                     "mosaic_run_id": None},
+                ]
+                (proj_dir / "plan.json").write_text(
+                    __import__("json").dumps(plan), encoding="utf-8")
+                idx_before = AS.get_longform_timeline_index("250")
+                ch1_before = next(
+                    c for c in idx_before["chapters"] if c["clip_num"] == 1)
+                self.assertFalse(ch1_before["has_beats"])
+                key_before = AS._lf_cache_key("250")
+                # Now the Manim render completes and writes 250-1-infographic.mp4
+                (clips_dir / "250-1-infographic.mp4").write_bytes(b"mp4bytes")
+                key_after = AS._lf_cache_key("250")
+                self.assertNotEqual(key_before, key_after)
+                idx_after = AS.get_longform_timeline_index("250")
+                ch1_after = next(
+                    c for c in idx_after["chapters"] if c["clip_num"] == 1)
+                self.assertTrue(ch1_after["has_beats"])
+            finally:
+                AS.SCRIPT_DIR = old_script_dir
+                AS._LF_INTERVALS_CACHE.clear()
+
+    def test_panel_lands_completed_250_1_design_in_node_harness(self):
+        import json
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node not available")
+        beats_html = (DDMA_DIR / "beats.html").read_text(encoding="utf-8")
+        sb_path = (DDMA_DIR / "projects" / "episode_250" / "storyboards"
+                   / "clip_1_storyboard.json")
+        if sb_path.exists():
+            sb_data = json.loads(sb_path.read_text(encoding="utf-8"))
+        else:
+            sb_data = {
+                "clip_num": 1, "clip_title": "Ultimate Anchor",
+                "total_duration": 134.65,
+                "design": {
+                    "kind": "anchor", "title": "Ultimate Anchor",
+                    "anchor": {"label": "ULTIMATE ANCHOR",
+                               "hook": "Clip one, the ultimate anchor."},
+                    "directive": "Rule: one artifact — title first, plus this one anchor.",
+                    "directive_report": "directive-honored: forced anchor",
+                },
+                "stages": [
+                    {"start": 0.0, "end": 3.0, "kind": "title",
+                     "title": "Ultimate Anchor", "text": "Ultimate Anchor"},
+                    {"start": 3.0, "end": 28.82, "kind": "anchor",
+                     "title": "Ultimate Anchor", "text": "Is infinity a boundless horizon or a terminal wall?"},
+                    {"start": 28.82, "end": 58.89, "kind": "anchor",
+                     "title": "Ultimate Anchor", "text": "So to map that kind of physical universe, we need a mathematical system."},
+                    {"start": 58.89, "end": 93.09, "kind": "anchor",
+                     "title": "Ultimate Anchor", "text": "The absolute essence of a division algebra is that it's this pristine space."},
+                    {"start": 93.09, "end": 122.76, "kind": "anchor",
+                     "title": "Ultimate Anchor", "text": "I want to make sure we are visualizing this correctly."},
+                    {"start": 122.76, "end": 134.65, "kind": "anchor",
+                     "title": "Ultimate Anchor", "text": "It scales logically. But what happens if the algebra isn't a division algebra?"},
+                ],
+            }
+        # Extract escapeHtml and renderClipManimPanel from beats.html
+        js_harness = f"""
+const sbPayload = {json.dumps(sb_data)};
+const htmlSrc = {json.dumps(beats_html)};
+function extractFn(src, name) {{
+    const marker = name.startsWith('async ') ? name : ('function ' + name);
+    const start = src.indexOf(marker);
+    if (start < 0) throw new Error('missing ' + name);
+    let depth = 0, i = src.indexOf('{{', start);
+    for (; i < src.length; i++) {{
+        if (src[i] === '{{') depth++;
+        else if (src[i] === '}}') {{
+            depth--;
+            if (depth === 0) return src.slice(start, i + 1);
+        }}
+    }}
+    throw new Error('unclosed ' + name);
+}}
+const escapeFn = extractFn(htmlSrc, 'escapeHtml');
+const panelFn = extractFn(htmlSrc, 'async function renderClipManimPanel');
+const container = {{ innerHTML: '' }};
+const document = {{
+    getElementById: (id) => (id === 'beats-below-player' ? container : null)
+}};
+const lfTimelineIndex = {{ has_video: false }};
+function beatsEpisode() {{ return '250'; }}
+async function fetch(url) {{
+    return {{
+        ok: true, status: 200,
+        json: async () => ({{
+            success: true, ep: '250', clip_num: 1,
+            storyboard: sbPayload,
+            manim_artifact_mtime: 1764295000.0,
+            master_mtime: null
+        }})
+    }};
+}}
+eval(escapeFn);
+eval(panelFn);
+(async () => {{
+    const chInfo = {{ clip_num: 1, title: 'Ultimate Anchor', has_beats: false }};
+    await renderClipManimPanel(1, chInfo);
+    console.log(JSON.stringify({{
+        html: container.innerHTML,
+        has_beats_after: chInfo.has_beats
+    }}));
+}})();
+"""
+        proc = subprocess.run([node, "-e", js_harness],
+                              capture_output=True, text=True, timeout=15)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        out = json.loads(proc.stdout.strip())
+        html = out["html"]
+        self.assertTrue(out["has_beats_after"])
+        self.assertNotIn("No Manim yet", html)
+        self.assertIn("Manim ready - 6 stages, 134.65s - 250-1-manim.mp4", html)
+        self.assertIn("Anchor: ULTIMATE ANCHOR - Clip one, the ultimate anchor.", html)
+        self.assertIn("lf-manim-stages-list", html)
+        self.assertIn("Stage 1 (", html)
+        self.assertIn("lf-manim-infographic-video", html)
+        self.assertNotIn("disabled>⚡ Patch", html)
+
+
 if __name__ == "__main__":
     unittest.main()

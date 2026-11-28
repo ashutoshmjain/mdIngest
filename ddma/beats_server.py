@@ -409,9 +409,11 @@ def find_clip_media(clean_id, clip_num):
     c = int(clip_num)
     candidates = [
         DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-manim.mp4",
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-infographic.mp4",
         DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-mosaic.mp4",
         DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}.mp4",
         DDMA_DIR / "clips" / f"{clean_id}-{c}-manim.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}-infographic.mp4",
         DDMA_DIR / "clips" / f"{clean_id}-{c}-mosaic.mp4",
         DDMA_DIR / "clips" / f"{clean_id}-{c}.mp4",
         DD_HUB_ROOT / "episodes" / clean_id / f"clip_{c}.mp3",
@@ -419,7 +421,7 @@ def find_clip_media(clean_id, clip_num):
     ]
     for p in candidates:
         try:
-            if p.exists():
+            if p.exists() and p.stat().st_size > 0:
                 return p
         except Exception:
             pass
@@ -638,9 +640,15 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             art_mtime = None
             master_mtime = None
             try:
-                _art = (DDMA_DIR / "clips" / f"{ep}-{clip_num}-infographic.mp4")
-                if _art.exists():
-                    art_mtime = _art.stat().st_mtime
+                for _art in (
+                    DDMA_DIR / "clips" / f"{ep}-{clip_num}-infographic.mp4",
+                    DDMA_DIR / "clips" / f"{ep}-{clip_num}-manim.mp4",
+                    DD_HUB_ROOT / "episodes" / str(ep) / f"{ep}-{clip_num}-infographic.mp4",
+                    DD_HUB_ROOT / "episodes" / str(ep) / f"{ep}-{clip_num}-manim.mp4",
+                ):
+                    if _art.exists() and _art.stat().st_size > 0:
+                        art_mtime = _art.stat().st_mtime
+                        break
                 _master = _h2_composite_master(ep)
                 if _master is not None and _master.exists():
                     master_mtime = _master.stat().st_mtime
