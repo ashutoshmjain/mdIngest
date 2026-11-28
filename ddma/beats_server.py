@@ -183,17 +183,59 @@ def _h2_run_design_group(group_id):
                  "directive": str(job.get("directive") or "")}).encode("utf-8")
             req = urllib.request.Request(
                 f"{CURATOR_BASE}/generate-manim-infographic"
-                f"?id=episode_{grp['ep']}&num={job['clip']}",
+                f"?id=episode_{grp['ep']}&num={job['clip']}&async=1",
                 data=body, headers={"Content-Type": "application/json"},
                 method="POST")
-            with urllib.request.urlopen(req, timeout=120) as r:
-                detail = json.loads(r.read().decode("utf-8"))
-            if isinstance(detail, dict) and detail.get("success") is False:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                accept = json.loads(r.read().decode("utf-8"))
+            if not isinstance(accept, dict) or not accept.get("accepted"):
                 raise RuntimeError(
-                    str(detail.get("error", "curator refused"))[:500])
+                    str((accept or {}).get("error", "curator refused async"))[:500])
+            with H2_DESIGN_LOCK:
+                job["progress"] = 15
+                job["stage"] = "designed"
+                if isinstance(accept.get("design"), dict):
+                    job["detail"] = {"design": accept.get("design"),
+                                     "reports": accept.get("reports", [])}
+            job_id = accept.get("job_id")
+            import time as _ptime
+            deadline = _ptime.time() + 45 * 60
+            final = None
+            while _ptime.time() < deadline:
+                with H2_DESIGN_LOCK:
+                    if grp.get("cancelled"):
+                        raise RuntimeError("design group cancelled")
+                _ptime.sleep(10)
+                sreq = urllib.request.Request(
+                    f"{CURATOR_BASE}/generate-manim-status?job={job_id}",
+                    method="GET")
+                try:
+                    with urllib.request.urlopen(sreq, timeout=30) as sr:
+                        st = json.loads(sr.read().decode("utf-8"))
+                except Exception:
+                    continue
+                if not isinstance(st, dict) or st.get("success") is False:
+                    continue
+                with H2_DESIGN_LOCK:
+                    try:
+                        job["progress"] = int(st.get("progress", job.get("progress", 0)) or 0)
+                    except Exception:
+                        pass
+                    job["stage"] = str(st.get("stage", job.get("stage", "")))
+                if st.get("state") == "done":
+                    final = st.get("detail") or {}
+                    break
+                if st.get("state") == "failed":
+                    raise RuntimeError(str(st.get("error", "curator job failed"))[:500])
+            else:
+                raise RuntimeError("curator job stalled (>45min): abandoned")
+            if final is None:
+                raise RuntimeError("curator job ended without detail")
+            if isinstance(final, dict) and final.get("success") is False:
+                raise RuntimeError(str(final.get("error", "curator refused"))[:500])
             with H2_DESIGN_LOCK:
                 job["status"] = "done"
-                job["detail"] = detail
+                job["detail"] = final
         except Exception as e:
             with H2_DESIGN_LOCK:
                 job["status"] = "failed"
@@ -692,7 +734,8 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             with H2_DESIGN_LOCK:
                 grp = H2_DESIGN_GROUPS.get(group_id)
                 def _job_snap(j):
-                    out = {k: j[k] for k in ("clip", "status", "error")
+                    out = {k: j[k] for k in ("clip", "status", "error",
+                                            "progress", "stage")
                            if k in j}
                     out["directive"] = str(j.get("directive") or "")
                     try:
@@ -969,7 +1012,8 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
                              for w in (c.get("_caption_words") or [])]
                     jobs.append({"clip": c.get("num"), "status": "queued",
                                  "transcript_chars": len(_h2_clip_transcript(c)),
-                                 "body_words": words, "shape": desc["shape"], "directive": _clip_directive})
+                                 "body_words": words, "shape": desc["shape"], "directive": _clip_directive,
+                                 "progress": 0, "stage": "queued"})
                 H2_DESIGN_GROUPS[group_id] = {"ep": ep, "finished": False,
                                               "jobs": jobs}
             threading.Thread(target=_h2_run_design_group,

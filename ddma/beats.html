@@ -692,6 +692,12 @@ a { color: var(--accent-indigo); }
                     panel.style.display = 'block';
                     const epTag = ((String(group).match(/^h2-(\d+)-/) || [])[1]) || beatsEpisode();
                     let html = `<b>Design ${escapeHtml(group)} (ep ${escapeHtml(epTag)}):</b> ${done}/${data.jobs.length} clips rendered`;
+                    const active = data.jobs.filter(j => j.status !== 'done' && j.status !== 'failed');
+                    for (const j of active) {
+                        const pct = (j.progress === undefined || j.progress === null) ? '' : ` — ${j.progress}%`;
+                        const stg = j.stage ? ` (${escapeHtml(String(j.stage))})` : '';
+                        html += `<br>Part ${j.clip}: ${escapeHtml(j.status)}${stg}${pct}`;
+                    }
                     if (failed.length) {
                         html += `<br>Exceptions only: ${failed.map(j => `Part ${j.clip}: ${escapeHtml(j.error || 'failed')}`).join('; ')}`;
                     } else if (data.finished) {

@@ -1831,6 +1831,66 @@ def generate_or_load_storyboard_data(project_id: str, clip_num, force_regen: boo
     return storyboard_obj
 
 
+_H2_MANIM_JOBS = {}
+_H2_MANIM_JOB_LOCK = threading.Lock()
+_H2_MANIM_JOB_SEQ = [0]
+_H2_RENDER_PROGRESS = {}
+
+
+def _h2_prog(project_id, clip_num, pct, stage):
+    """Render-pipeline telemetry: shared progress map + server-log line."""
+    _H2_RENDER_PROGRESS[(str(project_id), str(clip_num))] = (pct, stage)
+    print("[manim-job] %s clip %s: %d%% %s"
+          % (project_id, clip_num, pct, stage), flush=True)
+
+
+def _h2_manim_job_new(project_id, clip_num):
+    with _H2_MANIM_JOB_LOCK:
+        _H2_MANIM_JOB_SEQ[0] += 1
+        job_id = "manim-%s-%s-%d" % (project_id, clip_num, _H2_MANIM_JOB_SEQ[0])
+        _H2_MANIM_JOBS[job_id] = {"job_id": job_id, "project_id": str(project_id),
+                                  "clip_num": str(clip_num), "state": "running",
+                                  "progress": 0, "stage": "queued",
+                                  "detail": None, "error": None}
+        while len(_H2_MANIM_JOBS) > 100:
+            _H2_MANIM_JOBS.pop(next(iter(_H2_MANIM_JOBS)))
+    return job_id
+
+
+def _h2_manim_job_set(job_id, **kw):
+    with _H2_MANIM_JOB_LOCK:
+        job = _H2_MANIM_JOBS.get(job_id)
+        if job is not None:
+            job.update(kw)
+
+
+def _h2_manim_job_get(job_id):
+    with _H2_MANIM_JOB_LOCK:
+        job = _H2_MANIM_JOBS.get(job_id)
+        return dict(job) if job else None
+
+
+def _h2_manim_async_run(job_id, url, body):
+    """Background thread for an accepted async design: replay the sync
+    request against this same server (threaded server: no deadlock) and
+    record the outcome on the job. Never raises out of the thread."""
+    import urllib.request as _urlreq
+    try:
+        req = _urlreq.Request(url, data=body,
+                              headers={"Content-Type": "application/json"},
+                              method="POST")
+        with _urlreq.urlopen(req, timeout=1800) as r:
+            detail = json.loads(r.read().decode("utf-8"))
+        if isinstance(detail, dict) and detail.get("success") is False:
+            raise RuntimeError(str(detail.get("error", "curator refused"))[:500])
+        _h2_manim_job_set(job_id, state="done", progress=100,
+                            stage="done", detail=detail, error=None)
+    except Exception as e:
+        _h2_manim_job_set(job_id, state="failed", error=str(e)[:500])
+
+
+
+
 class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -5204,6 +5264,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                 project_id = query.get('id', [None])[0]
                 clip_num = query.get('num', [None])[0]
                 force_regen = query.get('force', ['false'])[0].lower() in ('true', '1')
+                wants_async = query.get('async', ['false'])[0].lower() in ('true', '1')
 
                 content_len = int(self.headers.get('Content-Length', 0))
                 req_body = {}
@@ -5242,6 +5303,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 fresh_design = None
                 fresh_reports = []
+                rev1 = None
                 _h2_ep_num = str(project_id).replace('episode_', '')
                 if force_regen:
                     import manim_fresh_design as _fresh
@@ -5284,6 +5346,11 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         clip_num=clip_num,
                         directive=custom_directive or None)
                     fresh_design = _art['design']
+                    _tex_norm = (fresh_design or {}).get("equation_norm")
+                    if _tex_norm:
+                        _tex_idx = _fresh.match_tex_for_norm(_tex_norm)
+                        if _tex_idx is not None:
+                            fresh_design["equation_tex"] = _fresh.EPISODE_TEX_SOURCES[_tex_idx]
                     _stages = _art['stages']
                     for _st in _stages:
                         _st.setdefault('labels', [_title.upper()[:24]])
@@ -5307,7 +5374,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                     if _tc0 is None:
                         raise Exception('Clip ' + str(clip_num) + ' not found in ' + _plan_path0)
                     _tc0['infographic_scenes'] = _stages
-                    save_plan(project_id, _plan0)
+                    rev1 = save_plan(project_id, _plan0)
                     with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh0:
                         json.dump(storyboard, _fh0, indent=2)
                 else:
@@ -5316,6 +5383,35 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         force_regen=force_regen,
                         custom_directive=custom_directive,
                     )
+                if fresh_design is not None and wants_async:
+                    scenes_a = (storyboard.get("scenes") or storyboard.get("stages") or [])
+                    if not scenes_a:
+                        raise Exception("Zero scenes produced (storyboard returned 0 scenes)")
+                    plan_path_a = os.path.join("projects", project_id, "plan.json")
+                    if not os.path.exists(plan_path_a):
+                        raise Exception(f"Project plan missing at {plan_path_a} (root plan.json is never used here)")
+                    with open(plan_path_a, "r", encoding="utf-8") as pf_a:
+                        plan_data_a = json.load(pf_a)
+                    t_clip_a = next((c for c in plan_data_a if str(c.get("num")) == str(clip_num)), None)
+                    if not t_clip_a:
+                        raise Exception(f"Clip {clip_num} not found in {plan_path_a}")
+                    job_id = _h2_manim_job_new(project_id, clip_num)
+                    _h2_prog(project_id, clip_num, 15, "designed")
+                    host = self.headers.get("Host", "127.0.0.1:8000")
+                    sync_url = f"http://{host}/generate-manim-infographic?id={project_id}&num={clip_num}"
+                    sync_body = json.dumps({k: v for k, v in req_body.items() if k != "async"}).encode("utf-8")
+                    th = threading.Thread(target=_h2_manim_async_run, args=(job_id, sync_url, sync_body), daemon=True)
+                    th.start()
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "success": True, "accepted": True, "job_id": job_id,
+                        "clip_num": int(clip_num), "project_id": project_id,
+                        "design": fresh_design, "reports": fresh_reports,
+                    }).encode('utf-8'))
+                    return
                 scenes = (req_body.get('scenes') or storyboard.get('scenes') or storyboard.get('stages') or [])
                 if not scenes:
                     raise Exception('Zero scenes produced (storyboard returned 0 scenes)')
@@ -5346,6 +5442,7 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         raise Exception(f"Could not locate or slice clip MP3 for Clip {clip_num}")
                 mp3_matches.sort(key=os.path.getmtime, reverse=True)
                 clip_mp3 = mp3_matches[0]
+                _h2_prog(project_id, clip_num, 18, "audio")
 
                 body_dur = 0.0
                 try:
@@ -5374,26 +5471,56 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
                         storyboard["total_duration"] = round(body_dur, 2)
                         with open(get_storyboard_filepath(project_id, clip_num), "w", encoding="utf-8") as _fh1:
                             json.dump(storyboard, _fh1, indent=2)
+                _h2_prog(project_id, clip_num, 20, "timing")
 
                 infographic_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-infographic.mp4")
-                _manim_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur)
+                import tempfile as _tf
+                import manim_fresh_design as _fresh_tex
+                tex_tmp = _tf.mkdtemp(prefix="texrows_%s_%s_" % (ep_num, clip_num))
+                try:
+                    _tex_design = storyboard.get("design") or {}
+                    for _st in scenes:
+                        if str(_st.get("kind")).lower() != "formula":
+                            continue
+                        _tex = _tex_design.get("equation_tex")
+                        if not _tex:
+                            raise RuntimeError("REFUSAL: clip %s formula stage has no equation_tex; will not render as math" % (clip_num,))
+                        _st["_render_svg_rows"] = _fresh_tex.render_tex_rows_svg(_tex, tex_tmp, "clip%s" % (clip_num,))
+                finally:
+                    shutil.rmtree(tex_tmp, ignore_errors=True)
+                _h2_prog(project_id, clip_num, 22, "tex")
+                _n_sc = len(scenes)
+                def _on_scene(_i, _n, _pid=project_id, _cn=clip_num, _t=_n_sc):
+                    _h2_prog(_pid, _cn, 25 + int(50 * _i / max(1, _t)), "render scene %d/%d" % (_i, _t))
+                _h2_prog(project_id, clip_num, 25, "render scene 1/%d" % _n_sc)
+                _t_render = time.time()
+                _manim_engine.render_manim_infographic_mp4(scenes, clip_mp3, infographic_mp4, duration=body_dur, on_scene=_on_scene)
+                print("[manim-job] %s clip %s: render phase %.1fs" % (project_id, clip_num, time.time() - _t_render), flush=True)
 
                 if not os.path.exists(infographic_mp4) or os.path.getsize(infographic_mp4) <= 0:
                     raise Exception(f"Manim render produced no video at {infographic_mp4}")
+                _h2_prog(project_id, clip_num, 80, "stitched")
 
                 t_clip["audio_duration"] = round(body_dur, 2)
                 t_clip["infographic_ready"] = True
-                with open(plan_path, "w", encoding="utf-8") as pf_w:
-                    json.dump(plan_data, pf_w, indent=4)
+                _h2_prog(project_id, clip_num, 88, "save")
+                save_plan(project_id, plan_data, expected_rev=rev1)
 
                 cmd_comp = [sys.executable, "ddma.py", "compile-clip", "--num", str(clip_num), "--plan-file", plan_path, "--source", "manim"]
-                proc = subprocess.run(cmd_comp, capture_output=True, text=True, cwd=".")
+                _h2_prog(project_id, clip_num, 90, "compile")
+                _t_comp = time.time()
+                try:
+                    proc = subprocess.run(cmd_comp, capture_output=True, text=True, cwd=".", timeout=1200)
+                except subprocess.TimeoutExpired:
+                    raise Exception("compile-clip stalled (>1200s): fail-fast")
+                print("[manim-job] %s clip %s: compile phase %.1fs" % (project_id, clip_num, time.time() - _t_comp), flush=True)
                 if proc.returncode != 0:
                     raise Exception(f"compile-clip --source manim failed: {proc.stderr}")
 
                 final_mp4 = os.path.join("clips", f"{ep_num}-{clip_num}-manim.mp4")
                 if not os.path.exists(final_mp4) or os.path.getsize(final_mp4) <= 0:
                     raise Exception(f"Compiled manim master missing at {final_mp4}")
+                _h2_prog(project_id, clip_num, 100, "done")
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -5449,6 +5576,28 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps(projects_list).encode('utf-8'))
             return
             
+        elif parsed_url.path == '/generate-manim-status':
+            job_id = params.get('job', [None])[0]
+            try:
+                job = _h2_manim_job_get(job_id)
+                if not job:
+                    raise Exception(f"unknown manim job {job_id}")
+                live = _H2_RENDER_PROGRESS.get((str(job["project_id"]), str(job["clip_num"])))
+                if live and job.get("state") == "running" and live[0] > int(job.get("progress") or 0):
+                    job = dict(job, progress=live[0], stage=live[1])
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, **job}).encode('utf-8'))
+            except Exception as e:
+                self.send_response(404)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode('utf-8'))
+            return
+
         elif parsed_url.path == '/get-project-audio':
             project_id = params.get('id', [None])[0]
             try:

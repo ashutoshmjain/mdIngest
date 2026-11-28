@@ -711,6 +711,7 @@ def render_manim_infographic_mp4(
     duration: Optional[float] = None,
     fps: int = 30,
     episode_num: Optional[str] = None,
+    on_scene=None,
 ) -> str:
     """
     Compile full Manim educational script, render 740x740 pure white-on-black MP4 scenes, and mux audio.
@@ -778,7 +779,13 @@ def render_manim_infographic_mp4(
             python_script_path,
             cls_name
         ]
-        res = subprocess.run(cmd_manim, capture_output=True, text=True)
+        try:
+            res = subprocess.run(cmd_manim, capture_output=True,
+                                 text=True, timeout=600)
+        except subprocess.TimeoutExpired:
+            raise Exception(
+                f"Manim render stalled (>600s) on {cls_name}: "
+                f"fail-fast, never an invisible hang")
         if res.returncode != 0:
             print(f"[Manim Engine] Warning rendering {cls_name}: {res.stderr}")
         
@@ -787,6 +794,11 @@ def render_manim_infographic_mp4(
         matches = glob.glob(os.path.join(temp_dir, "videos", "**", f"scene_{idx + 1:02d}.mp4"), recursive=True)
         if matches and os.path.exists(matches[0]):
             rendered_clips.append(matches[0])
+            if on_scene is not None:
+                try:
+                    on_scene(idx + 1, len(scene_classes))
+                except Exception:
+                    pass
         else:
             print(f"[Manim Engine] Could not locate rendered output for {cls_name}")
 
@@ -809,7 +821,8 @@ def render_manim_infographic_mp4(
         "-c", "copy",
         tmp_concat_mp4
     ]
-    subprocess.run(cmd_stitch, capture_output=True, text=True)
+    subprocess.run(cmd_stitch, capture_output=True, text=True,
+                       timeout=120)
 
     # Final Mux with Audio Track
     cmd_mux = [
@@ -828,7 +841,8 @@ def render_manim_infographic_mp4(
         "-movflags", "+faststart",
         out_mp4_path
     ]
-    proc_mux = subprocess.run(cmd_mux, capture_output=True, text=True)
+    proc_mux = subprocess.run(cmd_mux, capture_output=True, text=True,
+                              timeout=300)
     if proc_mux.returncode != 0:
         raise Exception(f"Final audio mux failed: {proc_mux.stderr}")
 
