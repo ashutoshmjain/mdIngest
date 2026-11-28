@@ -428,6 +428,28 @@ def find_clip_media(clean_id, clip_num):
     return None
 
 
+def find_manim_clip_media(clean_id, clip_num):
+    """Manim-only lookup for the Manim panel video player.
+
+    Resolves ONLY *-manim.mp4 and *-infographic.mp4 (hub first, then local)
+    and NEVER falls back to Mosaic or plain compiled shorts.
+    """
+    c = int(clip_num)
+    candidates = [
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-manim.mp4",
+        DD_HUB_ROOT / "episodes" / clean_id / f"{clean_id}-{c}-infographic.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}-manim.mp4",
+        DDMA_DIR / "clips" / f"{clean_id}-{c}-infographic.mp4",
+    ]
+    for p in candidates:
+        try:
+            if p.exists() and p.stat().st_size > 0:
+                return p
+        except Exception:
+            pass
+    return None
+
+
 def clean_ep(raw, default="248"):
     return str(raw or default).replace(".md", "").lstrip("_") or default
 
@@ -576,7 +598,9 @@ class BeatsHandler(http.server.BaseHTTPRequestHandler):
             except ValueError:
                 self.send_error(400, "bad clip_num")
                 return
-            clip_p = find_clip_media(ep, clip_num)
+            source = str(params.get("source", [""])[0] or "").strip().lower()
+            clip_p = (find_manim_clip_media(ep, clip_num)
+                      if source == "manim" else find_clip_media(ep, clip_num))
             if clip_p:
                 self.serve_media_file(clip_p)
             else:

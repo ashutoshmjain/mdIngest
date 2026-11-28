@@ -517,17 +517,8 @@ a { color: var(--accent-indigo); }
                 hasManim = false;
             }
             if (hasManim) {
-                const mediaSrc = '/api/beats/clip_media?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum + (artMtime != null ? ('&t=' + Math.floor(artMtime)) : '');
+                const mediaSrc = '/api/beats/clip_media?ep=' + encodeURIComponent(ep) + '&clip_num=' + cNum + '&source=manim' + (artMtime != null ? ('&t=' + Math.floor(artMtime)) : '');
                 previewVideoHtml = '<div style="margin-top:6px;margin-bottom:10px;"><video id="lf-manim-infographic-video" src="' + escapeHtml(mediaSrc) + '" controls preload="metadata" style="max-width:360px;width:100%;max-height:240px;background:#000;border-radius:6px;border:1px solid var(--border-color);display:block;"></video></div>';
-                if (!lfTimelineIndex || !lfTimelineIndex.has_video) {
-                    const topVideoEl = document.getElementById('lf-studio-video-player');
-                    if (topVideoEl && artMtime != null) {
-                        const curAttr = topVideoEl.getAttribute('src') || '';
-                        if (curAttr.indexOf('/api/beats/clip_media') !== -1 && curAttr !== mediaSrc) {
-                            topVideoEl.src = mediaSrc;
-                        }
-                    }
-                }
             }
             const statusLine = hasManim
                 ? ('Manim ready' + (stageNote ? ' - ' + stageNote : '') + ' - ' + escapeHtml(ep + '-' + cNum + '-manim.mp4'))

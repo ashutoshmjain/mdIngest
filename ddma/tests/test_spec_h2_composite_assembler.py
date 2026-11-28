@@ -364,7 +364,44 @@ eval(panelFn);
         self.assertIn("lf-manim-stages-list", html)
         self.assertIn("Stage 1 (", html)
         self.assertIn("lf-manim-infographic-video", html)
+        self.assertIn("source=manim", html)
         self.assertNotIn("disabled>⚡ Patch", html)
+
+    def test_manim_only_clip_media_ignores_hub_mosaic_short(self):
+        import tempfile
+        import beats_server as BS
+        with tempfile.TemporaryDirectory() as td:
+            old_hub = BS.DD_HUB_ROOT
+            old_ddma = BS.DDMA_DIR
+            try:
+                hub_dir = Path(td) / "hub"
+                ddma_dir = Path(td) / "ddma"
+                hub_ep = hub_dir / "episodes" / "250"
+                local_clips = ddma_dir / "clips"
+                hub_ep.mkdir(parents=True, exist_ok=True)
+                local_clips.mkdir(parents=True, exist_ok=True)
+                BS.DD_HUB_ROOT = hub_dir
+                BS.DDMA_DIR = ddma_dir
+                # Hub holds the compiled Mosaic short (candidate 4 in find_clip_media)
+                mosaic_short = hub_ep / "250-1.mp4"
+                mosaic_short.write_bytes(b"mosaic-short-140s")
+                # When no Manim files exist, Manim-only lookup returns None (404),
+                # never falling back to the hub Mosaic short; general lookup returns mosaic_short.
+                self.assertIsNone(BS.find_manim_clip_media("250", 1))
+                self.assertEqual(BS.find_clip_media("250", 1), mosaic_short)
+                # When local 250-1-manim.mp4 exists, Manim-only lookup returns it
+                # instead of being shadowed by hub 250-1.mp4.
+                local_manim = local_clips / "250-1-manim.mp4"
+                local_infographic = local_clips / "250-1-infographic.mp4"
+                local_infographic.write_bytes(b"manim-infographic-134s")
+                self.assertEqual(BS.find_manim_clip_media("250", 1), local_infographic)
+                local_manim.write_bytes(b"manim-compiled-134s")
+                self.assertEqual(BS.find_manim_clip_media("250", 1), local_manim)
+                # Top-player general lookup remains unchanged (hub 250-1.mp4 still candidate 4).
+                self.assertEqual(BS.find_clip_media("250", 1), mosaic_short)
+            finally:
+                BS.DD_HUB_ROOT = old_hub
+                BS.DDMA_DIR = old_ddma
 
 
 if __name__ == "__main__":
